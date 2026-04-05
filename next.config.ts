@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Disable Turbopack for builds (OneDrive conflict on Windows)
+  experimental: {},
 };
 
 export default nextConfig;

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui/Toast";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   weight: ["300", "400", "500", "600", "700"],
@@ -35,7 +37,10 @@ export default function RootLayout({
   return (
     <html lang="th" className={`${ibmPlexSansThai.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-[family-name:var(--font-thai)]">
-        {children}
+        <ToastProvider>
+          {children}
+          <PWAInstallPrompt />
+        </ToastProvider>
       </body>
     </html>
   );

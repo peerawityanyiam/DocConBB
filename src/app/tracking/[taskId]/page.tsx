@@ -1,17 +1,21 @@
 import { redirect } from 'next/navigation';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser } from '@/lib/auth/guards';
-import TrackingDashboard from './components/TrackingDashboard';
+import TaskDetailPage from './TaskDetailPage';
 
 export const dynamic = 'force-dynamic';
 
-export default async function TrackingPage() {
+export default async function TrackingTaskPage({
+  params,
+}: {
+  params: Promise<{ taskId: string }>;
+}) {
   const user = await getAuthUser('tracking');
   if (!user) redirect('/login');
 
+  const { taskId } = await params;
   const admin = await createServiceRoleClient();
 
-  // หา DB user id จาก email
   const { data: dbUser } = await admin
     .from('users')
     .select('id')
@@ -21,10 +25,10 @@ export default async function TrackingPage() {
   if (!dbUser) redirect('/login');
 
   return (
-    <TrackingDashboard
+    <TaskDetailPage
+      taskId={taskId}
       userRoles={user.roles}
       userId={dbUser.id}
-      userEmail={user.email}
     />
   );
 }
