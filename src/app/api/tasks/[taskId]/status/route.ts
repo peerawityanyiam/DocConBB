@@ -82,15 +82,26 @@ export async function PATCH(
         if (task.officer_id !== dbUser.id) throw new AuthError('ไม่ใช่ผู้รับผิดชอบงานนี้', 403);
         const submitFrom: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
         if (!submitFrom.includes(task.status)) throw new AuthError('ไม่สามารถส่งงานได้ในสถานะนี้', 400);
-        newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
+        // ตาม reference: SBOSS_REJ→WAIT_SBOSS, BOSS_REJ→WAIT_BOSS (ข้าม DocCon/Reviewer)
+        if (task.status === 'SUPER_BOSS_REJECTED') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
+        else if (task.status === 'BOSS_REJECTED') newStatus = 'WAITING_BOSS_APPROVAL';
+        else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
         break;
       }
       case 'doccon_approve': {
         if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "ส่งตรวจรูปแบบ"', 400);
-        // ตรวจสอบว่าถูกส่งกลับโดยใคร
-        const lastEntry = (task.status_history as Array<{note?: string}>)?.at(-1);
-        if (lastEntry?.note === 'sentBackBy:BOSS') newStatus = 'WAITING_BOSS_APPROVAL';
-        else if (lastEntry?.note === 'sentBackBy:SUPER_BOSS') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
+        // ค้นย้อนหลังใน status_history หา note sentBackToDocconBy:*
+        const history = (task.status_history as Array<{status?: string; note?: string}>) ?? [];
+        let sentBackBy = '';
+        for (let i = history.length - 1; i >= 0; i--) {
+          const h = history[i];
+          if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) {
+            sentBackBy = h.note;
+            break;
+          }
+        }
+        if (sentBackBy.includes('SUPER_BOSS')) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
+        else if (sentBackBy.includes('BOSS')) newStatus = 'WAITING_BOSS_APPROVAL';
         else newStatus = 'PENDING_REVIEW';
         updates.doccon_checked = true;
         if (doc_ref) updates.doc_ref = doc_ref;
@@ -155,8 +166,10 @@ export async function PATCH(
       case 'cancel': {
         if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สร้างงานนี้', 403);
         if (['COMPLETED', 'CANCELLED'].includes(task.status)) throw new AuthError('ไม่สามารถยกเลิกงานที่เสร็จแล้วได้', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการยกเลิก', 400);
         newStatus = 'CANCELLED';
         updates.is_archived = true;
+        updates.completed_at = now;
         break;
       }
       default:
@@ -165,8 +178,8 @@ export async function PATCH(
 
     // ─── สร้าง history entry ────────────────────────────────────────────
     const noteMap: Partial<Record<StatusAction, string>> = {
-      boss_send_to_doccon: 'sentBackBy:BOSS',
-      super_boss_send_to_doccon: 'sentBackBy:SUPER_BOSS',
+      boss_send_to_doccon: 'sentBackToDocconBy:BOSS',
+      super_boss_send_to_doccon: 'sentBackToDocconBy:SUPER_BOSS',
     };
 
     const statusEntry = {

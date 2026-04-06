@@ -24,12 +24,14 @@ export function calcNextStatus(
   currentStatus: string,
   docconChecked: boolean
 ): string {
+  // ตาม reference: SBOSS_REJ→WAIT_SBOSS, BOSS_REJ→WAIT_BOSS (ข้าม DocCon/Reviewer)
+  if (currentStatus === 'SUPER_BOSS_REJECTED') return 'WAITING_SUPER_BOSS_APPROVAL';
+  if (currentStatus === 'BOSS_REJECTED') return 'WAITING_BOSS_APPROVAL';
+
   const resubmitStatuses = [
     'ASSIGNED',
     'DOCCON_REJECTED',
     'REVIEWER_REJECTED',
-    'BOSS_REJECTED',
-    'SUPER_BOSS_REJECTED',
   ];
 
   if (resubmitStatuses.includes(currentStatus)) {

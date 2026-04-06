@@ -26,6 +26,7 @@ interface StandardCardProps {
   standard: Standard;
   userRoles: AppRole[];
   onUpload: (standard: Standard) => void;
+  onRename: (standard: Standard) => void;
   onSettings: (standard: Standard) => void;
   onDelete: (standard: Standard) => void;
   onTogglePin: (standard: Standard) => void;
@@ -42,7 +43,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-export default function StandardCard({ standard, userRoles, onUpload, onSettings, onDelete, onTogglePin }: StandardCardProps) {
+export default function StandardCard({ standard, userRoles, onUpload, onRename, onSettings, onDelete, onTogglePin }: StandardCardProps) {
   const docStatus = calculateDocStatus(
     standard.start_date ?? null,
     standard.end_date ?? null,
@@ -111,6 +112,10 @@ export default function StandardCard({ standard, userRoles, onUpload, onSettings
                 className="px-3 py-1.5 text-xs font-medium bg-yellow-50 text-yellow-700 hover:bg-yellow-100 rounded-lg transition-colors"
                 title={standard.pinned ? 'เลิกปักหมุด' : 'ปักหมุด'}>
                 {standard.pinned ? '📌 เลิกปักหมุด' : '📌 ปักหมุด'}
+              </button>
+              <button onClick={() => onRename(standard)}
+                className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg transition-colors">
+                ✏️ เปลี่ยนชื่อ
               </button>
               <button onClick={() => onSettings(standard)}
                 className="px-3 py-1.5 text-xs font-medium bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">

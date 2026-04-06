@@ -43,6 +43,31 @@ export async function GET(request: NextRequest) {
       case 'SUPER_BOSS':
         query = query.eq('status', 'WAITING_SUPER_BOSS_APPROVAL');
         break;
+      case 'completed': {
+        // ดึงงานที่เสร็จ/ยกเลิก — กรองตาม role ของผู้ใช้
+        const { data: userRoleRows } = await admin
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', dbUser.id);
+        const userRolesSet = new Set((userRoleRows ?? []).map(r => r.role));
+
+        let completedQuery = admin
+          .from('tasks')
+          .select('id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by')
+          .in('status', ['COMPLETED', 'CANCELLED'])
+          .order('updated_at', { ascending: false })
+          .limit(100);
+
+        // DOCCON/SUPER_ADMIN เห็นทั้งหมด, คนอื่นเห็นเฉพาะที่เกี่ยวข้อง
+        if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_ADMIN')) {
+          completedQuery = completedQuery.or(
+            `officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`
+          );
+        }
+
+        query = completedQuery;
+        break;
+      }
       default:
         // ไม่ระบุ role → เห็นที่เกี่ยวข้องทั้งหมด
         query = query.or(`officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`);

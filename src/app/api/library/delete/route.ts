@@ -10,8 +10,9 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     requireRole(user, ['DOCCON', 'SUPER_ADMIN']);
 
-    const { id } = await request.json();
+    const { id, reason } = await request.json();
     if (!id) return NextResponse.json({ error: 'ไม่ระบุ id' }, { status: 400 });
+    if (!reason?.trim()) return NextResponse.json({ error: 'กรุณาระบุเหตุผลในการลบ' }, { status: 400 });
 
     const admin = await createServiceRoleClient();
 
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
         deleted_by: dbUser.id,
         doc_name: standard.name,
         drive_file_id: standard.drive_file_id ?? null,
-        reason: 'ลบจาก Admin Panel',
+        reason: reason.trim(),
       });
     }
 

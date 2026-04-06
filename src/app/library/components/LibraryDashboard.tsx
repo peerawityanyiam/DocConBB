@@ -13,29 +13,39 @@ interface LibraryDashboardProps {
 }
 
 type FilterStatus = 'all' | 'open' | 'expired' | 'locked';
+type SortValue = 'name_asc' | 'name_desc' | 'status' | 'close_date';
 
 export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashboardProps) {
   const [standards, setStandards] = useState<Standard[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterStatus>('all');
+  const [sort, setSort] = useState<SortValue>('name_asc');
   const [settingsTarget, setSettingsTarget] = useState<Standard | null>(null);
   const [settingsMode, setSettingsMode] = useState<'create' | 'edit'>('create');
   const [uploadTarget, setUploadTarget] = useState<Standard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Standard | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [renameTarget, setRenameTarget] = useState<Standard | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [addLinkOpen, setAddLinkOpen] = useState(false);
+  const [linkName, setLinkName] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [addLinkLoading, setAddLinkLoading] = useState(false);
 
   const isDoccon = userRoles.includes('DOCCON') || userRoles.includes('SUPER_ADMIN');
 
   const fetchStandards = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/library');
+      const res = await fetch(`/api/library?sort=${sort}`);
       if (res.ok) setStandards(await res.json());
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sort]);
 
   useEffect(() => { fetchStandards(); }, [fetchStandards]);
 
@@ -49,17 +59,47 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !deleteReason.trim()) return;
     setDeleteLoading(true);
     try {
       const res = await fetch('/api/library/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deleteTarget.id }),
+        body: JSON.stringify({ id: deleteTarget.id, reason: deleteReason.trim() }),
       });
-      if (res.ok) { setDeleteTarget(null); fetchStandards(); }
+      if (res.ok) { setDeleteTarget(null); setDeleteReason(''); fetchStandards(); }
     } finally {
       setDeleteLoading(false);
+    }
+  }
+
+  async function handleRename() {
+    if (!renameTarget || !renameName.trim()) return;
+    setRenameLoading(true);
+    try {
+      const res = await fetch('/api/library/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: renameTarget.id, newName: renameName.trim() }),
+      });
+      if (res.ok) { setRenameTarget(null); setRenameName(''); fetchStandards(); }
+    } finally {
+      setRenameLoading(false);
+    }
+  }
+
+  async function handleAddLink() {
+    if (!linkName.trim() || !linkUrl.trim()) return;
+    setAddLinkLoading(true);
+    try {
+      const res = await fetch('/api/library/add-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: linkName.trim(), url: linkUrl.trim() }),
+      });
+      if (res.ok) { setAddLinkOpen(false); setLinkName(''); setLinkUrl(''); fetchStandards(); }
+    } finally {
+      setAddLinkLoading(false);
     }
   }
 
@@ -96,11 +136,18 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
           <p className="text-sm text-slate-500 mt-0.5">{userEmail}</p>
         </div>
         {isDoccon && (
-          <button onClick={() => { setSettingsMode('create'); setSettingsTarget({} as Standard); }}
-            className="flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-semibold text-sm rounded-lg transition-colors shadow-sm">
-            <span>+</span>
-            เพิ่มเอกสารใหม่
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { setSettingsMode('create'); setSettingsTarget({} as Standard); }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
+              <span>+</span>
+              สร้างไฟล์มาตรฐานใหม่
+            </button>
+            <button onClick={() => setAddLinkOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
+              <span>🔗</span>
+              เพิ่มลิงก์
+            </button>
+          </div>
         )}
       </div>
 
@@ -121,6 +168,13 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
           <option value="open">🟢 เปิดรับ</option>
           <option value="locked">🔒 ล็อค</option>
           <option value="expired">⛔ หมดเวลา</option>
+        </select>
+        <select value={sort} onChange={e => setSort(e.target.value as SortValue)}
+          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400">
+          <option value="name_asc">ตามชื่อ (ก-ฮ)</option>
+          <option value="name_desc">ตามชื่อ (ฮ-ก)</option>
+          <option value="status">ตามสถานะ</option>
+          <option value="close_date">ตามวันปิด</option>
         </select>
       </div>
 
@@ -152,8 +206,9 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
                 standard={s}
                 userRoles={userRoles}
                 onUpload={setUploadTarget}
+                onRename={std => { setRenameTarget(std); setRenameName(std.name); }}
                 onSettings={std => { setSettingsMode('edit'); setSettingsTarget(std); }}
-                onDelete={setDeleteTarget}
+                onDelete={std => { setDeleteTarget(std); setDeleteReason(''); }}
                 onTogglePin={handleTogglePin}
               />
             ))}
@@ -183,18 +238,95 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
             <p className="text-2xl text-center mb-3">🗑️</p>
             <h3 className="text-base font-semibold text-slate-800 text-center mb-2">ยืนยันการลบ</h3>
-            <p className="text-sm text-slate-600 text-center mb-4">
-              ลบ &ldquo;<strong>{deleteTarget.name}</strong>&rdquo; ?<br />
-              <span className="text-xs text-red-500">ไฟล์ใน Google Drive จะถูก trash ด้วย</span>
+            <p className="text-sm text-slate-600 text-center mb-2">
+              ลบ &ldquo;<strong>{deleteTarget.name}</strong>&rdquo; ?
             </p>
+            <p className="text-xs text-red-500 text-center mb-4">ไฟล์ใน Google Drive จะถูก trash ด้วย</p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">เหตุผลในการลบ <span className="text-red-500">*</span></label>
+              <textarea
+                value={deleteReason}
+                onChange={e => setDeleteReason(e.target.value)}
+                placeholder="ระบุเหตุผลในการลบ..."
+                rows={3}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+              />
+            </div>
             <div className="flex gap-3 justify-center">
-              <button onClick={() => setDeleteTarget(null)}
+              <button onClick={() => { setDeleteTarget(null); setDeleteReason(''); }}
                 className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
                 ยกเลิก
               </button>
-              <button onClick={handleDelete} disabled={deleteLoading}
+              <button onClick={handleDelete} disabled={deleteLoading || !deleteReason.trim()}
                 className="px-5 py-2 text-sm bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg disabled:opacity-50">
                 {deleteLoading ? 'กำลังลบ...' : 'ลบ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename modal */}
+      {renameTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-base font-semibold text-slate-800 text-center mb-4">✏️ เปลี่ยนชื่อเอกสาร</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อใหม่</label>
+              <input
+                type="text"
+                value={renameName}
+                onChange={e => setRenameName(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => { setRenameTarget(null); setRenameName(''); }}
+                className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
+                ยกเลิก
+              </button>
+              <button onClick={handleRename} disabled={renameLoading || !renameName.trim()}
+                className="px-5 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-50">
+                {renameLoading ? 'กำลังบันทึก...' : 'บันทึก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add link modal */}
+      {addLinkOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-base font-semibold text-slate-800 text-center mb-4">🔗 เพิ่มลิงก์</h3>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อลิงก์ <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={linkName}
+                onChange={e => setLinkName(e.target.value)}
+                placeholder="ชื่อลิงก์"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">URL <span className="text-red-500">*</span></label>
+              <input
+                type="url"
+                value={linkUrl}
+                onChange={e => setLinkUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => { setAddLinkOpen(false); setLinkName(''); setLinkUrl(''); }}
+                className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
+                ยกเลิก
+              </button>
+              <button onClick={handleAddLink} disabled={addLinkLoading || !linkName.trim() || !linkUrl.trim()}
+                className="px-5 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-50">
+                {addLinkLoading ? 'กำลังเพิ่ม...' : 'เพิ่มลิงก์'}
               </button>
             </div>
           </div>

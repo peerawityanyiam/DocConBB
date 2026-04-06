@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/client';
 import TaskCard, { type Task } from './TaskCard';
 import CreateTaskModal from './CreateTaskModal';
 import TaskDetailModal from './TaskDetailModal';
+import DashboardModal from './DashboardModal';
+import RegistryModal from './RegistryModal';
+import SummaryReportModal from './SummaryReportModal';
 import type { AppRole } from '@/lib/auth/guards';
 
 interface TrackingDashboardProps {
@@ -12,6 +15,8 @@ interface TrackingDashboardProps {
   userId: string;
   userEmail: string;
 }
+
+type TabKey = AppRole | 'completed';
 
 const ROLE_TABS: { role: AppRole; label: string }[] = [
   { role: 'STAFF', label: 'งานของฉัน' },
@@ -21,28 +26,66 @@ const ROLE_TABS: { role: AppRole; label: string }[] = [
   { role: 'SUPER_BOSS', label: 'รออนุมัติ' },
 ];
 
+type QuickFilter = 'all' | 'pending' | 'rejected';
+
+const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
+  { key: 'all', label: 'ทั้งหมด' },
+  { key: 'pending', label: 'รอดำเนินการ' },
+  { key: 'rejected', label: 'ตีกลับ' },
+];
+
 export default function TrackingDashboard({ userRoles, userId, userEmail }: TrackingDashboardProps) {
   // Pick first available tab by priority
   const availableTabs = ROLE_TABS.filter(t => userRoles.includes(t.role));
-  const [activeRole, setActiveRole] = useState<AppRole | null>(availableTabs[0]?.role ?? null);
+  const [activeTab, setActiveTab] = useState<TabKey>(availableTabs[0]?.role ?? 'completed');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [showRegistry, setShowRegistry] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+
+  const isCompletedTab = activeTab === 'completed';
+
+  // Fetch task counts for badges
+  const fetchTabCounts = useCallback(async () => {
+    const counts: Record<string, number> = {};
+    await Promise.all(
+      [...availableTabs.map(t => t.role), 'completed' as const].map(async (role) => {
+        try {
+          const res = await fetch(`/api/tasks?role=${role}`);
+          if (res.ok) {
+            const data: Task[] = await res.json();
+            counts[role] = data.length;
+          }
+        } catch { /* ignore count fetch errors */ }
+      })
+    );
+    setTabCounts(counts);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRoles.join(',')]);
+
+  useEffect(() => { fetchTabCounts(); }, [fetchTabCounts]);
 
   const fetchTasks = useCallback(async () => {
-    if (!activeRole) return;
+    if (!activeTab) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/tasks?role=${activeRole}`);
+      const res = await fetch(`/api/tasks?role=${activeTab}`);
       if (res.ok) setTasks(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [activeRole]);
+  }, [activeTab]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
+  // Reset quick filter when switching tabs
+  useEffect(() => { setQuickFilter('all'); }, [activeTab]);
 
   // Realtime subscription
   useEffect(() => {
@@ -51,19 +94,35 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
       .channel('tasks-dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
         fetchTasks();
+        fetchTabCounts();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchTasks]);
+  }, [fetchTasks, fetchTabCounts]);
 
-  const filtered = tasks.filter(t =>
+  // Apply search filter
+  const searchFiltered = tasks.filter(t =>
     !search.trim()
     || t.title.toLowerCase().includes(search.toLowerCase())
     || t.task_code.toLowerCase().includes(search.toLowerCase())
     || (t.doc_ref ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
-  if (availableTabs.length === 0) {
+  // Apply quick filter (client-side, only for non-completed tabs)
+  const filtered = searchFiltered.filter(t => {
+    if (isCompletedTab || quickFilter === 'all') return true;
+    if (quickFilter === 'pending') {
+      const pendingStatuses = ['ASSIGNED', 'SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'];
+      return pendingStatuses.includes(t.status);
+    }
+    if (quickFilter === 'rejected') {
+      const rejectedStatuses = ['DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
+      return rejectedStatuses.includes(t.status);
+    }
+    return true;
+  });
+
+  if (availableTabs.length === 0 && userRoles.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
         <div className="bg-white rounded-2xl border border-slate-200 p-10">
@@ -84,27 +143,74 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
           <h1 className="text-xl font-bold text-slate-900">ระบบติดตามเอกสาร</h1>
           <p className="text-sm text-slate-500 mt-0.5">{userEmail}</p>
         </div>
-        {userRoles.includes('BOSS') && (
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-semibold text-sm rounded-lg transition-colors shadow-sm">
-            <span className="text-base leading-none">+</span>
-            สร้างงานใหม่
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {(userRoles.includes('BOSS') || userRoles.includes('DOCCON') || userRoles.includes('SUPER_BOSS')) && (
+            <button onClick={() => setShowDashboard(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-lg transition-colors shadow-sm">
+              📊 ภาพรวม
+            </button>
+          )}
+          {userRoles.includes('DOCCON') && (
+            <button onClick={() => setShowRegistry(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-lg transition-colors shadow-sm">
+              📄 ทะเบียนเอกสาร
+            </button>
+          )}
+          {(userRoles.includes('BOSS') || userRoles.includes('SUPER_BOSS')) && (
+            <button onClick={() => setShowReport(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-lg transition-colors shadow-sm">
+              📋 รายงานสรุป
+            </button>
+          )}
+          {userRoles.includes('BOSS') && (
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-semibold text-sm rounded-lg transition-colors shadow-sm">
+              <span className="text-base leading-none">+</span>
+              สร้างงานใหม่
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Role Tabs */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-5 overflow-x-auto">
         {availableTabs.map(t => (
-          <button key={t.role} onClick={() => setActiveRole(t.role)}
-            className={`flex-1 min-w-max px-4 py-2 text-sm rounded-lg font-medium transition-colors whitespace-nowrap ${
-              activeRole === t.role
+          <button key={t.role} onClick={() => setActiveTab(t.role)}
+            className={`flex-1 min-w-max px-4 py-2 text-sm rounded-lg font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 ${
+              activeTab === t.role
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
             }`}>
             {t.label}
+            {(tabCounts[t.role] ?? 0) > 0 && (
+              <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full ${
+                activeTab === t.role
+                  ? 'bg-yellow-400 text-slate-900'
+                  : 'bg-slate-300 text-slate-600'
+              }`}>
+                {tabCounts[t.role]}
+              </span>
+            )}
           </button>
         ))}
+        {/* Completed/Archive Tab - visible to all */}
+        <button onClick={() => setActiveTab('completed')}
+          className={`flex-1 min-w-max px-4 py-2 text-sm rounded-lg font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 ${
+            activeTab === 'completed'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}>
+          เสร็จแล้ว
+          {(tabCounts['completed'] ?? 0) > 0 && (
+            <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full ${
+              activeTab === 'completed'
+                ? 'bg-yellow-400 text-slate-900'
+                : 'bg-slate-300 text-slate-600'
+            }`}>
+              {tabCounts['completed']}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Search */}
@@ -121,6 +227,25 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
           <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
         )}
       </div>
+
+      {/* Quick Filter Chips (non-completed tabs only) */}
+      {!isCompletedTab && (
+        <div className="flex gap-2 mb-5">
+          {QUICK_FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setQuickFilter(f.key)}
+              className={`px-3 py-1 text-xs rounded-full font-medium transition-colors border ${
+                quickFilter === f.key
+                  ? 'bg-yellow-400 border-yellow-400 text-slate-900'
+                  : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Task Grid */}
       {loading ? (
@@ -163,6 +288,18 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         userId={userId}
         onClose={() => setSelectedTaskId(null)}
         onUpdated={fetchTasks}
+      />
+      <DashboardModal
+        open={showDashboard}
+        onClose={() => setShowDashboard(false)}
+      />
+      <RegistryModal
+        open={showRegistry}
+        onClose={() => setShowRegistry(false)}
+      />
+      <SummaryReportModal
+        open={showReport}
+        onClose={() => setShowReport(false)}
       />
     </div>
   );
