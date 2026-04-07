@@ -146,42 +146,45 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800">สร้างงานใหม่</h2>
-          <button onClick={() => { reset(); onClose(); }} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+      <div className="bg-white rounded-xl shadow-[0_12px_40px_rgba(13,27,46,0.13)] w-full max-w-lg border-none">
+        {/* Header - matches ref modal with accent bg */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#e2e8f0]" style={{ background: '#00c2a8', borderRadius: '12px 12px 0 0' }}>
+          <h2 className="text-[0.95rem] font-bold text-white flex items-center gap-2">
+            ＋ สร้างงานใหม่
+          </h2>
+          <button onClick={() => { reset(); onClose(); }} className="text-white/80 hover:text-white text-xl leading-none">&times;</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">ชื่องาน / เอกสาร <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">ชื่องาน <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="เช่น ขั้นตอนการรับผู้ป่วยใหม่"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              placeholder="ชื่องาน / ชื่อเอกสาร"
+              className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">รายละเอียด</label>
+            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">รายละเอียด</label>
             <textarea
               value={detail}
               onChange={e => setDetail(e.target.value)}
               rows={3}
-              placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none"
+              placeholder="รายละเอียดเพิ่มเติม"
+              className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8] resize-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">เจ้าหน้าที่ผู้รับงาน <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">เจ้าหน้าที่ผู้รับงาน <span className="text-red-500">*</span></label>
               <select
                 value={officerId}
                 onChange={e => setOfficerId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
               >
                 <option value="">-- เลือก --</option>
                 {users.filter(u => u.roles?.includes('STAFF')).map(u => (
@@ -190,11 +193,11 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">ผู้ตรวจสอบ <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">ผู้ตรวจสอบ <span className="text-red-500">*</span></label>
               <select
                 value={reviewerId}
                 onChange={e => setReviewerId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
               >
                 <option value="">-- เลือก --</option>
                 {users.filter(u => u.roles?.includes('REVIEWER')).map(u => (
@@ -204,9 +207,11 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             </div>
           </div>
 
-          {/* File attachment */}
+          {/* File attachment (matches ref upload zone) */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">แนบไฟล์</label>
+            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">
+              แนบไฟล์เอกสาร <span className="text-[#6b7f96] font-normal">(ไม่บังคับ)</span>
+            </label>
             <input
               ref={fileInputRef}
               type="file"
@@ -218,63 +223,56 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 flex items-center justify-center gap-2 text-sm text-slate-500 hover:border-yellow-400 hover:text-slate-700 transition-colors"
+                className="w-full border-2 border-dashed border-[#cbd5e1] rounded-xl px-4 py-5 flex flex-col items-center gap-2 text-sm text-[#94a3b8] hover:border-[#00c2a8] hover:bg-[#e0faf7] transition-all cursor-pointer"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-                แนบไฟล์ (ไม่บังคับ)
+                <span className="text-2xl">📎</span>
+                <span>คลิกเพื่อเลือกไฟล์</span>
               </button>
             ) : (
-              <div className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 py-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="text-sm text-slate-700 truncate flex-1">{file.name}</span>
-                <span className="text-xs text-slate-400 shrink-0">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>
-                <button
-                  type="button"
-                  onClick={removeFile}
-                  className="text-slate-400 hover:text-red-500 text-lg leading-none shrink-0"
-                  title="ลบไฟล์"
-                >
-                  &times;
-                </button>
+              <div className="flex items-center gap-2 bg-[#dcfce7] border border-[#bbf7d0] rounded-lg px-3 py-2">
+                <span>📄</span>
+                <span className="text-sm text-[#15803d] font-semibold truncate flex-1">{file.name}</span>
+                <span className="text-xs text-[#6b7f96] shrink-0">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>
+                <button type="button" onClick={removeFile}
+                  className="text-[#6b7f96] hover:text-red-500 text-lg leading-none shrink-0" title="ลบไฟล์">&times;</button>
               </div>
             )}
-            <p className="text-xs text-slate-400 mt-1">รองรับ .docx, .pdf ขนาดไม่เกิน 50MB</p>
+            <p className="text-xs text-[#6b7f96] mt-1.5 flex items-center gap-1">
+              ℹ️ รองรับ Word (.docx) และ PDF (.pdf)
+            </p>
           </div>
 
           {/* Upload progress */}
           {isUploading && (
             <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-slate-600">
+              <div className="flex items-center justify-between text-xs text-[#6b7f96]">
                 <span>กำลังอัปโหลดไฟล์...</span>
                 <span>{uploadProgress}%</span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
+              <div className="w-full bg-[#e2e8f0] rounded-full" style={{ height: '6px' }}>
                 <div
-                  className="bg-yellow-400 h-2 rounded-full transition-all duration-200"
-                  style={{ width: `${uploadProgress}%` }}
+                  className="rounded-full transition-all duration-200"
+                  style={{ width: `${uploadProgress}%`, height: '6px', background: '#00c2a8' }}
                 />
               </div>
             </div>
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+            <div className="bg-[#fee2e2] border border-[#fecaca] rounded-lg px-3 py-2 text-sm text-[#991b1b]">
               {error}
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2 border-t border-[#e2e8f0]" style={{ paddingTop: '12px' }}>
             <button type="button" onClick={() => { reset(); onClose(); }}
-              className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">
+              className="px-4 py-2 text-sm text-[#374f6b] border border-[#e2e8f0] rounded-lg hover:bg-[#f8fafc] font-semibold">
               ยกเลิก
             </button>
             <button type="submit" disabled={loading}
-              className="px-5 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors">
-              {loading ? (isUploading ? 'กำลังอัปโหลด...' : 'กำลังสร้าง...') : 'สร้างงาน'}
+              className="px-5 py-2 text-white font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors"
+              style={{ background: '#00c2a8' }}>
+              {loading ? (isUploading ? 'กำลังอัปโหลด...' : 'กำลังสร้าง...') : '📨 สร้างงาน'}
             </button>
           </div>
         </form>

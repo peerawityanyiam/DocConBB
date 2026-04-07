@@ -128,78 +128,103 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">คลังเอกสารคุณภาพ</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{userEmail}</p>
-        </div>
-        {isDoccon && (
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setSettingsMode('create'); setSettingsTarget({} as Standard); }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
-              <span>+</span>
-              สร้างไฟล์มาตรฐานใหม่
-            </button>
-            <button onClick={() => setAddLinkOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
-              <span>🔗</span>
-              เพิ่มลิงก์
-            </button>
-          </div>
-        )}
+    <div style={{ fontFamily: "'Sarabun', 'IBM Plex Sans Thai', sans-serif" }}>
+      {/* Hero section (matches ref .hero) */}
+      <div
+        className="text-center border-b border-white/10"
+        style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
+          padding: '45px 28px 35px',
+        }}
+      >
+        <h1 className="text-white text-2xl font-bold" style={{ letterSpacing: '-0.02em', marginBottom: '6px' }}>
+          📑 ระบบเอกสารคุณภาพ
+        </h1>
+        <div className="text-white/50 text-sm">ศูนย์ควบคุมเอกสาร (Document Control Dashboard)</div>
       </div>
 
-      {/* Search + filter */}
-      <div className="flex gap-3 mb-5 flex-wrap">
-        <div className="relative flex-1 min-w-52">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อเอกสาร..."
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400" />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
+      {/* Main content */}
+      <div className="max-w-[1080px] mx-auto" style={{ padding: '32px 24px 64px' }}>
+        {/* Toolbar (matches ref .toolbar) */}
+        <div className="flex justify-between items-center gap-4 mb-7 flex-wrap">
+          {/* Search */}
+          <div className="relative flex-1" style={{ minWidth: '260px', maxWidth: '400px' }}>
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] text-sm">🔍</span>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่อเอกสาร..."
+              className="w-full bg-white text-[#111827] border border-[#e5e7eb] rounded-[10px] text-sm outline-none transition-all shadow-[0_2px_6px_rgba(0,0,0,0.02)] focus:border-[#3b82f6] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+              style={{ padding: '10px 16px 10px 40px' }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#111827]">✕</button>
+            )}
+          </div>
+
+          {/* Sort */}
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span className="text-[13px] text-[#6b7280] font-semibold">เรียงตาม</span>
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value as SortValue)}
+              className="border border-[#e5e7eb] rounded-lg text-[13px] text-[#111827] bg-white outline-none cursor-pointer transition-colors focus:border-[#3b82f6]"
+              style={{ padding: '9px 14px' }}
+            >
+              <option value="name_asc">ชื่อ ก→ฮ</option>
+              <option value="name_desc">ชื่อ ฮ→ก</option>
+              <option value="status">สถานะ (เปิดก่อน)</option>
+              <option value="close_date">วันปิดใกล้สุด</option>
+            </select>
+          </div>
+
+          {/* Action buttons (DocCon only, matches ref #adminActions) */}
+          {isDoccon && (
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => { setSettingsMode('create'); setSettingsTarget({} as Standard); }}
+                className="inline-flex items-center gap-1.5 rounded-lg border-none text-[13px] font-semibold cursor-pointer transition-all whitespace-nowrap text-white shadow-[0_2px_8px_rgba(37,99,235,0.25)] hover:-translate-y-px"
+                style={{ background: '#2563eb', padding: '9px 18px' }}
+              >
+                📄 สร้างไฟล์ใหม่
+              </button>
+              <button
+                onClick={() => setAddLinkOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] text-[13px] font-semibold cursor-pointer transition-all whitespace-nowrap bg-white text-[#374151] shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[#f8fafc] hover:border-[#cbd5e1]"
+                style={{ padding: '9px 18px' }}
+              >
+                🔗 เพิ่มลิงก์
+              </button>
+            </div>
           )}
         </div>
-        <select value={filter} onChange={e => setFilter(e.target.value as FilterStatus)}
-          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400">
-          <option value="all">ทั้งหมด</option>
-          <option value="open">🟢 เปิดรับ</option>
-          <option value="locked">🔒 ล็อค</option>
-          <option value="expired">⛔ หมดเวลา</option>
-        </select>
-        <select value={sort} onChange={e => setSort(e.target.value as SortValue)}
-          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400">
-          <option value="name_asc">ตามชื่อ (ก-ฮ)</option>
-          <option value="name_desc">ตามชื่อ (ฮ-ก)</option>
-          <option value="status">ตามสถานะ</option>
-          <option value="close_date">ตามวันปิด</option>
-        </select>
-      </div>
 
-      {/* Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 animate-pulse">
-              <div className="h-4 w-3/4 bg-slate-100 rounded" />
-              <div className="h-3 w-1/2 bg-slate-100 rounded" />
-              <div className="h-8 w-full bg-slate-100 rounded-lg" />
-            </div>
-          ))}
+        {/* Section label (matches ref .sec-label) */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-[11.5px] font-bold tracking-wider uppercase text-[#6b7280]">แฟ้มเอกสารในระบบ</span>
+          <div className="flex-1 h-px bg-[#e5e7eb]" />
+          <span className="text-xs text-[#9ca3af]">{filtered.length} รายการ</span>
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <p className="text-3xl mb-3">{search ? '🔍' : '📂'}</p>
-          <p className="text-slate-500 text-sm">
-            {search ? `ไม่พบเอกสารที่ตรงกับ "${search}"` : 'ยังไม่มีเอกสารในคลัง'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <p className="text-xs text-slate-400 mb-3">{filtered.length} รายการ</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        {/* Cards Grid (matches ref .cards-grid) */}
+        {loading ? (
+          <div className="text-center py-16 text-[#6b7280]">
+            <div className="w-8 h-8 border-3 border-[#e5e7eb] border-t-[#3b82f6] rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm">กำลังโหลดข้อมูล...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-[42px] mb-3 opacity-30">📭</div>
+            <p className="text-sm text-[#6b7280]">
+              {search ? `ไม่พบเอกสารที่ตรงกับ "${search}"` : 'ไม่พบเอกสาร หรือคุณไม่มีสิทธิ์เข้าถึง'}
+            </p>
+          </div>
+        ) : (
+          <div
+            className="grid gap-[18px]"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(285px, 1fr))' }}
+          >
             {filtered.map(s => (
               <StandardCard
                 key={s.id}
@@ -213,8 +238,8 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
               />
             ))}
           </div>
-        </>
-      )}
+        )}
+      </div>
 
       {/* Modals */}
       {(settingsMode === 'create' ? !!settingsTarget : !!settingsTarget?.id) && (
@@ -232,101 +257,121 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
         onUploaded={fetchStandards}
       />
 
-      {/* Delete confirm */}
+      {/* Delete confirm (matches ref #deleteOverlay) */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <p className="text-2xl text-center mb-3">🗑️</p>
-            <h3 className="text-base font-semibold text-slate-800 text-center mb-2">ยืนยันการลบ</h3>
-            <p className="text-sm text-slate-600 text-center mb-2">
-              ลบ &ldquo;<strong>{deleteTarget.name}</strong>&rdquo; ?
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-[rgba(15,23,42,0.6)] backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-[92%] max-w-[450px] shadow-[0_24px_64px_rgba(0,0,0,0.22)] animate-[pop_0.2s_ease]" style={{ padding: '32px' }}>
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-[22px]">🗑️</span>
+              <h3 className="text-[17px] font-bold flex-1">ลบเอกสารออกจากระบบ</h3>
+              <button onClick={() => { setDeleteTarget(null); setDeleteReason(''); }}
+                className="w-7 h-7 rounded-full bg-[#f8fafc] border border-[#e5e7eb] flex items-center justify-center text-[#6b7280] text-sm hover:bg-[#f1f5f9] hover:text-[#111827] cursor-pointer transition-colors">✕</button>
+            </div>
+            <p className="text-[13px] font-bold text-[#111827] bg-[#f1f5f9] rounded-lg mb-4" style={{ padding: '10px 14px' }}>
+              {deleteTarget.name}
             </p>
-            <p className="text-xs text-red-500 text-center mb-4">ไฟล์ใน Google Drive จะถูก trash ด้วย</p>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-1">เหตุผลในการลบ <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-bold text-[#6b7280] mb-2 tracking-wide">เหตุผลการลบ <span className="text-[#dc2626]">*</span></label>
               <textarea
                 value={deleteReason}
                 onChange={e => setDeleteReason(e.target.value)}
-                placeholder="ระบุเหตุผลในการลบ..."
+                placeholder="ระบุเหตุผล เช่น เอกสารซ้ำ, เวอร์ชันเก่า, ยกเลิกการใช้งาน..."
                 rows={3}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+                className="w-full border border-[#e5e7eb] rounded-lg text-sm text-[#111827] outline-none resize-y transition-colors focus:border-[#3b82f6] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+                style={{ padding: '10px 14px', boxSizing: 'border-box' }}
               />
             </div>
-            <div className="flex gap-3 justify-center">
+            <div className="bg-[#fff1f2] border border-[#fecaca] rounded-lg text-[12.5px] text-[#991b1b] leading-relaxed mb-5" style={{ padding: '12px 14px' }}>
+              ⚠️ ลบเฉพาะรายการออกจาก Dashboard — ไฟล์ใน Drive ยังคงอยู่
+            </div>
+            <div className="flex justify-end gap-2.5">
               <button onClick={() => { setDeleteTarget(null); setDeleteReason(''); }}
-                className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
-                ยกเลิก
-              </button>
+                className="inline-flex items-center gap-1.5 bg-white text-[#374151] border border-[#e5e7eb] rounded-lg text-xs font-semibold cursor-pointer transition-all hover:bg-[#f8fafc]"
+                style={{ padding: '6px 14px' }}>ยกเลิก</button>
               <button onClick={handleDelete} disabled={deleteLoading || !deleteReason.trim()}
-                className="px-5 py-2 text-sm bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg disabled:opacity-50">
-                {deleteLoading ? 'กำลังลบ...' : 'ลบ'}
+                className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all text-white disabled:opacity-50"
+                style={{ background: '#dc2626', padding: '6px 14px' }}>
+                {deleteLoading ? 'กำลังลบ...' : '🗑️ ยืนยันลบ'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Rename modal */}
+      {/* Rename modal (matches ref #renameOverlay) */}
       {renameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-base font-semibold text-slate-800 text-center mb-4">✏️ เปลี่ยนชื่อเอกสาร</h3>
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-[rgba(15,23,42,0.6)] backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-[92%] max-w-[450px] shadow-[0_24px_64px_rgba(0,0,0,0.22)] animate-[pop_0.2s_ease]" style={{ padding: '32px' }}>
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-[22px]">✏️</span>
+              <h3 className="text-[17px] font-bold flex-1">เปลี่ยนชื่อเอกสาร</h3>
+              <button onClick={() => { setRenameTarget(null); setRenameName(''); }}
+                className="w-7 h-7 rounded-full bg-[#f8fafc] border border-[#e5e7eb] flex items-center justify-center text-[#6b7280] text-sm hover:bg-[#f1f5f9] hover:text-[#111827] cursor-pointer transition-colors">✕</button>
+            </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อใหม่</label>
+              <label className="block text-xs font-bold text-[#6b7280] mb-2 tracking-wide">ชื่อใหม่</label>
               <input
                 type="text"
                 value={renameName}
                 onChange={e => setRenameName(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full border border-[#e5e7eb] rounded-lg text-sm text-[#111827] outline-none transition-all focus:border-[#3b82f6] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+                style={{ padding: '10px 14px' }}
               />
             </div>
-            <div className="flex gap-3 justify-center">
+            <div className="flex justify-end gap-2.5 mt-7">
               <button onClick={() => { setRenameTarget(null); setRenameName(''); }}
-                className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
-                ยกเลิก
-              </button>
+                className="inline-flex items-center gap-1.5 bg-white text-[#374151] border border-[#e5e7eb] rounded-lg text-xs font-semibold cursor-pointer transition-all hover:bg-[#f8fafc]"
+                style={{ padding: '6px 14px' }}>ยกเลิก</button>
               <button onClick={handleRename} disabled={renameLoading || !renameName.trim()}
-                className="px-5 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-50">
-                {renameLoading ? 'กำลังบันทึก...' : 'บันทึก'}
+                className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all text-white disabled:opacity-50"
+                style={{ background: '#2563eb', padding: '6px 14px' }}>
+                {renameLoading ? 'กำลังบันทึก...' : '✓ บันทึก'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add link modal */}
+      {/* Add link modal (matches ref #addLinkOverlay) */}
       {addLinkOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-base font-semibold text-slate-800 text-center mb-4">🔗 เพิ่มลิงก์</h3>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อลิงก์ <span className="text-red-500">*</span></label>
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-[rgba(15,23,42,0.6)] backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-[92%] max-w-[450px] shadow-[0_24px_64px_rgba(0,0,0,0.22)] animate-[pop_0.2s_ease]" style={{ padding: '32px' }}>
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-[22px]">🔗</span>
+              <h3 className="text-[17px] font-bold flex-1">เพิ่มลิงก์ภายนอก</h3>
+              <button onClick={() => { setAddLinkOpen(false); setLinkName(''); setLinkUrl(''); }}
+                className="w-7 h-7 rounded-full bg-[#f8fafc] border border-[#e5e7eb] flex items-center justify-center text-[#6b7280] text-sm hover:bg-[#f1f5f9] hover:text-[#111827] cursor-pointer transition-colors">✕</button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-[#6b7280] mb-2 tracking-wide">ชื่อลิงก์</label>
               <input
                 type="text"
                 value={linkName}
                 onChange={e => setLinkName(e.target.value)}
-                placeholder="ชื่อลิงก์"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                placeholder="เช่น QP ภาควิชา"
+                className="w-full border border-[#e5e7eb] rounded-lg text-sm text-[#111827] outline-none transition-all focus:border-[#3b82f6] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+                style={{ padding: '10px 14px' }}
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-1">URL <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-bold text-[#6b7280] mb-2 tracking-wide">URL</label>
               <input
                 type="url"
                 value={linkUrl}
                 onChange={e => setLinkUrl(e.target.value)}
                 placeholder="https://..."
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full border border-[#e5e7eb] rounded-lg text-sm text-[#111827] outline-none transition-all focus:border-[#3b82f6] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+                style={{ padding: '10px 14px' }}
               />
             </div>
-            <div className="flex gap-3 justify-center">
+            <div className="flex justify-end gap-2.5 mt-7">
               <button onClick={() => { setAddLinkOpen(false); setLinkName(''); setLinkUrl(''); }}
-                className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
-                ยกเลิก
-              </button>
+                className="inline-flex items-center gap-1.5 bg-white text-[#374151] border border-[#e5e7eb] rounded-lg text-xs font-semibold cursor-pointer transition-all hover:bg-[#f8fafc]"
+                style={{ padding: '6px 14px' }}>ยกเลิก</button>
               <button onClick={handleAddLink} disabled={addLinkLoading || !linkName.trim() || !linkUrl.trim()}
-                className="px-5 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-50">
-                {addLinkLoading ? 'กำลังเพิ่ม...' : 'เพิ่มลิงก์'}
+                className="inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all text-white disabled:opacity-50"
+                style={{ background: '#7c3aed', padding: '6px 14px' }}>
+                {addLinkLoading ? 'กำลังเพิ่ม...' : '🔗 เพิ่มลิงก์'}
               </button>
             </div>
           </div>

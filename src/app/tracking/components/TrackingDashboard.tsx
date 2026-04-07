@@ -18,12 +18,12 @@ interface TrackingDashboardProps {
 
 type TabKey = AppRole | 'completed';
 
-const ROLE_TABS: { role: AppRole; label: string }[] = [
-  { role: 'STAFF', label: 'งานของฉัน' },
-  { role: 'DOCCON', label: 'ตรวจรูปแบบ' },
-  { role: 'REVIEWER', label: 'ตรวจเนื้อหา' },
-  { role: 'BOSS', label: 'งานในฝ่าย' },
-  { role: 'SUPER_BOSS', label: 'รออนุมัติ' },
+const ROLE_TABS: { role: AppRole; label: string; icon: string }[] = [
+  { role: 'STAFF', label: 'เจ้าหน้าที่', icon: '📥' },
+  { role: 'DOCCON', label: 'DocCon', icon: '🔍' },
+  { role: 'REVIEWER', label: 'ผู้ตรวจสอบ', icon: '📝' },
+  { role: 'BOSS', label: 'ผู้สั่งงาน', icon: '💼' },
+  { role: 'SUPER_BOSS', label: 'หัวหน้างาน', icon: '👑' },
 ];
 
 type QuickFilter = 'all' | 'pending' | 'rejected';
@@ -135,93 +135,99 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     );
   }
 
+  // Tab page headers (match reference)
+  const TAB_HEADERS: Record<string, { icon: string; title: string }> = {
+    STAFF: { icon: '📥', title: 'งานของฉัน' },
+    BOSS: { icon: '💼', title: 'งานที่สั่ง' },
+    DOCCON: { icon: '🔍', title: 'คิวตรวจรูปแบบ' },
+    REVIEWER: { icon: '📝', title: 'รอตรวจสอบเนื้อหา' },
+    SUPER_BOSS: { icon: '👑', title: 'รออนุมัติขั้นสุดท้าย' },
+    completed: { icon: '✅', title: 'งานที่เสร็จแล้ว' },
+  };
+
+  const currentHeader = TAB_HEADERS[activeTab] ?? TAB_HEADERS.completed;
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">ระบบติดตามเอกสาร</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{userEmail}</p>
+    <div className="max-w-5xl mx-auto px-4 py-5">
+      {/* Role Switcher - pill buttons (matches ref #roleTabBtns) */}
+      {availableTabs.length > 1 && (
+        <div className="flex gap-1.5 flex-wrap mb-5">
+          {availableTabs.map(t => (
+            <button key={t.role} onClick={() => setActiveTab(t.role)}
+              className={`px-4 py-1.5 text-xs rounded-full font-semibold tracking-wide border transition-all shadow-sm ${
+                activeTab === t.role
+                  ? 'bg-[#00c2a8] text-white border-[#00c2a8] shadow-[0_2px_8px_rgba(0,194,168,0.3)]'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}>
+              {t.label}
+              {(tabCounts[t.role] ?? 0) > 0 && (
+                <span className={`ml-1.5 inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 text-[0.6rem] font-bold rounded-full ${
+                  activeTab === t.role
+                    ? 'bg-white/30 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {tabCounts[t.role]}
+                </span>
+              )}
+            </button>
+          ))}
+          <button onClick={() => setActiveTab('completed')}
+            className={`px-4 py-1.5 text-xs rounded-full font-semibold tracking-wide border transition-all shadow-sm ${
+              activeTab === 'completed'
+                ? 'bg-[#00c2a8] text-white border-[#00c2a8] shadow-[0_2px_8px_rgba(0,194,168,0.3)]'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+            }`}>
+            เสร็จแล้ว
+            {(tabCounts['completed'] ?? 0) > 0 && (
+              <span className={`ml-1.5 inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 text-[0.6rem] font-bold rounded-full ${
+                activeTab === 'completed'
+                  ? 'bg-white/30 text-white'
+                  : 'bg-slate-200 text-slate-600'
+              }`}>
+                {tabCounts['completed']}
+              </span>
+            )}
+          </button>
         </div>
+      )}
+
+      {/* Page Header (matches ref .page-hdr) */}
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+        <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 m-0">
+          <span style={{ color: '#00c2a8' }}>{currentHeader.icon}</span>
+          {currentHeader.title}
+        </h2>
         <div className="flex items-center gap-2">
+          <button onClick={() => fetchTasks()}
+            className="p-1.5 text-slate-400 hover:text-slate-600 border border-slate-200 rounded-md text-xs transition-colors"
+            title="รีเฟรช">
+            🔄
+          </button>
           {(userRoles.includes('BOSS') || userRoles.includes('DOCCON') || userRoles.includes('SUPER_BOSS')) && (
             <button onClick={() => setShowDashboard(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-lg transition-colors shadow-sm">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-lg transition-colors shadow-sm">
               📊 ภาพรวม
-            </button>
-          )}
-          {userRoles.includes('DOCCON') && (
-            <button onClick={() => setShowRegistry(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-lg transition-colors shadow-sm">
-              📄 ทะเบียนเอกสาร
-            </button>
-          )}
-          {(userRoles.includes('BOSS') || userRoles.includes('SUPER_BOSS')) && (
-            <button onClick={() => setShowReport(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-lg transition-colors shadow-sm">
-              📋 รายงานสรุป
             </button>
           )}
           {userRoles.includes('BOSS') && (
             <button onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-semibold text-sm rounded-lg transition-colors shadow-sm">
-              <span className="text-base leading-none">+</span>
-              สร้างงานใหม่
+              className="flex items-center gap-1.5 px-3 py-1.5 text-white font-semibold text-xs rounded-lg transition-colors shadow-sm"
+              style={{ background: '#00c2a8' }}>
+              ＋ สร้างงานใหม่
             </button>
           )}
         </div>
       </div>
 
-      {/* Role Tabs */}
-      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-5 overflow-x-auto">
-        {availableTabs.map(t => (
-          <button key={t.role} onClick={() => setActiveTab(t.role)}
-            className={`flex-1 min-w-max px-4 py-2 text-sm rounded-lg font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 ${
-              activeTab === t.role
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}>
-            {t.label}
-            {(tabCounts[t.role] ?? 0) > 0 && (
-              <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full ${
-                activeTab === t.role
-                  ? 'bg-yellow-400 text-slate-900'
-                  : 'bg-slate-300 text-slate-600'
-              }`}>
-                {tabCounts[t.role]}
-              </span>
-            )}
-          </button>
-        ))}
-        {/* Completed/Archive Tab - visible to all */}
-        <button onClick={() => setActiveTab('completed')}
-          className={`flex-1 min-w-max px-4 py-2 text-sm rounded-lg font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 ${
-            activeTab === 'completed'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}>
-          เสร็จแล้ว
-          {(tabCounts['completed'] ?? 0) > 0 && (
-            <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full ${
-              activeTab === 'completed'
-                ? 'bg-yellow-400 text-slate-900'
-                : 'bg-slate-300 text-slate-600'
-            }`}>
-              {tabCounts['completed']}
-            </span>
-          )}
-        </button>
-      </div>
-
       {/* Search */}
-      <div className="relative mb-5">
+      <div className="relative mb-4">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="ค้นหาชื่องาน, รหัสงาน, เลขที่เอกสาร..."
-          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
         />
         {search && (
           <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
@@ -230,14 +236,14 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
 
       {/* Quick Filter Chips (non-completed tabs only) */}
       {!isCompletedTab && (
-        <div className="flex gap-2 mb-5">
+        <div className="flex gap-2 mb-4">
           {QUICK_FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => setQuickFilter(f.key)}
               className={`px-3 py-1 text-xs rounded-full font-medium transition-colors border ${
                 quickFilter === f.key
-                  ? 'bg-yellow-400 border-yellow-400 text-slate-900'
+                  ? 'bg-[#00c2a8] border-[#00c2a8] text-white'
                   : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
               }`}
             >

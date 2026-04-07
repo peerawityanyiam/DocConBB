@@ -12,17 +12,17 @@ export type TaskStatus =
   | 'CANCELLED';
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {
-  ASSIGNED: 'มอบหมายแล้ว',
-  SUBMITTED_TO_DOCCON: 'ส่งตรวจรูปแบบ',
-  DOCCON_REJECTED: 'DocCon ตีกลับ',
+  ASSIGNED: 'รอดำเนินการ',
+  SUBMITTED_TO_DOCCON: 'รอ DocCon ตรวจ',
+  DOCCON_REJECTED: 'DocCon ส่งกลับ',
   PENDING_REVIEW: 'รอตรวจสอบเนื้อหา',
-  REVIEWER_REJECTED: 'ผู้ตรวจสอบตีกลับ',
-  WAITING_BOSS_APPROVAL: 'รออนุมัติหัวหน้า',
-  BOSS_REJECTED: 'หัวหน้าตีกลับ',
-  WAITING_SUPER_BOSS_APPROVAL: 'รออนุมัติผู้บริหาร',
-  SUPER_BOSS_REJECTED: 'ผู้บริหารตีกลับ',
-  COMPLETED: 'เสร็จสมบูรณ์',
-  CANCELLED: 'ยกเลิก',
+  REVIEWER_REJECTED: 'Reviewer ส่งกลับ',
+  WAITING_BOSS_APPROVAL: 'รอผู้สั่งงานตรวจสอบ',
+  BOSS_REJECTED: 'ผู้สั่งงานส่งกลับ',
+  WAITING_SUPER_BOSS_APPROVAL: 'รอหัวหน้างานอนุมัติ',
+  SUPER_BOSS_REJECTED: 'หัวหน้างานส่งกลับ',
+  COMPLETED: 'เสร็จสิ้น',
+  CANCELLED: 'ยกเลิกแล้ว',
 };
 
 export const STATUS_COLORS: Record<TaskStatus, string> = {

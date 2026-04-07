@@ -12,7 +12,8 @@ export default function LogoutButton() {
   return (
     <button
       onClick={handleLogout}
-      className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+      className="px-3 py-1 text-xs bg-transparent hover:bg-[#dc3545] text-white border border-white rounded transition-all hover:border-[#dc3545]"
+      style={{ fontFamily: "'Sarabun', sans-serif" }}
     >
       ออกจากระบบ
     </button>

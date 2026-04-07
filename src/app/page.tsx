@@ -11,14 +11,12 @@ const cards = [
     icon: '🚀',
     description: 'ส่งงาน สั่งงาน ตรวจสอบความคืบหน้า',
     href: '/tracking',
-    accent: 'border-l-[#003366]',
   },
   {
     title: 'Document Control',
     icon: '📑',
     description: 'จัดการระบบเอกสารคุณภาพ',
     href: '/library',
-    accent: 'border-l-[#c5a059]',
   },
 ];
 
@@ -27,52 +25,59 @@ export default async function Home() {
   if (!user) redirect('/login');
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f5f5]">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-40 bg-[#003366] shadow-md">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🏥</span>
-            <span className="text-white font-semibold text-sm">ระบบเอกสารคุณภาพ</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-white/80 text-xs hidden sm:block">{user.email}</span>
-            <LogoutButton />
-          </div>
+    <div className="flex min-h-screen flex-col bg-[#f8f9fa]" style={{ fontFamily: "'Sarabun', 'IBM Plex Sans Thai', sans-serif" }}>
+      {/* Navbar - matches ref: dark #212529 */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#212529] shadow-sm" style={{ height: '45px' }}>
+        <div className="max-w-[900px] mx-auto px-5 h-full flex items-center justify-between">
+          <span className="text-white/80 text-sm font-normal tracking-wide">
+            {user.email}
+          </span>
+          <LogoutButton />
         </div>
       </nav>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-2xl text-center">
-          <h1 className="text-4xl font-bold text-[#003366]">สวัสดีครับ 👋</h1>
-          <p className="mt-2 text-lg text-gray-600">
+      {/* Content - centered vertically */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4" style={{ paddingTop: '50px' }}>
+        <div className="w-[90%] max-w-[900px] text-center">
+          <h1 className="text-[2.4rem] font-bold text-[#003366] mb-2.5" style={{ letterSpacing: '-0.5px' }}>
+            สวัสดีครับ 👋
+          </h1>
+          <p className="text-[1.1rem] text-[#555] font-normal mb-12">
             ยินดีต้อนรับสู่ระบบสนับสนุนการทำงานคุณภาพ
           </p>
 
-          <div className="mt-10 grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-[30px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
             {cards.map((card) => (
               <Link
                 key={card.href}
                 href={card.href}
-                className={`group relative rounded-2xl border border-gray-200 border-l-4 ${card.accent} bg-white p-6 shadow-sm transition hover:shadow-md`}
+                className="group flex flex-col items-center bg-white rounded-xl border border-[#eee] border-t-[5px] border-t-[#003366] shadow-[0_4px_15px_rgba(0,0,0,0.05)] no-underline text-inherit transition-all duration-400 hover:-translate-y-[5px] hover:shadow-[0_12px_25px_rgba(0,0,0,0.1)] hover:border-t-[#c5a059]"
+                style={{ padding: '45px 35px' }}
               >
-                <span className="absolute right-3 top-3 rounded-full bg-[#c5a059] px-3 py-0.5 text-xs font-medium text-white">
+                <div className="text-[45px] mb-6" style={{ filter: 'grayscale(20%)' }}>{card.icon}</div>
+                <h2 className="text-[1.5rem] font-semibold text-[#003366] mb-3 m-0">{card.title}</h2>
+                <p className="text-base text-[#666] leading-relaxed m-0">{card.description}</p>
+                <span className="mt-6 bg-[#f1f5f9] text-[#003366] px-5 py-1.5 rounded text-[0.85rem] font-semibold border border-[#e2e8f0]">
                   เข้าใช้งานระบบ
                 </span>
-                <div className="mb-3 text-4xl">{card.icon}</div>
-                <h2 className="text-xl font-semibold text-[#003366]">{card.title}</h2>
-                <p className="mt-1 text-sm text-gray-500">{card.description}</p>
               </Link>
             ))}
           </div>
-
-          <footer className="mt-16 text-xs text-gray-400">
-            สงวนสิทธิ์การใช้งานเฉพาะ หน่วยคลังเลือดและเวชศาสตร์บริการโลหิต
-            โรงพยาบาลสงขลานครินทร์ เท่านั้น
-          </footer>
         </div>
       </div>
+
+      {/* Footer - matches ref */}
+      <footer className="w-full py-8 bg-white border-t border-[#eaeaea] text-center text-[0.9rem] text-[#777]">
+        <div>
+          สงวนสิทธิ์การใช้งานเฉพาะ{' '}
+          <span className="font-semibold text-[#333]">หน่วยคลังเลือดและเวชศาสตร์บริการโลหิต โรงพยาบาลสงขลานครินทร์</span>{' '}
+          เท่านั้น
+        </div>
+        <div className="mt-1">
+          หากพบปัญหาการใช้งานหรือต้องการความช่วยเหลือ กรุณาติดต่อ{' '}
+          <span className="text-[#003366] border-b border-[#ccc]">ผู้ดูแลระบบ</span>
+        </div>
+      </footer>
     </div>
   );
 }

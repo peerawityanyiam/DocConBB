@@ -8,7 +8,7 @@ export default function TrackingLayout({
   return (
     <>
       <Navbar />
-      <main className="flex-1 bg-slate-50">{children}</main>
+      <main className="flex-1" style={{ background: '#f0f4f8' }}>{children}</main>
     </>
   );
 }
