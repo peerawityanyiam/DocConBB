@@ -26,13 +26,34 @@ const ROLE_TABS: { role: AppRole; label: string; icon: string }[] = [
   { role: 'SUPER_BOSS', label: 'หัวหน้างาน', icon: '👑' },
 ];
 
-type QuickFilter = 'all' | 'pending' | 'rejected';
+type QuickFilter = 'all' | 'pending' | 'rejected' | 'action_required' | 'in_progress' | 'waiting_check' | 'passed';
 
-const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
-  { key: 'all', label: 'ทั้งหมด' },
-  { key: 'pending', label: 'รอดำเนินการ' },
-  { key: 'rejected', label: 'ตีกลับ' },
-];
+/** Role-specific sub-filters */
+const ROLE_QUICK_FILTERS: Record<string, { key: QuickFilter; label: string }[]> = {
+  STAFF: [
+    { key: 'all', label: 'ทั้งหมด' },
+    { key: 'action_required', label: 'ต้องดำเนินการ' },
+    { key: 'in_progress', label: 'กำลังดำเนินการ' },
+    { key: 'rejected', label: 'ถูกตีกลับ' },
+  ],
+  BOSS: [
+    { key: 'all', label: 'ทั้งหมด' },
+    { key: 'action_required', label: 'รออนุมัติ' },
+    { key: 'in_progress', label: 'กำลังดำเนินการ' },
+    { key: 'rejected', label: 'ตีกลับ' },
+  ],
+  DOCCON: [
+    { key: 'all', label: 'ทั้งหมด' },
+    { key: 'waiting_check', label: 'รอตรวจรูปแบบ' },
+    { key: 'passed', label: 'ผ่านแล้ว' },
+  ],
+  REVIEWER: [
+    { key: 'all', label: 'ทั้งหมด' },
+  ],
+  SUPER_BOSS: [
+    { key: 'all', label: 'ทั้งหมด' },
+  ],
+};
 
 export default function TrackingDashboard({ userRoles, userId, userEmail }: TrackingDashboardProps) {
   // Pick first available tab by priority
@@ -108,17 +129,55 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     || (t.doc_ref ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
-  // Apply quick filter (client-side, only for non-completed tabs)
+  // Apply quick filter (client-side, role-specific)
   const filtered = searchFiltered.filter(t => {
     if (isCompletedTab || quickFilter === 'all') return true;
+
+    const rejectedStatuses = ['DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
+
+    if (quickFilter === 'rejected') {
+      return rejectedStatuses.includes(t.status);
+    }
+
+    if (quickFilter === 'action_required') {
+      // STAFF: statuses where officer needs to act
+      if (activeTab === 'STAFF') {
+        return ['ASSIGNED', ...rejectedStatuses].includes(t.status);
+      }
+      // BOSS: tasks waiting for boss approval
+      if (activeTab === 'BOSS') {
+        return t.status === 'WAITING_BOSS_APPROVAL';
+      }
+      return false;
+    }
+
+    if (quickFilter === 'in_progress') {
+      // STAFF: tasks sent and being processed
+      if (activeTab === 'STAFF') {
+        return ['SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'].includes(t.status);
+      }
+      // BOSS: tasks not yet at WAITING_BOSS_APPROVAL
+      if (activeTab === 'BOSS') {
+        return ['ASSIGNED', 'SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', ...rejectedStatuses].includes(t.status);
+      }
+      return false;
+    }
+
+    if (quickFilter === 'waiting_check') {
+      // DOCCON: only tasks submitted for format check
+      return t.status === 'SUBMITTED_TO_DOCCON';
+    }
+
+    if (quickFilter === 'passed') {
+      // DOCCON: tasks that have passed format check
+      return t.doccon_checked && !['SUBMITTED_TO_DOCCON', 'DOCCON_REJECTED'].includes(t.status);
+    }
+
     if (quickFilter === 'pending') {
       const pendingStatuses = ['ASSIGNED', 'SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'];
       return pendingStatuses.includes(t.status);
     }
-    if (quickFilter === 'rejected') {
-      const rejectedStatuses = ['DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
-      return rejectedStatuses.includes(t.status);
-    }
+
     return true;
   });
 
@@ -209,6 +268,18 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
               📊 ภาพรวม
             </button>
           )}
+          {userRoles.includes('DOCCON') && activeTab === 'DOCCON' && (
+            <>
+              <button onClick={() => setShowRegistry(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+                📑 ทะเบียนเอกสาร
+              </button>
+              <button onClick={() => setShowReport(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+                📈 รายงาน
+              </button>
+            </>
+          )}
           {userRoles.includes('BOSS') && (
             <button onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-white font-semibold text-xs rounded-lg transition-colors shadow-sm"
@@ -234,24 +305,48 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         )}
       </div>
 
-      {/* Quick Filter Chips (non-completed tabs only) */}
-      {!isCompletedTab && (
-        <div className="flex gap-2 mb-4">
-          {QUICK_FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setQuickFilter(f.key)}
-              className={`px-3 py-1 text-xs rounded-full font-medium transition-colors border ${
-                quickFilter === f.key
-                  ? 'bg-[#00c2a8] border-[#00c2a8] text-white'
-                  : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Quick Filter Chips (role-specific sub-filters) */}
+      {!isCompletedTab && (() => {
+        const roleFilters = ROLE_QUICK_FILTERS[activeTab as string] ?? [{ key: 'all' as QuickFilter, label: 'ทั้งหมด' }];
+        if (roleFilters.length <= 1) return null;
+        return (
+          <div className="flex gap-2 mb-4">
+            {roleFilters.map(f => {
+              // Count items for each filter
+              const filterCount = f.key === 'all' ? searchFiltered.length : searchFiltered.filter(t => {
+                const rejectedStatuses = ['DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
+                if (f.key === 'rejected') return rejectedStatuses.includes(t.status);
+                if (f.key === 'action_required' && activeTab === 'STAFF') return ['ASSIGNED', ...rejectedStatuses].includes(t.status);
+                if (f.key === 'action_required' && activeTab === 'BOSS') return t.status === 'WAITING_BOSS_APPROVAL';
+                if (f.key === 'in_progress' && activeTab === 'STAFF') return ['SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'].includes(t.status);
+                if (f.key === 'in_progress' && activeTab === 'BOSS') return ['ASSIGNED', 'SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', ...rejectedStatuses].includes(t.status);
+                if (f.key === 'waiting_check') return t.status === 'SUBMITTED_TO_DOCCON';
+                if (f.key === 'passed') return t.doccon_checked && !['SUBMITTED_TO_DOCCON', 'DOCCON_REJECTED'].includes(t.status);
+                return true;
+              }).length;
+
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setQuickFilter(f.key)}
+                  className={`px-3 py-1 text-xs rounded-full font-medium transition-colors border ${
+                    quickFilter === f.key
+                      ? 'bg-[#00c2a8] border-[#00c2a8] text-white'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                  }`}
+                >
+                  {f.label}
+                  {filterCount > 0 && (
+                    <span className={`ml-1 text-[0.6rem] ${quickFilter === f.key ? 'opacity-80' : ''}`}>
+                      ({filterCount})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Task Grid */}
       {loading ? (
@@ -276,7 +371,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
           <p className="text-xs text-slate-400 mb-3">{filtered.length} รายการ</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {filtered.map(task => (
-              <TaskCard key={task.id} task={task} onClick={t => setSelectedTaskId(t.id)} />
+              <TaskCard key={task.id} task={task} onClick={t => setSelectedTaskId(t.id)} activeRole={activeTab === 'completed' ? undefined : activeTab} userId={userId} />
             ))}
           </div>
         </>

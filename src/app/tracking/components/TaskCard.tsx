@@ -108,6 +108,8 @@ export interface Task {
 interface TaskCardProps {
   task: Task;
   onClick: (task: Task) => void;
+  activeRole?: string;  // Which role tab is viewing this card
+  userId?: string;      // Current user id for action-required detection
 }
 
 function formatDate(iso: string) {
@@ -129,6 +131,45 @@ function ageStyle(days: number): string {
   if (days > 14) return 'bg-[#fee2e2] text-[#991b1b]'; // urgent red
   if (days >= 7) return 'bg-[#fef3c7] text-[#92400e]';  // warning yellow
   return 'bg-[#f3f4f6] text-[#374151]';                  // neutral
+}
+
+/** Role-specific action hint — tells the viewer what they need to do */
+function getActionHint(task: Task, activeRole?: string, userId?: string): { text: string; color: string; icon: string } | null {
+  const s = task.status;
+
+  if (activeRole === 'STAFF') {
+    if (s === 'ASSIGNED') return { text: 'รอส่งงาน', icon: '📤', color: '#f59e0b' };
+    if (s === 'DOCCON_REJECTED') return { text: 'ถูกตีกลับ (DocCon) — แก้ไขแล้วส่งใหม่', icon: '🔄', color: '#ef4444' };
+    if (s === 'REVIEWER_REJECTED') return { text: 'ถูกตีกลับ (ผู้ตรวจสอบ) — แก้ไขแล้วส่งใหม่', icon: '🔄', color: '#ef4444' };
+    if (s === 'BOSS_REJECTED') return { text: 'ถูกตีกลับ (หัวหน้า) — แก้ไขแล้วส่งใหม่', icon: '🔄', color: '#ef4444' };
+    if (s === 'SUPER_BOSS_REJECTED') return { text: 'ถูกตีกลับ (ผู้บริหาร) — แก้ไขแล้วส่งใหม่', icon: '🔄', color: '#ef4444' };
+    if (s === 'SUBMITTED_TO_DOCCON') return { text: 'อยู่ระหว่าง DocCon ตรวจสอบ', icon: '⏳', color: '#06b6d4' };
+    if (s === 'PENDING_REVIEW') return { text: 'อยู่ระหว่างตรวจเนื้อหา', icon: '⏳', color: '#3b82f6' };
+    if (s === 'WAITING_BOSS_APPROVAL') return { text: 'อยู่ระหว่างรออนุมัติหัวหน้า', icon: '⏳', color: '#8b5cf6' };
+    if (s === 'WAITING_SUPER_BOSS_APPROVAL') return { text: 'อยู่ระหว่างรออนุมัติผู้บริหาร', icon: '⏳', color: '#ec4899' };
+    if (s === 'COMPLETED') return { text: 'เสร็จสมบูรณ์', icon: '✅', color: '#10b981' };
+    if (s === 'CANCELLED') return { text: 'ยกเลิกแล้ว', icon: '🚫', color: '#9ca3af' };
+  }
+
+  if (activeRole === 'DOCCON') {
+    if (s === 'SUBMITTED_TO_DOCCON') return { text: 'รอตรวจรูปแบบ', icon: '🔍', color: '#00c2a8' };
+  }
+
+  if (activeRole === 'REVIEWER') {
+    if (s === 'PENDING_REVIEW') return { text: 'รอตรวจสอบเนื้อหา', icon: '📝', color: '#00c2a8' };
+  }
+
+  if (activeRole === 'BOSS') {
+    if (s === 'WAITING_BOSS_APPROVAL') return { text: 'รออนุมัติ', icon: '✍️', color: '#00c2a8' };
+    if (s === 'ASSIGNED') return { text: 'เจ้าหน้าที่กำลังดำเนินการ', icon: '⏳', color: '#f59e0b' };
+    if (['DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'].includes(s)) return { text: 'ถูกตีกลับ — รอแก้ไข', icon: '🔄', color: '#ef4444' };
+  }
+
+  if (activeRole === 'SUPER_BOSS') {
+    if (s === 'WAITING_SUPER_BOSS_APPROVAL') return { text: 'รออนุมัติขั้นสุดท้าย', icon: '👑', color: '#00c2a8' };
+  }
+
+  return null;
 }
 
 /* ── Pipeline visualization (matches ref .tracking-pipeline) ── */
@@ -186,9 +227,13 @@ function PipelineBar({ status }: { status: TaskStatus }) {
   );
 }
 
-export default function TaskCard({ task, onClick }: TaskCardProps) {
+export default function TaskCard({ task, onClick, activeRole, userId }: TaskCardProps) {
   const age = daysAgo(task.created_at);
   const isRejected = REJECTED_STATUSES.has(task.status);
+  const actionHint = getActionHint(task, activeRole, userId);
+
+  // Determine if this card needs action from the current viewer
+  const needsAction = actionHint?.color === '#00c2a8' || actionHint?.color === '#ef4444';
 
   return (
     <button
@@ -211,6 +256,21 @@ export default function TaskCard({ task, onClick }: TaskCardProps) {
           <StatusBadge status={task.status} size="sm" />
         </div>
 
+        {/* Action hint (role-specific) */}
+        {actionHint && (
+          <div
+            className="flex items-center gap-1.5 mt-1.5 mb-1 px-2.5 py-1 rounded-md text-[0.72rem] font-semibold"
+            style={{
+              background: needsAction ? `${actionHint.color}12` : `${actionHint.color}10`,
+              color: actionHint.color,
+              border: needsAction ? `1px solid ${actionHint.color}30` : 'none',
+            }}
+          >
+            <span>{actionHint.icon}</span>
+            <span>{actionHint.text}</span>
+          </div>
+        )}
+
         {/* Pipeline visualization */}
         <PipelineBar status={task.status} />
 
@@ -220,11 +280,43 @@ export default function TaskCard({ task, onClick }: TaskCardProps) {
           </p>
         )}
 
-        {/* Meta row (matches ref .task-meta) */}
+        {/* Meta row (matches ref .task-meta) — role-specific info */}
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.72rem] text-[#6b7f96] mt-2">
-          <span>👤 {task.officer?.display_name ?? '—'}</span>
-          <span>📋 {task.reviewer?.display_name ?? '—'}</span>
+          {activeRole === 'BOSS' ? (
+            <>
+              <span>👤 ผู้รับผิดชอบ: {task.officer?.display_name ?? '—'}</span>
+              <span>📋 ผู้ตรวจสอบ: {task.reviewer?.display_name ?? '—'}</span>
+            </>
+          ) : activeRole === 'STAFF' ? (
+            <>
+              <span>💼 ผู้สั่งงาน: {task.creator?.display_name ?? '—'}</span>
+              <span>📋 ผู้ตรวจสอบ: {task.reviewer?.display_name ?? '—'}</span>
+            </>
+          ) : activeRole === 'DOCCON' ? (
+            <>
+              <span>👤 {task.officer?.display_name ?? '—'}</span>
+              <span>💼 {task.creator?.display_name ?? '—'}</span>
+              {task.doccon_checked && <span className="text-green-600 font-medium">✅ ตรวจแล้ว</span>}
+            </>
+          ) : (
+            <>
+              <span>👤 {task.officer?.display_name ?? '—'}</span>
+              <span>📋 {task.reviewer?.display_name ?? '—'}</span>
+            </>
+          )}
         </div>
+
+        {/* Drive checklist for DocCon role on completed tasks */}
+        {activeRole === 'DOCCON' && task.status === 'COMPLETED' && (
+          <div className="flex gap-3 text-[0.68rem] mt-1.5">
+            <span className={task.drive_uploaded ? 'text-green-600' : 'text-slate-400'}>
+              {task.drive_uploaded ? '✅' : '⬜'} อัปโหลด Drive
+            </span>
+            <span className={task.sent_to_branch ? 'text-green-600' : 'text-slate-400'}>
+              {task.sent_to_branch ? '✅' : '⬜'} ส่งหน่วยงาน
+            </span>
+          </div>
+        )}
 
         {/* Latest comment (matches ref .comment-box) */}
         {task.latest_comment && (
