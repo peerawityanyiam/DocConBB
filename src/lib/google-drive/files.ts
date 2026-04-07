@@ -2,6 +2,20 @@ import { getDriveClient } from './client';
 
 const drive = () => getDriveClient();
 
+/** Check if a folder ID exists and is accessible in Shared Drive */
+export async function checkFolderExists(folderId: string): Promise<boolean> {
+  try {
+    const res = await drive().files.get({
+      fileId: folderId,
+      fields: 'id,trashed',
+      supportsAllDrives: true,
+    });
+    return !res.data.trashed;
+  } catch {
+    return false;
+  }
+}
+
 export async function getOrCreateFolder(parentId: string, name: string): Promise<string> {
   // Escape single quotes in folder name for Drive query
   const safeName = name.replace(/'/g, "\\'");

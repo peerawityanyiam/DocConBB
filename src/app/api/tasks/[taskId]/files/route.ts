@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
-import { uploadFile, getOrCreateFolder, trashFile } from '@/lib/google-drive/files';
+import { uploadFile, getOrCreateFolder, trashFile, checkFolderExists } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 
 const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
-const SHARED_DRIVE_ID = '0AL34uBSBGIDjUk9PVA'; // Shared Drive root for fallback
 
 // POST /api/tasks/[taskId]/files — อัปโหลดไฟล์ (docx/pdf) เข้า task folder
 export async function POST(
@@ -102,13 +101,26 @@ export async function POST(
     }
 
     // สร้าง/หา task folder ใน Shared Drive
+    // ถ้า task มี folder เก่า ตรวจว่ายังอยู่ใน Shared Drive ไหม ถ้าไม่ สร้างใหม่
     let taskFolderId = task.task_folder_id;
-    if (!taskFolderId) {
+    let needNewFolder = !taskFolderId;
+
+    if (taskFolderId) {
+      // Validate existing folder is accessible (might be in old My Drive)
+      const folderOk = await checkFolderExists(taskFolderId);
+      if (!folderOk) {
+        console.warn('[FILE_UPLOAD] Existing task_folder_id is invalid/inaccessible:', taskFolderId);
+        needNewFolder = true;
+      }
+    }
+
+    if (needNewFolder) {
+      console.log('[FILE_UPLOAD] Creating new folder in Shared Drive. Parent:', UPLOAD_FOLDER_ID, 'Task:', task.task_code);
       taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code);
       await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
     }
 
-    // อัปโหลด (retry with new Shared Drive folder if quota error)
+    // อัปโหลด
     const buffer = Buffer.from(await file.arrayBuffer());
     let driveFileId: string;
     let driveFileName: string;
@@ -123,10 +135,10 @@ export async function POST(
       driveFileName = result.name;
     } catch (uploadErr: unknown) {
       const errMsg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
-      // If quota error → old folder is in My Drive, recreate in Shared Drive
+      // If quota error → folder somehow still in My Drive, force create in Shared Drive
       if (errMsg.includes('storage quota') || errMsg.includes('storageQuotaExceeded')) {
-        console.warn('[FILE_UPLOAD] Quota error, retrying with new Shared Drive folder. Old folder:', taskFolderId, 'Upload folder:', UPLOAD_FOLDER_ID);
-        taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code + '_v2');
+        console.warn('[FILE_UPLOAD] Quota error! Force recreating folder in Shared Drive. Old:', taskFolderId);
+        taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code);
         await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
         const result = await uploadFile(
           taskFolderId,
