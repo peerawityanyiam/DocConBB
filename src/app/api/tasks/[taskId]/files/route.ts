@@ -5,6 +5,7 @@ import { uploadFile, getOrCreateFolder, trashFile } from '@/lib/google-drive/fil
 import { setFilePublic } from '@/lib/google-drive/permissions';
 
 const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
+const SHARED_DRIVE_ID = '0AL34uBSBGIDjUk9PVA'; // Shared Drive root for fallback
 
 // POST /api/tasks/[taskId]/files — อัปโหลดไฟล์ (docx/pdf) เข้า task folder
 export async function POST(
@@ -100,21 +101,45 @@ export async function POST(
       return NextResponse.json({ error: 'ตำแหน่งนี้อัปโหลดได้เฉพาะไฟล์ .docx เท่านั้น' }, { status: 400 });
     }
 
-    // สร้าง/หา task folder ใน Drive
+    // สร้าง/หา task folder ใน Shared Drive
     let taskFolderId = task.task_folder_id;
     if (!taskFolderId) {
       taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code);
       await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
     }
 
-    // อัปโหลด
+    // อัปโหลด (retry with new Shared Drive folder if quota error)
     const buffer = Buffer.from(await file.arrayBuffer());
-    const { id: driveFileId, name: driveFileName } = await uploadFile(
-      taskFolderId,
-      file.name,
-      file.type || 'application/octet-stream',
-      buffer
-    );
+    let driveFileId: string;
+    let driveFileName: string;
+    try {
+      const result = await uploadFile(
+        taskFolderId,
+        file.name,
+        file.type || 'application/octet-stream',
+        buffer
+      );
+      driveFileId = result.id;
+      driveFileName = result.name;
+    } catch (uploadErr: unknown) {
+      const errMsg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+      // If quota error → old folder is in My Drive, recreate in Shared Drive
+      if (errMsg.includes('storage quota') || errMsg.includes('storageQuotaExceeded')) {
+        console.warn('[FILE_UPLOAD] Quota error, retrying with new Shared Drive folder. Old folder:', taskFolderId, 'Upload folder:', UPLOAD_FOLDER_ID);
+        taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code + '_v2');
+        await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
+        const result = await uploadFile(
+          taskFolderId,
+          file.name,
+          file.type || 'application/octet-stream',
+          buffer
+        );
+        driveFileId = result.id;
+        driveFileName = result.name;
+      } else {
+        throw uploadErr;
+      }
+    }
 
     // ตั้ง public
     await setFilePublic(driveFileId);
