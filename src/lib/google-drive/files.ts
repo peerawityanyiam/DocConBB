@@ -3,10 +3,14 @@ import { getDriveClient } from './client';
 const drive = () => getDriveClient();
 
 export async function getOrCreateFolder(parentId: string, name: string): Promise<string> {
+  // Escape single quotes in folder name for Drive query
+  const safeName = name.replace(/'/g, "\\'");
   const res = await drive().files.list({
-    q: `'${parentId}' in parents and name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    q: `'${parentId}' in parents and name='${safeName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id)',
     spaces: 'drive',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   if (res.data.files && res.data.files.length > 0) {
@@ -20,6 +24,7 @@ export async function getOrCreateFolder(parentId: string, name: string): Promise
       parents: [parentId],
     },
     fields: 'id',
+    supportsAllDrives: true,
   });
 
   return folder.data.id!;
@@ -37,6 +42,7 @@ export async function copyTemplate(
       parents: [folderId],
     },
     fields: 'id,webViewLink',
+    supportsAllDrives: true,
   });
 
   return {
@@ -49,34 +55,8 @@ export async function trashFile(fileId: string): Promise<void> {
   await drive().files.update({
     fileId,
     requestBody: { trashed: true },
+    supportsAllDrives: true,
   });
-}
-
-export async function createResumableUpload(
-  folderId: string,
-  fileName: string,
-  mimeType: string
-): Promise<string> {
-  const res = await drive().files.create(
-    {
-      requestBody: {
-        name: fileName,
-        parents: [folderId],
-      },
-      media: {
-        mimeType,
-        body: '',
-      },
-      fields: 'id',
-    },
-    {
-      headers: {
-        'X-Upload-Content-Type': mimeType,
-      },
-    }
-  );
-
-  return res.data.id!;
 }
 
 export async function uploadFile(
@@ -98,6 +78,7 @@ export async function uploadFile(
       body: readable,
     },
     fields: 'id,name',
+    supportsAllDrives: true,
   });
 
   return { id: res.data.id!, name: res.data.name! };
@@ -108,6 +89,8 @@ export async function listFilesInFolder(folderId: string) {
     q: `'${folderId}' in parents and trashed=false`,
     fields: 'files(id,name,mimeType,size,createdTime,webViewLink)',
     orderBy: 'createdTime desc',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   return res.data.files ?? [];

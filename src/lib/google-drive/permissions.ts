@@ -9,6 +9,7 @@ export async function setFilePublic(fileId: string): Promise<void> {
       role: 'reader',
       type: 'anyone',
     },
+    supportsAllDrives: true,
   });
 }
 
@@ -16,6 +17,7 @@ export async function setFilePrivate(fileId: string): Promise<void> {
   const res = await drive().permissions.list({
     fileId,
     fields: 'permissions(id,type)',
+    supportsAllDrives: true,
   });
 
   const anyonePerms = (res.data.permissions ?? []).filter(p => p.type === 'anyone');
@@ -23,6 +25,7 @@ export async function setFilePrivate(fileId: string): Promise<void> {
     await drive().permissions.delete({
       fileId,
       permissionId: perm.id!,
+      supportsAllDrives: true,
     });
   }
 }
@@ -40,5 +43,6 @@ export async function grantAccess(
       emailAddress: email,
     },
     sendNotificationEmail: false,
+    supportsAllDrives: true,
   });
 }
