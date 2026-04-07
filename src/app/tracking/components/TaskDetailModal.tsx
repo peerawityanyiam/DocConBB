@@ -101,10 +101,10 @@ function getAvailableActions(task: Task, roles: AppRole[], userId: string): Acti
 }
 
 const ACTION_STYLE: Record<string, string> = {
-  primary: 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-semibold',
-  danger: 'bg-red-500 hover:bg-red-600 text-white font-semibold',
-  secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-700',
-  warning: 'bg-orange-400 hover:bg-orange-500 text-white font-semibold',
+  primary: 'bg-[#00c2a8] hover:bg-[#009e88] text-white font-semibold',
+  danger: 'bg-[#ef4444] hover:bg-[#dc2626] text-white font-semibold',
+  secondary: 'bg-[#f8fafc] hover:bg-[#e2e8f0] text-[#374f6b] border border-[#e2e8f0]',
+  warning: 'bg-[#f59e0b] hover:bg-[#d97706] text-white font-semibold',
 };
 
 function formatDateTime(iso: string) {
@@ -120,12 +120,38 @@ function calcAgeDays(createdAt: string): number {
   return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-const FILE_UPLOAD_STATUSES: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
+/* Upload context per role (matches reference GAS getUploadContext) */
+function getUploadContext(task: Task, roles: AppRole[], userId: string): { canUpload: boolean; acceptDocx: boolean; acceptPdf: boolean; hint: string } {
+  const s = task.status;
+  const officerStatuses: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
+
+  // Officer: docx only at actionable statuses
+  if ((roles.includes('STAFF') || task.officer_id === userId) && officerStatuses.includes(s)) {
+    return { canUpload: true, acceptDocx: true, acceptPdf: false, hint: 'รองรับเฉพาะ .docx (Word)' };
+  }
+  // DocCon: docx + pdf at SUBMITTED_TO_DOCCON
+  if (roles.includes('DOCCON') && s === 'SUBMITTED_TO_DOCCON') {
+    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
+  }
+  // Reviewer: docx + pdf at PENDING_REVIEW
+  if (roles.includes('REVIEWER') && task.reviewer_id === userId && s === 'PENDING_REVIEW') {
+    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
+  }
+  // Boss: docx + pdf at WAITING_BOSS_APPROVAL
+  if (roles.includes('BOSS') && s === 'WAITING_BOSS_APPROVAL') {
+    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
+  }
+  // Super Boss: docx + pdf at WAITING_SUPER_BOSS_APPROVAL
+  if (roles.includes('SUPER_BOSS') && s === 'WAITING_SUPER_BOSS_APPROVAL') {
+    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
+  }
+  return { canUpload: false, acceptDocx: false, acceptPdf: false, hint: '' };
+}
 
 export default function TaskDetailModal({ taskId, userRoles, userId, onClose, onUpdated }: TaskDetailModalProps) {
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<'detail' | 'files' | 'timeline' | 'comments'>('detail');
+  const [tab, setTab] = useState<'detail' | 'files' | 'timeline'>('detail');
   const [pendingAction, setPendingAction] = useState<ActionDef | null>(null);
   const [comment, setComment] = useState('');
   const [docRef, setDocRef] = useState('');
@@ -367,10 +393,8 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     }
   }
 
-  const canUploadFile = task && (
-    (userRoles.includes('STAFF') && task.officer_id === userId && FILE_UPLOAD_STATUSES.includes(task.status)) ||
-    (userRoles.includes('DOCCON') && task.status === 'SUBMITTED_TO_DOCCON')
-  );
+  const uploadCtx = task ? getUploadContext(task, userRoles, userId) : null;
+  const canUploadFile = uploadCtx?.canUpload ?? false;
 
   const canReassign = task &&
     userRoles.includes('BOSS') &&
@@ -395,10 +419,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
             {task ? (
               <>
                 <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-xs text-slate-400 font-mono">{task.task_code}</p>
                   {/* Age Chip */}
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ageColor}`}>
-                    {ageDays} วัน
+                    ⏱ {ageDays} วัน
                   </span>
                 </div>
                 <h2 className="text-lg font-semibold text-slate-800 leading-snug">{task.title}</h2>
@@ -414,11 +437,11 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 px-6 shrink-0">
-          {(['detail', 'files', 'timeline', 'comments'] as const).map(t => (
+        <div className="flex border-b border-[#e2e8f0] px-6 shrink-0">
+          {(['detail', 'files', 'timeline'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`py-2.5 px-4 text-sm border-b-2 -mb-px transition-colors ${tab === t ? 'border-yellow-400 text-slate-900 font-medium' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-              {t === 'detail' ? 'รายละเอียด' : t === 'files' ? 'ประวัติไฟล์' : t === 'timeline' ? 'ประวัติสถานะ' : 'ความคิดเห็น'}
+              className={`py-2 px-4 text-[0.8rem] font-semibold border-b-2 -mb-px transition-colors ${tab === t ? 'border-[#00c2a8] text-[#00c2a8]' : 'border-transparent text-[#6b7f96] hover:text-[#374f6b] hover:border-[#e2e8f0]'}`}>
+              {t === 'detail' ? 'รายละเอียด' : t === 'files' ? 'ประวัติไฟล์' : 'ประวัติสถานะ'}
             </button>
           ))}
         </div>
@@ -599,48 +622,46 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                   )}
 
                   {/* File Upload Zone */}
-                  {canUploadFile && (
+                  {canUploadFile && uploadCtx && (
                     <div className="space-y-2">
-                      <p className="text-xs font-medium text-slate-500">อัปโหลดไฟล์</p>
+                      <p className="text-xs font-medium text-[#6b7f96]">อัปโหลดไฟล์</p>
                       <div
                         onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
                         onDragLeave={() => setIsDragOver(false)}
                         onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                        className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
                           isDragOver
-                            ? 'border-yellow-400 bg-yellow-50'
-                            : 'border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100'
+                            ? 'border-[#00c2a8] bg-[#e0faf7]'
+                            : 'border-[#e2e8f0] hover:border-[#00c2a8] bg-[#f8fafc] hover:bg-[#e0faf7]'
                         }`}
                       >
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept=".docx,.pdf"
+                          accept={uploadCtx.acceptPdf ? '.docx,.pdf' : '.docx'}
                           onChange={handleFileInputChange}
                           className="hidden"
                         />
                         {uploadProgress !== null ? (
                           <div className="space-y-2">
-                            <p className="text-sm text-slate-600">กำลังอัปโหลด... {uploadProgress}%</p>
-                            <div className="w-full bg-slate-200 rounded-full h-2">
-                              <div
-                                className="bg-yellow-400 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress}%` }}
-                              />
+                            <p className="text-sm text-[#374f6b]">กำลังอัปโหลด... {uploadProgress}%</p>
+                            <div className="w-full bg-[#e2e8f0] rounded-full" style={{ height: '6px' }}>
+                              <div className="rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%`, height: '6px', background: '#00c2a8' }} />
                             </div>
                           </div>
                         ) : (
                           <>
-                            <p className="text-sm text-slate-500">
-                              ลากไฟล์มาวางที่นี่ หรือ <span className="text-yellow-600 font-medium">คลิกเพื่อเลือกไฟล์</span>
+                            <p className="text-2xl mb-2 text-[#94a3b8]">📎</p>
+                            <p className="text-sm text-[#6b7f96]">
+                              ลากไฟล์มาวางที่นี่ หรือ <span className="text-[#00c2a8] font-semibold">คลิกเพื่อเลือกไฟล์</span>
                             </p>
-                            <p className="text-xs text-slate-400 mt-1">รองรับ .docx และ .pdf (สูงสุด 50MB)</p>
+                            <p className="text-xs text-[#94a3b8] mt-1">{uploadCtx.hint}</p>
                           </>
                         )}
                       </div>
                       {uploadError && (
-                        <p className="text-xs text-red-600">{uploadError}</p>
+                        <p className="text-xs text-[#ef4444]">{uploadError}</p>
                       )}
                     </div>
                   )}
@@ -726,20 +747,23 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                       )}
                       {pendingAction.needsComment && (
                         <div>
-                          <label className="block text-xs text-slate-600 mb-1">หมายเหตุ</label>
-                          <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
-                            placeholder="ระบุเหตุผลหรือหมายเหตุ"
-                            className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none" />
+                          <label className="block text-xs text-[#6b7f96] font-bold mb-1">ระบุเหตุผล / ข้อที่ต้องแก้ไข <span className="text-[#ef4444]">*</span></label>
+                          <textarea value={comment} onChange={e => setComment(e.target.value)} rows={3}
+                            placeholder="เช่น หน้าปกไม่ครบ, ต้องแก้ข้อ 3.2 ..."
+                            className="w-full border border-[#e2e8f0] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8] resize-none" />
+                          {pendingAction.needsComment && !comment.trim() && (
+                            <p className="text-xs text-[#ef4444] mt-1">กรุณาระบุเหตุผล</p>
+                          )}
                         </div>
                       )}
                       {actionError && <p className="text-xs text-red-600">{actionError}</p>}
                       <div className="flex gap-2">
-                        <button onClick={handleAction} disabled={actionLoading}
-                          className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-sm rounded-lg disabled:opacity-50 font-medium transition-colors">
+                        <button onClick={handleAction} disabled={actionLoading || (pendingAction.needsComment && !comment.trim())}
+                          className="px-4 py-1.5 bg-[#0d1b2e] hover:bg-[#1a3a5c] text-white text-sm rounded-lg disabled:opacity-50 font-semibold transition-colors">
                           {actionLoading ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
                         </button>
-                        <button onClick={() => { setPendingAction(null); setActionError(''); setDocRefCheck(null); }}
-                          className="px-4 py-1.5 bg-white border border-slate-300 text-slate-600 text-sm rounded-lg hover:bg-slate-50">
+                        <button onClick={() => { setPendingAction(null); setActionError(''); setDocRefCheck(null); setComment(''); }}
+                          className="px-4 py-1.5 bg-white border border-[#e2e8f0] text-[#374f6b] text-sm rounded-lg hover:bg-[#f8fafc]">
                           ยกเลิก
                         </button>
                       </div>
@@ -791,40 +815,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                 <StatusTimeline history={task.status_history ?? []} />
               )}
 
-              {/* Comments Tab */}
-              {tab === 'comments' && (
-                <div className="space-y-4">
-                  {(task.comment_history ?? []).length === 0 ? (
-                    <p className="text-sm text-slate-400 italic text-center py-4">ยังไม่มีความคิดเห็น</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {[...(task.comment_history ?? [])].reverse().map((c, idx) => (
-                        <div key={idx} className="bg-slate-50 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-medium text-slate-700">{c.byName}</span>
-                            <span className="text-xs text-slate-400">{formatDateTime(c.at)}</span>
-                          </div>
-                          <p className="text-sm text-slate-800">{c.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <form onSubmit={handleAddComment} className="flex gap-2 pt-3 border-t border-slate-100">
-                    <input
-                      type="text"
-                      value={newComment}
-                      onChange={e => setNewComment(e.target.value)}
-                      placeholder="เพิ่มความคิดเห็น..."
-                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                    />
-                    <button type="submit" disabled={commentLoading || !newComment.trim()}
-                      className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg disabled:opacity-40 hover:bg-slate-900 transition-colors">
-                      ส่ง
-                    </button>
-                  </form>
-                </div>
-              )}
+              {/* Comments tab removed — comments are only collected during rejections */}
             </>
           )}
         </div>

@@ -4,7 +4,7 @@ import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
 import { uploadFile, getOrCreateFolder, trashFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 
-const UPLOAD_FOLDER_ID = process.env.GOOGLE_SHARED_FOLDER_ID!;
+const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
 
 // POST /api/tasks/[taskId]/files — อัปโหลดไฟล์ (docx/pdf) เข้า task folder
 export async function POST(
@@ -45,18 +45,59 @@ export async function POST(
     const { data: task } = await admin.from('tasks').select('*').eq('id', taskId).single();
     if (!task) return NextResponse.json({ error: 'ไม่พบงาน' }, { status: 404 });
 
-    // ตรวจสอบสถานะ — อนุญาตอัปโหลดเฉพาะสถานะที่ถูกต้อง
-    const uploadableStatuses = [
-      'ASSIGNED', 'SUBMITTED_TO_DOCCON',
-      'DOCCON_REJECTED', 'REVIEWER_REJECTED',
-      'BOSS_REJECTED', 'SUPER_BOSS_REJECTED',
-      'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL',
-    ];
-    if (!uploadableStatuses.includes(task.status)) {
-      return NextResponse.json(
-        { error: 'ไม่สามารถอัปโหลดไฟล์ในสถานะนี้ได้' },
-        { status: 400 }
-      );
+    // ── ตรวจสอบสิทธิ์อัปโหลดตาม role + status (ตาม reference GAS) ──
+    const { data: userRoleRows } = await admin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', dbUser.id);
+    const userRolesSet = new Set((userRoleRows ?? []).map(r => r.role));
+
+    // Officer: can upload DOCX only at actionable statuses
+    const officerStatuses = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
+    // DocCon: can upload at SUBMITTED_TO_DOCCON
+    const docconStatuses = ['SUBMITTED_TO_DOCCON'];
+    // Reviewer: can upload at PENDING_REVIEW
+    const reviewerStatuses = ['PENDING_REVIEW'];
+    // Boss: can upload at WAITING_BOSS_APPROVAL
+    const bossStatuses = ['WAITING_BOSS_APPROVAL'];
+    // Super Boss: can upload at WAITING_SUPER_BOSS_APPROVAL
+    const superBossStatuses = ['WAITING_SUPER_BOSS_APPROVAL'];
+
+    let canUpload = false;
+    let allowPdf = false; // PDF ref only for non-officer roles
+
+    if ((userRolesSet.has('STAFF') || task.officer_id === dbUser.id) && officerStatuses.includes(task.status)) {
+      canUpload = true;
+      allowPdf = false; // Officer: DOCX only
+    }
+    if (userRolesSet.has('DOCCON') && docconStatuses.includes(task.status)) {
+      canUpload = true;
+      allowPdf = true;
+    }
+    if (userRolesSet.has('REVIEWER') && reviewerStatuses.includes(task.status) && task.reviewer_id === dbUser.id) {
+      canUpload = true;
+      allowPdf = true;
+    }
+    if (userRolesSet.has('BOSS') && bossStatuses.includes(task.status)) {
+      canUpload = true;
+      allowPdf = true;
+    }
+    if (userRolesSet.has('SUPER_BOSS') && superBossStatuses.includes(task.status)) {
+      canUpload = true;
+      allowPdf = true;
+    }
+    if (userRolesSet.has('SUPER_ADMIN')) {
+      canUpload = true;
+      allowPdf = true;
+    }
+
+    if (!canUpload) {
+      return NextResponse.json({ error: 'คุณไม่มีสิทธิ์อัปโหลดไฟล์ในสถานะนี้' }, { status: 403 });
+    }
+
+    const isPdfFile = ext === 'pdf';
+    if (isPdfFile && !allowPdf) {
+      return NextResponse.json({ error: 'ตำแหน่งนี้อัปโหลดได้เฉพาะไฟล์ .docx เท่านั้น' }, { status: 400 });
     }
 
     // สร้าง/หา task folder ใน Drive
@@ -134,6 +175,9 @@ export async function POST(
       viewUrl: `https://drive.google.com/file/d/${driveFileId}/view`,
     }, { status: 201 });
   } catch (err) {
-    return handleAuthError(err);
+    if (err instanceof AuthError) return handleAuthError(err);
+    console.error('[FILE_UPLOAD_ERROR]', err);
+    const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัปโหลดไฟล์';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

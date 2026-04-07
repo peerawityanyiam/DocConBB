@@ -204,7 +204,6 @@ export default function TaskCard({ task, onClick }: TaskCardProps) {
       <div className="p-3.5">
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="flex-1 min-w-0">
-            <p className="text-[0.68rem] text-[#6b7f96] font-mono mb-0.5">{task.task_code}</p>
             <h3 className="font-bold text-[#0d1b2e] text-sm leading-snug line-clamp-2">
               {task.title}
             </h3>
