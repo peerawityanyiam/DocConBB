@@ -42,12 +42,21 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
   STAFF: [
     {
       key: 'my_tasks',
-      label: 'งานของฉัน',
+      label: 'งานรอดำเนินการ',
       filter: (t, userId) => {
         const actionable: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
         return t.officer_id === userId && actionable.includes(t.status);
       },
       useActionCard: true,
+    },
+    {
+      key: 'tracking',
+      label: 'ติดตามงาน',
+      filter: (t, userId) => {
+        const nonTrackable: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED', 'COMPLETED', 'CANCELLED'];
+        return t.officer_id === userId && !nonTrackable.includes(t.status);
+      },
+      useActionCard: false,
     },
     {
       key: 'completed',
@@ -156,7 +165,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     setActiveSubTab(subs[0]?.key ?? '');
   }, [activeTab]);
 
-  // Fetch task counts for badges
+  // Fetch task counts for badges — show only actionable tasks per role
   const fetchTabCounts = useCallback(async () => {
     const counts: Record<string, number> = {};
     await Promise.all(
@@ -165,14 +174,31 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
           const res = await fetch(`/api/tasks?role=${role}`);
           if (res.ok) {
             const data: Task[] = await res.json();
-            counts[role] = data.length;
+            // Filter to actionable tasks only for badge counts
+            const actionable = data.filter(t => {
+              switch (role) {
+                case 'STAFF':
+                  return t.officer_id === userId && ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'].includes(t.status);
+                case 'DOCCON':
+                  return t.status === 'SUBMITTED_TO_DOCCON';
+                case 'REVIEWER':
+                  return t.status === 'PENDING_REVIEW' && t.reviewer_id === userId;
+                case 'BOSS':
+                  return t.status === 'WAITING_BOSS_APPROVAL' && t.created_by === userId;
+                case 'SUPER_BOSS':
+                  return t.status === 'WAITING_SUPER_BOSS_APPROVAL';
+                default:
+                  return true;
+              }
+            });
+            counts[role] = actionable.length;
           }
         } catch { /* ignore */ }
       })
     );
     setTabCounts(counts);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userRoles.join(',')]);
+  }, [userRoles.join(','), userId]);
 
   useEffect(() => { fetchTabCounts(); }, [fetchTabCounts]);
 

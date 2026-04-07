@@ -52,52 +52,39 @@ export async function POST(
       .eq('user_id', dbUser.id);
     const userRolesSet = new Set((userRoleRows ?? []).map(r => r.role));
 
-    // Officer: can upload DOCX only at actionable statuses
+    // All roles can upload both .docx and .pdf at their actionable statuses
     const officerStatuses = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
-    // DocCon: can upload at SUBMITTED_TO_DOCCON
     const docconStatuses = ['SUBMITTED_TO_DOCCON'];
-    // Reviewer: can upload at PENDING_REVIEW
     const reviewerStatuses = ['PENDING_REVIEW'];
-    // Boss: can upload at WAITING_BOSS_APPROVAL
     const bossStatuses = ['WAITING_BOSS_APPROVAL'];
-    // Super Boss: can upload at WAITING_SUPER_BOSS_APPROVAL
     const superBossStatuses = ['WAITING_SUPER_BOSS_APPROVAL'];
 
     let canUpload = false;
-    let allowPdf = false; // PDF ref only for non-officer roles
 
-    if ((userRolesSet.has('STAFF') || task.officer_id === dbUser.id) && officerStatuses.includes(task.status)) {
+    if (userRolesSet.has('STAFF') && task.officer_id === dbUser.id && officerStatuses.includes(task.status)) {
       canUpload = true;
-      allowPdf = false; // Officer: DOCX only
     }
     if (userRolesSet.has('DOCCON') && docconStatuses.includes(task.status)) {
       canUpload = true;
-      allowPdf = true;
     }
     if (userRolesSet.has('REVIEWER') && reviewerStatuses.includes(task.status) && task.reviewer_id === dbUser.id) {
       canUpload = true;
-      allowPdf = true;
     }
     if (userRolesSet.has('BOSS') && bossStatuses.includes(task.status)) {
       canUpload = true;
-      allowPdf = true;
     }
     if (userRolesSet.has('SUPER_BOSS') && superBossStatuses.includes(task.status)) {
       canUpload = true;
-      allowPdf = true;
     }
     if (userRolesSet.has('SUPER_ADMIN')) {
       canUpload = true;
-      allowPdf = true;
     }
 
     if (!canUpload) {
-      return NextResponse.json({ error: 'คุณไม่มีสิทธิ์อัปโหลดไฟล์ในสถานะนี้' }, { status: 403 });
-    }
-
-    const isPdfFile = ext === 'pdf';
-    if (isPdfFile && !allowPdf) {
-      return NextResponse.json({ error: 'ตำแหน่งนี้อัปโหลดได้เฉพาะไฟล์ .docx เท่านั้น' }, { status: 400 });
+      const rolesStr = Array.from(userRolesSet).join(', ') || 'none';
+      return NextResponse.json({
+        error: `คุณไม่มีสิทธิ์อัปโหลดไฟล์ในสถานะนี้ (roles: ${rolesStr}, status: ${task.status}, officer_id: ${task.officer_id}, user_id: ${dbUser.id})`,
+      }, { status: 403 });
     }
 
     // สร้าง/หา task folder ใน Shared Drive
@@ -161,24 +148,19 @@ export async function POST(
     const updates: Record<string, unknown> = { updated_at: now };
 
     if (isPdf) {
-      // PDF → ไฟล์อ้างอิง (ref)
+      // PDF → ไฟล์อ้างอิง (ref) — replace old PDF only
       if (task.ref_file_id && task.ref_file_id !== driveFileId) {
         try { await trashFile(task.ref_file_id); } catch { /* ignore */ }
       }
       updates.ref_file_id = driveFileId;
       updates.ref_file_name = driveFileName;
     } else {
-      // DOCX → ไฟล์หลัก + ล้าง ref PDF + trash ไฟล์เก่า
+      // DOCX → ไฟล์หลัก — replace old DOCX only, keep ref PDF intact
       if (task.drive_file_id && task.drive_file_id !== driveFileId) {
         try { await trashFile(task.drive_file_id); } catch { /* ignore */ }
       }
-      if (task.ref_file_id) {
-        try { await trashFile(task.ref_file_id); } catch { /* ignore */ }
-      }
       updates.drive_file_id = driveFileId;
       updates.drive_file_name = driveFileName;
-      updates.ref_file_id = null;
-      updates.ref_file_name = null;
     }
 
     // อัปเดต file_history
