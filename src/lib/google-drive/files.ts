@@ -16,6 +16,30 @@ export async function checkFolderExists(folderId: string): Promise<boolean> {
   }
 }
 
+export async function assertFolderAccessible(folderId: string): Promise<void> {
+  try {
+    const res = await drive().files.get({
+      fileId: folderId,
+      fields: 'id,name,trashed',
+      supportsAllDrives: true,
+    });
+    if (res.data.trashed) {
+      throw new Error(`โฟลเดอร์ถูกย้ายไปถังขยะแล้ว (${folderId})`);
+    }
+  } catch (err) {
+    const apiMessage =
+      typeof err === 'object' &&
+      err !== null &&
+      'response' in err &&
+      typeof (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message === 'string'
+        ? (err as { response: { data: { error: { message: string } } } }).response.data.error.message
+        : null;
+    const fallbackMessage =
+      err instanceof Error ? err.message : 'ไม่สามารถเข้าถึงโฟลเดอร์ได้';
+    throw new Error(apiMessage || fallbackMessage);
+  }
+}
+
 export async function getOrCreateFolder(parentId: string, name: string): Promise<string> {
   // Escape single quotes in folder name for Drive query
   const safeName = name.replace(/'/g, "\\'");

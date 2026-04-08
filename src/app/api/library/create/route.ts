@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
-import { checkFolderExists, copyTemplate } from '@/lib/google-drive/files';
+import { assertFolderAccessible, copyTemplate } from '@/lib/google-drive/files';
 import { grantAccess } from '@/lib/google-drive/permissions';
 
 const LIBRARY_FOLDER_ID = '10Ithv7g75Sd0he6IuVP6Nwk0IIVCFw1i';
@@ -66,9 +66,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const folderOk = await checkFolderExists(LIBRARY_FOLDER_ID);
-      if (!folderOk) {
-        return NextResponse.json({ error: 'ไม่พบโฟลเดอร์ปลายทางของคลังเอกสาร' }, { status: 500 });
+      try {
+        await assertFolderAccessible(LIBRARY_FOLDER_ID);
+      } catch (folderErr) {
+        const msg = folderErr instanceof Error ? folderErr.message : 'ไม่สามารถเข้าถึงโฟลเดอร์ปลายทางของคลังเอกสารได้';
+        return NextResponse.json(
+          { error: `เข้าถึงโฟลเดอร์คลังเอกสารไม่ได้: ${msg}` },
+          { status: 500 }
+        );
       }
 
       try {

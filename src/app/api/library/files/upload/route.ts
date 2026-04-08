@@ -2,7 +2,7 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError, requireRole } from '@/lib/auth/guards';
 import { convertExcelToSpreadsheet, trashFile, uploadFile } from '@/lib/google-drive/files';
-import { setFilePublic } from '@/lib/google-drive/permissions';
+import { grantAccess, setFilePublic } from '@/lib/google-drive/permissions';
 import { importExcelSheetsIntoSpreadsheet } from '@/lib/google-sheets/workbook';
 
 // Fixed library upload folder (requested behavior to mirror GAS flow)
@@ -64,6 +64,13 @@ export async function POST(request: NextRequest) {
       // GAS behavior: ถ้ามีไฟล์ template อยู่แล้ว ให้ดูดชีตจาก Excel มาแทนชีตเดิมในไฟล์นั้น
       // เพื่อคงเมนู GAS เพิ่ม/ลบเอกสารไว้
       if (standard.drive_file_id) {
+        // Ensure current DocCon can edit this sheet before importing
+        try {
+          await grantAccess(standard.drive_file_id, user.email, 'writer');
+        } catch {
+          // ignore duplicate permission / policy conflict
+        }
+
         await importExcelSheetsIntoSpreadsheet({
           targetSpreadsheetId: standard.drive_file_id,
           tempFolderId: folderId,
@@ -188,3 +195,4 @@ export async function POST(request: NextRequest) {
     return handleAuthError(err);
   }
 }
+
