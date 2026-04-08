@@ -105,29 +105,6 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
     }
   }
 
-  async function handleClearFile(standard: Standard) {
-    const ok = window.confirm(`ยืนยันลบไฟล์ปัจจุบันของเอกสาร "${standard.name}" ?`);
-    if (!ok) return;
-
-    try {
-      const res = await fetch('/api/library/files/clear', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ standardId: standard.id }),
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        window.alert(d.error ?? 'ลบไฟล์ไม่สำเร็จ');
-        return;
-      }
-
-      fetchStandards();
-    } catch {
-      window.alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-    }
-  }
-
   const filtered = standards.filter(s => {
     const matchSearch = !search.trim() || s.name.toLowerCase().includes(search.toLowerCase());
     const status = calculateDocStatus(s.start_date ?? null, s.end_date ?? null, s.always_open, s.locked);
@@ -264,7 +241,6 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
                 standard={s}
                 userRoles={userRoles}
                 onUpload={setUploadTarget}
-                onClearFile={handleClearFile}
                 onRename={std => { setRenameTarget(std); setRenameName(std.name); }}
                 onSettings={std => { setSettingsMode('edit'); setSettingsTarget(std); }}
                 onDelete={std => { setDeleteTarget(std); setDeleteReason(''); }}

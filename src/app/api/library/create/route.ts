@@ -1,6 +1,10 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
+import { checkFolderExists, copyTemplate } from '@/lib/google-drive/files';
+
+const LIBRARY_FOLDER_ID = '10Ithv7g75Sd0he6IuVP6Nwk0IIVCFw1i';
+const LIBRARY_TEMPLATE_ID = process.env.GOOGLE_LIBRARY_TEMPLATE_ID || '1HKO-Nfg3bV0QbP2WTK4V2R_eoywruNrolxOjVJS8mjo';
 
 // POST /api/library/create - สร้างมาตรฐานใหม่ (DOCCON only)
 export async function POST(request: NextRequest) {
@@ -44,12 +48,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const linkMode = Boolean(is_link);
+    let finalUrl = typeof url === 'string' ? url.trim() : '';
+    let driveFileId: string | null = null;
+
+    // เอกสารปกติ: สร้างไฟล์จาก Template เพื่อให้ได้ GAS menu เพิ่ม/ลบเอกสารเหมือนระบบเดิม
+    if (!linkMode) {
+      const folderOk = await checkFolderExists(LIBRARY_FOLDER_ID);
+      if (!folderOk) {
+        return NextResponse.json({ error: 'ไม่พบโฟลเดอร์ปลายทางของคลังเอกสาร' }, { status: 500 });
+      }
+
+      try {
+        const copied = await copyTemplate(LIBRARY_TEMPLATE_ID, normalizedName, LIBRARY_FOLDER_ID);
+        driveFileId = copied.id;
+        finalUrl = copied.url || `https://docs.google.com/spreadsheets/d/${copied.id}/edit`;
+      } catch (copyErr) {
+        const copyMsg = copyErr instanceof Error ? copyErr.message : 'ไม่สามารถคัดลอก Template ได้';
+        return NextResponse.json({ error: `สร้างไฟล์เอกสารไม่สำเร็จ: ${copyMsg}` }, { status: 500 });
+      }
+    }
+
     const { data, error } = await admin
       .from('standards')
       .insert({
         name: normalizedName,
-        url: url?.trim() ?? '',
-        is_link: is_link ?? false,
+        url: finalUrl,
+        drive_file_id: driveFileId,
+        is_link: linkMode,
         start_date: start_date ?? null,
         end_date: end_date ?? null,
         always_open: always_open ?? false,

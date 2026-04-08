@@ -84,7 +84,11 @@ export async function uploadFile(
   folderId: string,
   fileName: string,
   mimeType: string,
-  body: Buffer | ReadableStream
+  body: Buffer | ReadableStream,
+  options?: {
+    appProperties?: Record<string, string>;
+    description?: string;
+  }
 ): Promise<{ id: string; name: string }> {
   const { Readable } = await import('stream');
   const readable = Buffer.isBuffer(body) ? Readable.from(body) : Readable.fromWeb(body as never);
@@ -93,6 +97,8 @@ export async function uploadFile(
     requestBody: {
       name: fileName,
       parents: [folderId],
+      appProperties: options?.appProperties,
+      description: options?.description,
     },
     media: {
       mimeType,
@@ -103,6 +109,26 @@ export async function uploadFile(
   });
 
   return { id: res.data.id!, name: res.data.name! };
+}
+
+export async function getFileMetadata(fileId: string): Promise<{
+  id: string;
+  name: string;
+  appProperties: Record<string, string>;
+  webViewLink: string | null;
+}> {
+  const res = await drive().files.get({
+    fileId,
+    fields: 'id,name,appProperties,webViewLink',
+    supportsAllDrives: true,
+  });
+
+  return {
+    id: res.data.id!,
+    name: res.data.name ?? '',
+    appProperties: (res.data.appProperties ?? {}) as Record<string, string>,
+    webViewLink: res.data.webViewLink ?? null,
+  };
 }
 
 export async function convertExcelToSpreadsheet(

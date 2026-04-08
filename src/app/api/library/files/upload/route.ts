@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError, requireRole } from '@/lib/auth/guards';
-import { convertExcelToSpreadsheet, uploadFile } from '@/lib/google-drive/files';
+import { convertExcelToSpreadsheet, trashFile, uploadFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
+import { importExcelSheetsIntoSpreadsheet } from '@/lib/google-sheets/workbook';
 
 // Fixed library upload folder (requested behavior to mirror GAS flow)
 const LIBRARY_UPLOAD_FOLDER_ID = '10Ithv7g75Sd0he6IuVP6Nwk0IIVCFw1i';
 
-// POST /api/library/files/upload — อัปโหลดไฟล์ผ่าน Service Account
+// POST /api/library/files/upload - อัปโหลดไฟล์ผ่าน Service Account
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser('library');
@@ -22,6 +23,18 @@ export async function POST(request: NextRequest) {
     if (!standardId) return NextResponse.json({ error: 'ไม่ระบุ standardId' }, { status: 400 });
 
     const admin = await createServiceRoleClient();
+
+    const { data: standard, error: stdError } = await admin
+      .from('standards')
+      .select('id, name, drive_file_id, is_link')
+      .eq('id', standardId)
+      .single();
+
+    if (stdError) throw stdError;
+    if (!standard) return NextResponse.json({ error: 'ไม่พบเอกสารในระบบ' }, { status: 404 });
+    if (standard.is_link) {
+      return NextResponse.json({ error: 'เอกสารนี้เป็นลิงก์ภายนอก ไม่สามารถอัปโหลดไฟล์ทับได้' }, { status: 400 });
+    }
 
     // ตรวจสอบ file size (max 50MB)
     const MAX_BYTES = 50 * 1024 * 1024;
@@ -40,20 +53,42 @@ export async function POST(request: NextRequest) {
     let driveFileId: string;
     let driveFileName: string;
     let viewUrl: string;
+    let replacedInPlace = false;
+
     if (isExcel) {
       const excelMimeType = file.type
         || (lowerName.endsWith('.xls')
           ? 'application/vnd.ms-excel'
           : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      const converted = await convertExcelToSpreadsheet(
-        folderId,
-        file.name,
-        excelMimeType,
-        buffer
-      );
-      driveFileId = converted.id;
-      driveFileName = converted.name;
-      viewUrl = converted.webViewLink ?? `https://docs.google.com/spreadsheets/d/${driveFileId}/edit`;
+
+      // GAS behavior: ถ้ามีไฟล์ template อยู่แล้ว ให้ดูดชีตจาก Excel มาแทนชีตเดิมในไฟล์นั้น
+      // เพื่อคงเมนู GAS เพิ่ม/ลบเอกสารไว้
+      if (standard.drive_file_id) {
+        await importExcelSheetsIntoSpreadsheet({
+          targetSpreadsheetId: standard.drive_file_id,
+          tempFolderId: folderId,
+          fileName: file.name,
+          mimeType: excelMimeType,
+          body: buffer,
+          removeOriginalSheets: true,
+        });
+
+        driveFileId = standard.drive_file_id;
+        driveFileName = standard.name || file.name.replace(/\.(xlsx|xls)$/i, '');
+        viewUrl = `https://docs.google.com/spreadsheets/d/${driveFileId}/edit`;
+        replacedInPlace = true;
+      } else {
+        // fallback กรณีเอกสารเก่ายังไม่มีไฟล์ผูกอยู่
+        const converted = await convertExcelToSpreadsheet(
+          folderId,
+          file.name,
+          excelMimeType,
+          buffer
+        );
+        driveFileId = converted.id;
+        driveFileName = converted.name;
+        viewUrl = converted.webViewLink ?? `https://docs.google.com/spreadsheets/d/${driveFileId}/edit`;
+      }
     } else {
       const uploaded = await uploadFile(
         folderId,
@@ -83,21 +118,9 @@ export async function POST(request: NextRequest) {
       console.warn('[library/files/upload] setFilePublic failed:', msg);
     }
 
-    // หา standard เพื่ออัปเดต drive_file_id
-    const { data: standard } = await admin
-      .from('standards')
-      .select('drive_file_id')
-      .eq('id', standardId)
-      .single();
-
-    if (!standard) {
-      return NextResponse.json({ error: 'ไม่พบเอกสารในระบบ' }, { status: 404 });
-    }
-
-    // Soft-delete ไฟล์เก่าใน DB + trash ใน Drive ถ้ามี
-    if (standard?.drive_file_id) {
+    // non-Excel หรือ fallback Excel ใหม่: ถ้ามีไฟล์เก่าให้ย้ายถังขยะ
+    if (!replacedInPlace && standard.drive_file_id && standard.drive_file_id !== driveFileId) {
       try {
-        const { trashFile } = await import('@/lib/google-drive/files');
         await trashFile(standard.drive_file_id);
       } catch {
         console.error('Could not trash old file:', standard.drive_file_id);
@@ -123,6 +146,7 @@ export async function POST(request: NextRequest) {
       driveFileName,
       viewUrl,
       warning: permissionWarning,
+      replacedInPlace,
     }, { status: 201 });
   } catch (err) {
     console.error('[library/files/upload] failed:', err);
