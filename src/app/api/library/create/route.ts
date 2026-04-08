@@ -6,6 +6,7 @@ import { grantAccess } from '@/lib/google-drive/permissions';
 
 const LIBRARY_FOLDER_ID = '10Ithv7g75Sd0he6IuVP6Nwk0IIVCFw1i';
 const LIBRARY_TEMPLATE_ID = process.env.GOOGLE_LIBRARY_TEMPLATE_ID || '1HKO-Nfg3bV0QbP2WTK4V2R_eoywruNrolxOjVJS8mjo';
+const IMPERSONATE_EMAIL = process.env.GOOGLE_IMPERSONATE_EMAIL?.trim();
 
 // POST /api/library/create - สร้างมาตรฐานใหม่ (DOCCON only)
 export async function POST(request: NextRequest) {
@@ -55,6 +56,16 @@ export async function POST(request: NextRequest) {
 
     // เอกสารปกติ: สร้างไฟล์จาก Template เพื่อให้ได้ GAS menu เพิ่ม/ลบเอกสารเหมือนระบบเดิม
     if (!linkMode) {
+      if (!IMPERSONATE_EMAIL) {
+        return NextResponse.json(
+          {
+            error:
+              'ยังไม่ได้ตั้งค่า GOOGLE_IMPERSONATE_EMAIL ทำให้ไฟล์ถูกสร้างโดย service account และ Apps Script จะรันไม่ได้ กรุณาตั้งเป็นอีเมลผู้ใช้จริงก่อนสร้างเอกสาร',
+          },
+          { status: 500 }
+        );
+      }
+
       const folderOk = await checkFolderExists(LIBRARY_FOLDER_ID);
       if (!folderOk) {
         return NextResponse.json({ error: 'ไม่พบโฟลเดอร์ปลายทางของคลังเอกสาร' }, { status: 500 });
@@ -70,6 +81,13 @@ export async function POST(request: NextRequest) {
           await grantAccess(copied.id, user.email, 'writer');
         } catch {
           // skip: may already have permission from shared drive
+        }
+
+        // ensure impersonated owner has explicit writer access too
+        try {
+          await grantAccess(copied.id, IMPERSONATE_EMAIL, 'writer');
+        } catch {
+          // skip duplicate permission
         }
 
         // ให้ DocCon/SuperAdmin ของ project library มีสิทธิ์ writer ด้วย
