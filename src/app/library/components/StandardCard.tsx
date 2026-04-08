@@ -26,6 +26,7 @@ interface StandardCardProps {
   standard: Standard;
   userRoles: AppRole[];
   onUpload: (standard: Standard) => void;
+  onClearFile: (standard: Standard) => void;
   onRename: (standard: Standard) => void;
   onSettings: (standard: Standard) => void;
   onDelete: (standard: Standard) => void;
@@ -86,7 +87,16 @@ function infoMsg(status: DocStatus, openDate: string | null | undefined) {
   return null;
 }
 
-export default function StandardCard({ standard, userRoles, onUpload, onRename, onSettings, onDelete, onTogglePin }: StandardCardProps) {
+export default function StandardCard({
+  standard,
+  userRoles,
+  onUpload,
+  onClearFile,
+  onRename,
+  onSettings,
+  onDelete,
+  onTogglePin,
+}: StandardCardProps) {
   const docStatus = calculateDocStatus(
     standard.start_date ?? null,
     standard.end_date ?? null,
@@ -187,6 +197,26 @@ export default function StandardCard({ standard, userRoles, onUpload, onRename, 
         {/* DocCon action buttons (matches ref card foot admin buttons) */}
         {isDoccon && (
           <div className="ml-auto flex gap-1.5">
+            {!standard.is_link && (
+              <button
+                onClick={() => onUpload(standard)}
+                className="bg-[#f1f5f9] text-[#475569] border border-[#e5e7eb] rounded-md text-xs hover:bg-[#e2e8f0] hover:text-[#111827] transition-colors"
+                style={{ padding: '6px 10px' }}
+                title="อัปโหลดไฟล์"
+              >
+                ⬆️
+              </button>
+            )}
+            {!standard.is_link && standard.drive_file_id && (
+              <button
+                onClick={() => onClearFile(standard)}
+                className="bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa] rounded-md text-xs hover:bg-[#ffedd5] transition-colors"
+                style={{ padding: '6px 10px' }}
+                title="ลบไฟล์ปัจจุบัน"
+              >
+                🗂️
+              </button>
+            )}
             <button onClick={() => onTogglePin(standard)}
               className={`rounded-md text-xs border transition-colors ${
                 standard.pinned

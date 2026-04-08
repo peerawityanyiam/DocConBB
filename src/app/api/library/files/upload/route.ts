@@ -66,8 +66,22 @@ export async function POST(request: NextRequest) {
       viewUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
     }
 
-    // ตั้งสิทธิ์ public (anyoneWithLink)
-    await setFilePublic(driveFileId);
+    // พยายามตั้งสิทธิ์ public (บางองค์กร block "anyone" ใน Shared Drive)
+    // ถ้าตั้งไม่ได้ให้ทำงานต่อ เพื่อไม่ให้ผู้ใช้เห็นว่าอัปโหลดล้มทั้งที่ไฟล์ขึ้น Drive แล้ว
+    let permissionWarning: string | null = null;
+    try {
+      await setFilePublic(driveFileId);
+    } catch (permissionError) {
+      const msg =
+        typeof permissionError === 'object' &&
+        permissionError !== null &&
+        'message' in permissionError &&
+        typeof (permissionError as { message?: unknown }).message === 'string'
+          ? (permissionError as { message: string }).message
+          : 'ไม่สามารถปรับสิทธิ์เป็นสาธารณะได้';
+      permissionWarning = msg;
+      console.warn('[library/files/upload] setFilePublic failed:', msg);
+    }
 
     // หา standard เพื่ออัปเดต drive_file_id
     const { data: standard } = await admin
@@ -108,6 +122,7 @@ export async function POST(request: NextRequest) {
       driveFileId,
       driveFileName,
       viewUrl,
+      warning: permissionWarning,
     }, { status: 201 });
   } catch (err) {
     console.error('[library/files/upload] failed:', err);
