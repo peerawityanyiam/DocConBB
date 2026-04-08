@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (err) {
     console.error('[library/files/upload] failed:', err);
-    const message =
+    const rawMessage =
       typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: unknown }).message === 'string'
         ? (err as { message: string }).message
         : 'เกิดข้อผิดพลาดภายใน';
@@ -162,12 +162,27 @@ export async function POST(request: NextRequest) {
         ? (err as { response: { data: { error: { message: string } } } }).response.data.error.message
         : null;
 
+    const combinedMessage = [driveApiMessage, rawMessage].filter(Boolean).join(' ');
+    if (/Google Sheets API has not been used|sheets\.googleapis\.com|is disabled/i.test(combinedMessage)) {
+      const projectMatch = combinedMessage.match(/project\s+(\d+)/i);
+      const projectNo = projectMatch?.[1];
+      const enableLink = projectNo
+        ? `https://console.developers.google.com/apis/api/sheets.googleapis.com/overview?project=${projectNo}`
+        : 'https://console.developers.google.com/apis/api/sheets.googleapis.com/overview';
+      return NextResponse.json(
+        {
+          error: `ยังไม่ได้เปิด Google Sheets API สำหรับ Service Account ที่ใช้งานอยู่ กรุณาเปิดที่ ${enableLink} แล้วรอ 5-10 นาที ก่อนลองใหม่`,
+        },
+        { status: 503 }
+      );
+    }
+
     if (driveApiMessage) {
       return NextResponse.json({ error: `อัปโหลดไฟล์ไม่สำเร็จ: ${driveApiMessage}` }, { status: 500 });
     }
 
-    if (message && message !== 'เกิดข้อผิดพลาดภายใน') {
-      return NextResponse.json({ error: message }, { status: 500 });
+    if (rawMessage && rawMessage !== 'เกิดข้อผิดพลาดภายใน') {
+      return NextResponse.json({ error: rawMessage }, { status: 500 });
     }
 
     return handleAuthError(err);
