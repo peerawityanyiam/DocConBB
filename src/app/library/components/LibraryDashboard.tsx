@@ -193,6 +193,13 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
                 📄 สร้างไฟล์ใหม่
               </button>
               <button
+                onClick={() => setImportOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border-none text-[13px] font-semibold cursor-pointer transition-all whitespace-nowrap text-white shadow-[0_2px_8px_rgba(22,163,74,0.25)] hover:-translate-y-px"
+                style={{ background: '#16a34a', padding: '9px 18px' }}
+              >
+                📊 นำเข้า Excel
+              </button>
+              <button
                 onClick={() => setAddLinkOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] text-[13px] font-semibold cursor-pointer transition-all whitespace-nowrap bg-white text-[#374151] shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[#f8fafc] hover:border-[#cbd5e1]"
                 style={{ padding: '9px 18px' }}
@@ -200,15 +207,6 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
                 🔗 เพิ่มลิงก์
               </button>
             </div>
-          )}
-          {isDoccon && (
-            <button
-              onClick={() => setImportOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border-none text-[13px] font-semibold cursor-pointer transition-all whitespace-nowrap text-white shadow-[0_2px_8px_rgba(22,163,74,0.25)] hover:-translate-y-px"
-              style={{ background: '#16a34a', padding: '9px 18px' }}
-            >
-              📊 นำเข้า Excel
-            </button>
           )}
         </div>
 

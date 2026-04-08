@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
+import { getAuthUser, handleAuthError, requireRole } from '@/lib/auth/guards';
 import { convertExcelToSpreadsheet, uploadFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 
@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser('library');
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    requireRole(user, ['DOCCON', 'SUPER_ADMIN']);
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -21,15 +22,6 @@ export async function POST(request: NextRequest) {
     if (!standardId) return NextResponse.json({ error: 'ไม่ระบุ standardId' }, { status: 400 });
 
     const admin = await createServiceRoleClient();
-
-    // หา uploader id
-    const { data: dbUser } = await admin
-      .from('users')
-      .select('id')
-      .eq('email', user.email)
-      .single();
-
-    if (!dbUser) return NextResponse.json({ error: 'ไม่พบข้อมูลผู้ใช้' }, { status: 404 });
 
     // ตรวจสอบ file size (max 50MB)
     const MAX_BYTES = 50 * 1024 * 1024;
@@ -49,10 +41,14 @@ export async function POST(request: NextRequest) {
     let driveFileName: string;
     let viewUrl: string;
     if (isExcel) {
+      const excelMimeType = file.type
+        || (lowerName.endsWith('.xls')
+          ? 'application/vnd.ms-excel'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       const converted = await convertExcelToSpreadsheet(
         folderId,
         file.name,
-        file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        excelMimeType,
         buffer
       );
       driveFileId = converted.id;
@@ -80,6 +76,10 @@ export async function POST(request: NextRequest) {
       .eq('id', standardId)
       .single();
 
+    if (!standard) {
+      return NextResponse.json({ error: 'ไม่พบเอกสารในระบบ' }, { status: 404 });
+    }
+
     // Soft-delete ไฟล์เก่าใน DB + trash ใน Drive ถ้ามี
     if (standard?.drive_file_id) {
       try {
@@ -88,52 +88,49 @@ export async function POST(request: NextRequest) {
       } catch {
         console.error('Could not trash old file:', standard.drive_file_id);
       }
-      await admin
-        .from('uploaded_files')
-        .update({ is_current: false })
-        .eq('task_id', standardId)
-        .eq('is_deleted', false);
     }
 
     // อัปเดต standards table
-    await admin
+    const { error: updateError } = await admin
       .from('standards')
       .update({
         drive_file_id: driveFileId,
-        drive_file_name: driveFileName,
         url: viewUrl,
-        is_link: true,
+        is_link: false,
         updated_at: new Date().toISOString(),
       })
       .eq('id', standardId);
 
-    // บันทึกใน uploaded_files
-    const ext = isExcel ? 'GSHEET' : (file.name.split('.').pop()?.toUpperCase() ?? 'FILE');
-    const { data: fileRecord, error: insertErr } = await admin
-      .from('uploaded_files')
-      .insert({
-        task_id: standardId,   // ใช้ task_id เก็บ standard reference
-        uploader_id: dbUser.id,
-        drive_file_id: driveFileId,
-        drive_file_name: driveFileName,
-        file_type: ext,
-        file_size_bytes: file.size,
-        is_current: true,
-        is_deleted: false,
-      })
-      .select()
-      .single();
-
-    if (insertErr) throw insertErr;
+    if (updateError) throw updateError;
 
     return NextResponse.json({
       ok: true,
-      file: fileRecord,
       driveFileId,
       driveFileName,
       viewUrl,
     }, { status: 201 });
   } catch (err) {
+    console.error('[library/files/upload] failed:', err);
+    const message =
+      typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: unknown }).message === 'string'
+        ? (err as { message: string }).message
+        : 'เกิดข้อผิดพลาดภายใน';
+    const driveApiMessage =
+      typeof err === 'object' &&
+      err !== null &&
+      'response' in err &&
+      typeof (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message === 'string'
+        ? (err as { response: { data: { error: { message: string } } } }).response.data.error.message
+        : null;
+
+    if (driveApiMessage) {
+      return NextResponse.json({ error: `อัปโหลดไฟล์ไม่สำเร็จ: ${driveApiMessage}` }, { status: 500 });
+    }
+
+    if (message && message !== 'เกิดข้อผิดพลาดภายใน') {
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+
     return handleAuthError(err);
   }
 }
