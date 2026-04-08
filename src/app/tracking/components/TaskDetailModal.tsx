@@ -623,13 +623,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
                   {/* Upload zone removed — use ActionCard inline actions instead */}
 
-                  {/* Checklist indicators */}
-                  <div className="flex gap-4 text-xs">
-                    <span className={task.doccon_checked ? 'text-green-600' : 'text-slate-400'}>
-                      {task.doccon_checked ? '✅' : '⬜'} ตรวจรูปแบบแล้ว
-                    </span>
-                  </div>
-
                   {/* DocCon post-completion checklist (only for DOCCON role on completed tasks) */}
                   {userRoles.includes('DOCCON') && task.status === 'COMPLETED' && (
                     <div className="border border-teal-200 bg-teal-50/50 rounded-xl p-4 space-y-3">

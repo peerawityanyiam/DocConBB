@@ -8,11 +8,11 @@ import type { TaskStatus } from '@/lib/constants/status';
 
 /* ── Border colors per role context ── */
 const ROLE_BORDER_COLOR: Record<string, string> = {
-  STAFF: '#f59e0b',       // yellow
-  DOCCON: '#0d9488',       // teal
-  REVIEWER: '#6366f1',     // indigo/purple
-  BOSS: '#8b5cf6',         // purple
-  SUPER_BOSS: '#ec4899',   // pink
+  STAFF: '#f59e0b',
+  DOCCON: '#0d9488',
+  REVIEWER: '#6366f1',
+  BOSS: '#8b5cf6',
+  SUPER_BOSS: '#ec4899',
 };
 
 interface ActionCardProps {
@@ -109,14 +109,17 @@ function PipelineViz({ status }: { status: TaskStatus }) {
   );
 }
 
-/* ── Rejection Modal ── */
-function RejectModal({ title, onConfirm, onCancel, loading }: {
+/* ── Rejection / Cancel Modal ── */
+function RejectModal({ title, onConfirm, onCancel, loading, confirmLabel = 'ตีกลับ', confirmStyle = 'danger' }: {
   title: string;
   onConfirm: (comment: string) => void;
   onCancel: () => void;
   loading: boolean;
+  confirmLabel?: string;
+  confirmStyle?: 'danger' | 'warning';
 }) {
   const [comment, setComment] = useState('');
+  const bgColor = confirmStyle === 'warning' ? 'bg-[#f59e0b] hover:bg-[#d97706]' : 'bg-[#dc3545] hover:bg-[#c82333]';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-5" onClick={e => e.stopPropagation()}>
@@ -124,7 +127,7 @@ function RejectModal({ title, onConfirm, onCancel, loading }: {
         <textarea
           value={comment}
           onChange={e => setComment(e.target.value)}
-          placeholder="ระบุเหตุผลในการตีกลับ..."
+          placeholder="ระบุเหตุผล..."
           rows={3}
           className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 resize-none"
         />
@@ -138,9 +141,9 @@ function RejectModal({ title, onConfirm, onCancel, loading }: {
           <button
             onClick={() => onConfirm(comment)}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-lg bg-[#dc3545] text-white text-sm font-bold hover:bg-[#c82333] disabled:opacity-50"
+            className={`flex-1 py-2.5 rounded-lg ${bgColor} text-white text-sm font-bold disabled:opacity-50`}
           >
-            {loading ? 'กำลังดำเนินการ...' : 'ตีกลับ'}
+            {loading ? 'กำลังดำเนินการ...' : confirmLabel}
           </button>
         </div>
       </div>
@@ -159,15 +162,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
   const age = daysAgo(task.created_at);
 
-  // File upload state — separate for word and pdf
+  // File selection state — just tracks what user selected, NOT auto-uploaded
   const [selectedWordFile, setSelectedWordFile] = useState<File | null>(null);
-  const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState('');
   const wordInputRef = useRef<HTMLInputElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-  // Keep legacy ref for backward compat in submit flows
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Action state
   const [actionLoading, setActionLoading] = useState(false);
@@ -200,75 +199,85 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     return () => { if (docRefTimerRef.current) clearTimeout(docRefTimerRef.current); };
   }, [docRef, activeRole, task.id]);
 
-  /* ── File Upload (XHR with progress) ── */
-  const handleFileUpload = useCallback((file: File, taskId: string, cb: () => void) => {
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) { setUploadError('ไฟล์มีขนาดเกิน 50MB'); return; }
-    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    if (!['.docx', '.pdf'].includes(ext)) {
-      setUploadError('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น');
-      return;
-    }
-    setUploadError('');
-    setUploadProgress(0);
-    const formData = new FormData();
-    formData.append('file', file);
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `/api/tasks/${taskId}/files`);
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
-    });
-    xhr.addEventListener('load', () => {
-      setUploadProgress(null);
-      if (xhr.status >= 200 && xhr.status < 300) {
-        cb();
-      } else {
-        try { const d = JSON.parse(xhr.responseText); setUploadError(d.error ?? 'อัปโหลดไม่สำเร็จ'); } catch { setUploadError('อัปโหลดไม่สำเร็จ'); }
+  /* ── uploadFileAsync: returns Promise (no callback) ── */
+  const uploadFileAsync = useCallback((file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (!['.docx', '.pdf'].includes(ext)) {
+        reject(new Error('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น'));
+        return;
       }
+      if (file.size > 50 * 1024 * 1024) {
+        reject(new Error('ไฟล์มีขนาดเกิน 50MB'));
+        return;
+      }
+      setUploadProgress(0);
+      const formData = new FormData();
+      formData.append('file', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `/api/tasks/${task.id}/files`);
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+      });
+      xhr.addEventListener('load', () => {
+        setUploadProgress(null);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          try { const d = JSON.parse(xhr.responseText); reject(new Error(d.error ?? 'อัปโหลดไม่สำเร็จ')); }
+          catch { reject(new Error('อัปโหลดไม่สำเร็จ')); }
+        }
+      });
+      xhr.addEventListener('error', () => { setUploadProgress(null); reject(new Error('เกิดข้อผิดพลาดในการอัปโหลด')); });
+      xhr.send(formData);
     });
-    xhr.addEventListener('error', () => { setUploadProgress(null); setUploadError('เกิดข้อผิดพลาดในการอัปโหลด'); });
-    xhr.send(formData);
-  }, []);
+  }, [task.id]);
 
-  /* ── Execute action ── */
-  async function executeAction(actionKey: string, comment?: string) {
+  /* ── callStatusApi: calls the status PATCH endpoint ── */
+  async function callStatusApi(actionKey: string, comment?: string): Promise<void> {
+    const body: Record<string, string> = { action: actionKey };
+    if (comment?.trim()) body.comment = comment.trim();
+    if (docRef.trim() && activeRole === 'DOCCON') body.doc_ref = docRef.trim();
+    const res = await fetch(`/api/tasks/${task.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
+  }
+
+  /* ── uploadThenExecute: optionally upload selected file, then execute action ── */
+  async function uploadThenExecute(actionKey: string, comment?: string) {
     setActionLoading(true);
     setActionError('');
+    setUploadError('');
     try {
-      const body: Record<string, string> = { action: actionKey };
-      if (comment?.trim()) body.comment = comment.trim();
-      if (docRef.trim() && activeRole === 'DOCCON') body.doc_ref = docRef.trim();
-
-      const res = await fetch(`/api/tasks/${task.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
+      if (selectedWordFile) {
+        await uploadFileAsync(selectedWordFile);
+        setSelectedWordFile(null);
+        if (wordInputRef.current) wordInputRef.current.value = '';
+      }
+      await callStatusApi(actionKey, comment);
       onUpdated();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาด';
+      setActionError(msg);
     } finally {
       setActionLoading(false);
+      setUploadProgress(null);
     }
   }
 
-  /* ── Staff: submit (must have file already uploaded) ── */
+  /* ── STAFF: submit (upload first if new file selected) ── */
   async function handleStaffSubmit() {
-    if (!task.drive_file_id && !selectedWordFile) {
+    const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
+    // On rejection statuses, must upload new file. On ASSIGNED, ok if already has file.
+    if (!selectedWordFile && (isRejectedStatus || !task.drive_file_id)) {
       setActionError('กรุณาอัปโหลดไฟล์ Word ก่อนส่งงาน');
       return;
     }
-    if (selectedWordFile) {
-      handleFileUpload(selectedWordFile, task.id, () => {
-        setSelectedWordFile(null);
-        if (wordInputRef.current) wordInputRef.current.value = '';
-        executeAction('submit');
-      });
-    } else {
-      executeAction('submit');
-    }
+    await uploadThenExecute('submit');
   }
 
   /* ── DocCon approve — require doc_ref ── */
@@ -277,86 +286,30 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       setActionError('กรุณาระบุรหัสเอกสารก่อน');
       return;
     }
-    executeAction('doccon_approve');
+    await uploadThenExecute('doccon_approve');
   }
 
-  /* ── DocCon reject ── */
-  function handleDocConRejectClick() {
-    setRejectActionKey('doccon_reject');
-    setShowRejectModal(true);
-  }
+  /* ── Reject/cancel modal triggers ── */
+  function handleDocConRejectClick() { setRejectActionKey('doccon_reject'); setShowRejectModal(true); }
+  function handleReviewerRejectClick() { setRejectActionKey('reviewer_reject'); setShowRejectModal(true); }
+  function handleBossRejectClick() { setRejectActionKey('boss_reject'); setShowRejectModal(true); }
+  function handleBossSendToDocCon() { setRejectActionKey('boss_send_to_doccon'); setShowRejectModal(true); }
+  function handleBossCancelClick() { setRejectActionKey('cancel'); setShowRejectModal(true); }
+  function handleSuperBossRejectClick() { setRejectActionKey('super_boss_reject'); setShowRejectModal(true); }
+  function handleSuperBossSendToDocCon() { setRejectActionKey('super_boss_send_to_doccon'); setShowRejectModal(true); }
 
-  /* ── Reviewer approve (with optional file) ── */
-  async function handleReviewerApprove() {
-    executeAction('reviewer_approve');
-  }
-
-  function handleReviewerRejectClick() {
-    setRejectActionKey('reviewer_reject');
-    setShowRejectModal(true);
-  }
-
-  /* ── Boss actions ── */
-  async function handleBossApprove() {
-    executeAction('boss_approve');
-  }
-
-  function handleBossRejectClick() {
-    setRejectActionKey('boss_reject');
-    setShowRejectModal(true);
-  }
-
-  function handleBossSendToDocCon() {
-    setRejectActionKey('boss_send_to_doccon');
-    setShowRejectModal(true);
-  }
-
-  /* ── SuperBoss actions ── */
-  async function handleSuperBossApprove() {
-    executeAction('super_boss_approve');
-  }
-
-  function handleSuperBossRejectClick() {
-    setRejectActionKey('super_boss_reject');
-    setShowRejectModal(true);
-  }
-
-  function handleSuperBossSendToDocCon() {
-    setRejectActionKey('super_boss_send_to_doccon');
-    setShowRejectModal(true);
-  }
-
-  /* ── Rejection confirm handler ── */
+  /* ── Rejection/cancel confirm — uploads file (if any) then executes action ── */
   function handleRejectConfirm(comment: string) {
     setShowRejectModal(false);
-    executeAction(rejectActionKey, comment);
+    uploadThenExecute(rejectActionKey, comment);
   }
 
-  // Auto-upload on file select (no separate button)
+  /* ── File input change: ONLY updates state, never auto-uploads ── */
   function onWordFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     setSelectedWordFile(file);
     setUploadError('');
-    if (file) {
-      handleFileUpload(file, task.id, () => {
-        setSelectedWordFile(null);
-        if (wordInputRef.current) wordInputRef.current.value = '';
-        onUpdated();
-      });
-    }
-  }
-
-  function onPdfFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setSelectedPdfFile(file);
-    setUploadError('');
-    if (file) {
-      handleFileUpload(file, task.id, () => {
-        setSelectedPdfFile(null);
-        if (pdfInputRef.current) pdfInputRef.current.value = '';
-        onUpdated();
-      });
-    }
+    setActionError('');
   }
 
   /* ── Is this a pipeline-only card (DocCon tracking sub-tab)? ── */
@@ -367,6 +320,17 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const wordFileUrl = hasWordFile ? `https://drive.google.com/file/d/${task.drive_file_id}/view` : null;
   const hasRefFile = !!task.ref_file_id;
   const refFileUrl = hasRefFile ? `https://drive.google.com/file/d/${task.ref_file_id}/view` : null;
+
+  /* ── Derived state for staff submit button ── */
+  const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
+  const staffCanSubmit = selectedWordFile !== null || (!isRejectedStatus && !!task.drive_file_id);
+
+  /* ── Is boss cancel available? ── */
+  const bossCanCancel = activeRole === 'BOSS' &&
+    task.created_by === userId &&
+    !['COMPLETED', 'CANCELLED'].includes(task.status);
+
+  const isBlocked = actionLoading || uploadProgress !== null;
 
   return (
     <>
@@ -491,12 +455,13 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {/* ──  ROLE-SPECIFIC INLINE ACTIONS  ──  */}
           {/* ══════════════════════════════════════ */}
 
-          {/* ── STAFF: word upload only + submit ── */}
+          {/* ── STAFF: word upload + submit ── */}
           {activeRole === 'STAFF' && isStaffActionable(task, userId) && (
             <div className="mt-2 space-y-3">
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-                  📄 อัปโหลดไฟล์ Word (.docx) {!task.drive_file_id && <span className="text-red-500">*</span>}
+                  📄 {isRejectedStatus ? 'อัปโหลดไฟล์ Word ที่แก้ไขแล้ว' : 'อัปโหลดไฟล์ Word (.docx)'}
+                  {(isRejectedStatus || !task.drive_file_id) && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   ref={wordInputRef}
@@ -505,8 +470,20 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
-                <p className="text-[0.65rem] text-gray-400 mt-1">รองรับเฉพาะ Word (.docx)</p>
+                {selectedWordFile && (
+                  <p className="text-xs text-green-700 mt-1.5 flex items-center gap-1">
+                    ✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span>
+                  </p>
+                )}
+                {!selectedWordFile && task.drive_file_id && !isRejectedStatus && (
+                  <p className="text-[0.65rem] text-gray-400 mt-1">มีไฟล์เดิมแล้ว — เลือกใหม่เพื่อแทนที่ หรือส่งได้เลย</p>
+                )}
+                {(isRejectedStatus || !task.drive_file_id) && !selectedWordFile && (
+                  <p className="text-[0.65rem] text-red-500 mt-1">กรุณาเลือกไฟล์ Word ก่อนส่งงาน</p>
+                )}
               </div>
+
+              {/* Upload progress */}
               {uploadProgress !== null && (
                 <div className="px-1">
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
@@ -517,14 +494,16 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   </div>
                 </div>
               )}
-              {uploadError && <p className="text-xs text-red-600 px-1">{uploadError}</p>}
-              {actionError && <p className="text-xs text-red-600 px-1">{actionError}</p>}
+
+              {uploadError && <p className="text-xs text-red-600 px-1">⚠️ {uploadError}</p>}
+              {actionError && <p className="text-xs text-red-600 px-1">⚠️ {actionError}</p>}
+
               <button
                 onClick={handleStaffSubmit}
-                disabled={actionLoading || uploadProgress !== null || (!task.drive_file_id && !selectedWordFile)}
+                disabled={isBlocked || !staffCanSubmit}
                 className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
               >
-                {actionLoading ? 'กำลังส่ง...' : '✈ ส่งงาน'}
+                {actionLoading ? (uploadProgress !== null ? `กำลังอัปโหลด ${uploadProgress}%...` : 'กำลังส่ง...') : '✈ ส่งงาน'}
               </button>
             </div>
           )}
@@ -543,12 +522,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                     placeholder="กรอกรหัสเอกสาร เช่น FIN - 001"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400 bg-white"
                   />
-                  <button
-                    onClick={() => { /* auto debounce handles check */ }}
-                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 shrink-0"
-                  >
-                    🔍 ตรวจสอบ
-                  </button>
                 </div>
                 {docRefChecking && <p className="text-xs text-gray-400 mt-1">กำลังตรวจสอบ...</p>}
                 {docRefCheck?.exists && (
@@ -565,7 +538,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 )}
               </div>
 
-              {/* Optional word attachment (auto-upload on select) */}
+              {/* Optional file attachment */}
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ที่มีรอยแก้ (ไม่บังคับ):</label>
                 <input
@@ -575,27 +548,31 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
                 />
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
+                {selectedWordFile && (
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                )}
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
-                {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
 
-              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
+              {(uploadError || actionError) && (
+                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+              )}
 
               {/* Action buttons */}
               <div className="flex gap-2">
                 <button
                   onClick={handleDocConApprove}
-                  disabled={actionLoading || (!docRef.trim() && !task.doc_ref)}
+                  disabled={isBlocked || (!docRef.trim() && !task.doc_ref)}
                   className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? '...' : '✓ ผ่านรูปแบบ'}
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านรูปแบบ'}
                 </button>
                 <button
                   onClick={handleDocConRejectClick}
-                  disabled={actionLoading}
+                  disabled={isBlocked}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
                   ↩ ส่งกลับแก้ไข
@@ -616,24 +593,30 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
                 />
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
+                {selectedWordFile && (
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                )}
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
-                {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
-              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
+
+              {(uploadError || actionError) && (
+                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+              )}
+
               <div className="flex gap-2">
                 <button
-                  onClick={handleReviewerApprove}
-                  disabled={actionLoading}
+                  onClick={() => uploadThenExecute('reviewer_approve')}
+                  disabled={isBlocked}
                   className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? '...' : '✓ ผ่านการตรวจสอบ'}
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านการตรวจสอบ'}
                 </button>
                 <button
                   onClick={handleReviewerRejectClick}
-                  disabled={actionLoading}
+                  disabled={isBlocked}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
                   ↩ ส่งกลับแก้ไข
@@ -642,7 +625,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
             </div>
           )}
 
-          {/* ── BOSS ── */}
+          {/* ── BOSS: pending tab actions ── */}
           {activeRole === 'BOSS' && task.status === 'WAITING_BOSS_APPROVAL' && task.created_by === userId && (
             <div className="mt-2 space-y-3">
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
@@ -654,31 +637,37 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
                 />
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
+                {selectedWordFile && (
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                )}
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
-                {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
-              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
+
+              {(uploadError || actionError) && (
+                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+              )}
+
               <button
-                onClick={handleBossApprove}
-                disabled={actionLoading}
+                onClick={() => uploadThenExecute('boss_approve')}
+                disabled={isBlocked}
                 className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
               >
-                {actionLoading ? '...' : '✓ อนุมัติ'}
+                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติ'}
               </button>
               <div className="flex gap-2">
                 <button
                   onClick={handleBossRejectClick}
-                  disabled={actionLoading}
+                  disabled={isBlocked}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
                   ↩ ตีกลับเจ้าหน้าที่
                 </button>
                 <button
                   onClick={handleBossSendToDocCon}
-                  disabled={actionLoading}
+                  disabled={isBlocked}
                   className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
                   ↩ ส่ง DocCon ตรวจใหม่
@@ -699,31 +688,37 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 cursor-pointer"
                 />
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
+                {selectedWordFile && (
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                )}
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
-                {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
-              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
+
+              {(uploadError || actionError) && (
+                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+              )}
+
               <button
-                onClick={handleSuperBossApprove}
-                disabled={actionLoading}
+                onClick={() => uploadThenExecute('super_boss_approve')}
+                disabled={isBlocked}
                 className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
               >
-                {actionLoading ? '...' : '✓ อนุมัติขั้นสุดท้าย'}
+                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติขั้นสุดท้าย'}
               </button>
               <div className="flex gap-2">
                 <button
                   onClick={handleSuperBossRejectClick}
-                  disabled={actionLoading}
+                  disabled={isBlocked}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
                   ↩ ตีกลับเจ้าหน้าที่
                 </button>
                 <button
                   onClick={handleSuperBossSendToDocCon}
-                  disabled={actionLoading}
+                  disabled={isBlocked}
                   className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
                   ↩ ส่ง DocCon ตรวจใหม่
@@ -732,8 +727,21 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
             </div>
           )}
 
-          {/* Action error */}
-          {actionError && (
+          {/* ── BOSS: cancel (always available for creator, non-terminal tasks) ── */}
+          {bossCanCancel && (
+            <div className={`mt-3 ${task.status === 'WAITING_BOSS_APPROVAL' ? 'border-t border-gray-100 pt-3' : ''}`}>
+              <button
+                onClick={handleBossCancelClick}
+                disabled={isBlocked}
+                className="w-full py-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                🗑 ยกเลิกงาน
+              </button>
+            </div>
+          )}
+
+          {/* Shared action error display (outside role blocks) */}
+          {actionError && !['STAFF', 'DOCCON', 'REVIEWER', 'BOSS', 'SUPER_BOSS'].some(r => r === activeRole) && (
             <div className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">
               ⚠️ {actionError}
             </div>
@@ -741,10 +749,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         </div>
       </div>
 
-      {/* Rejection modal */}
+      {/* Rejection / Cancel modal */}
       {showRejectModal && (
         <RejectModal
-          title="ตีกลับเอกสาร"
+          title={rejectActionKey === 'cancel' ? 'ยกเลิกงาน — ระบุเหตุผล' : rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่ง DocCon ตรวจใหม่' : 'ตีกลับเอกสาร'}
+          confirmLabel={rejectActionKey === 'cancel' ? 'ยืนยันยกเลิก' : rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่งตรวจใหม่' : 'ตีกลับ'}
+          confirmStyle={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'warning' : 'danger'}
           onConfirm={handleRejectConfirm}
           onCancel={() => setShowRejectModal(false)}
           loading={actionLoading}
