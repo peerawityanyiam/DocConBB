@@ -1,4 +1,4 @@
-export type TaskStatus =
+﻿export type TaskStatus =
   | 'ASSIGNED'
   | 'SUBMITTED_TO_DOCCON'
   | 'DOCCON_REJECTED'
@@ -16,8 +16,8 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   SUBMITTED_TO_DOCCON: 'รอ DocCon ตรวจ',
   DOCCON_REJECTED: 'DocCon ส่งกลับ',
   PENDING_REVIEW: 'รอตรวจสอบเนื้อหา',
-  REVIEWER_REJECTED: 'Reviewer ส่งกลับ',
-  WAITING_BOSS_APPROVAL: 'รอผู้สั่งงานตรวจสอบ',
+  REVIEWER_REJECTED: 'ผู้ตรวจสอบส่งกลับ',
+  WAITING_BOSS_APPROVAL: 'รอผู้สั่งงานอนุมัติ',
   BOSS_REJECTED: 'ผู้สั่งงานส่งกลับ',
   WAITING_SUPER_BOSS_APPROVAL: 'รอหัวหน้างานอนุมัติ',
   SUPER_BOSS_REJECTED: 'หัวหน้างานส่งกลับ',
@@ -43,7 +43,7 @@ export type DocStatus = 'OPEN' | 'LOCKED' | 'NOT_YET' | 'EXPIRED' | 'NOT_SET';
 
 export const DOC_STATUS_LABELS: Record<DocStatus, string> = {
   OPEN: 'เปิดรับ',
-  LOCKED: 'ล็อค',
+  LOCKED: 'ล็อก',
   NOT_YET: 'ยังไม่เปิด',
   EXPIRED: 'หมดเวลา',
   NOT_SET: 'ไม่ระบุ',

@@ -188,17 +188,23 @@ export async function POST(
       }
     }
 
+    const existingHistory = (task.file_history as Array<{ driveFileId?: string; isPdf?: boolean }> | null) ?? [];
+    const latestOldDocxFromHistory = [...existingHistory].reverse().find(f => !f.isPdf && f.driveFileId)?.driveFileId;
+    const latestOldPdfFromHistory = [...existingHistory].reverse().find(f => f.isPdf && f.driveFileId)?.driveFileId;
+
     if (isPdf) {
       // PDF → ไฟล์อ้างอิง (ref) — replace old PDF only
-      if (task.ref_file_id && task.ref_file_id !== driveFileId) {
-        await removeOldFile(task.ref_file_id, 'PDF');
+      const oldPdfId = task.ref_file_id ?? latestOldPdfFromHistory;
+      if (oldPdfId && oldPdfId !== driveFileId) {
+        await removeOldFile(oldPdfId, 'PDF');
       }
       updates.ref_file_id = driveFileId;
       updates.ref_file_name = driveFileName;
     } else {
       // DOCX → ไฟล์หลัก — replace old DOCX only, keep ref PDF intact
-      if (task.drive_file_id && task.drive_file_id !== driveFileId) {
-        await removeOldFile(task.drive_file_id, 'DOCX');
+      const oldDocxId = task.drive_file_id ?? latestOldDocxFromHistory;
+      if (oldDocxId && oldDocxId !== driveFileId) {
+        await removeOldFile(oldDocxId, 'DOCX');
       }
       updates.drive_file_id = driveFileId;
       updates.drive_file_name = driveFileName;

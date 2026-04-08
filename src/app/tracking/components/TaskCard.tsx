@@ -4,12 +4,12 @@ import StatusBadge from './StatusBadge';
 import type { TaskStatus } from '@/lib/constants/status';
 
 const PIPELINE_STAGES: { key: string; label: string; icon: string }[] = [
-  { key: 'ASSIGNED', label: 'Assigned', icon: '1' },
+  { key: 'ASSIGNED', label: 'เจ้าหน้าที่', icon: '1' },
   { key: 'SUBMITTED_TO_DOCCON', label: 'DocCon', icon: '2' },
-  { key: 'PENDING_REVIEW', label: 'Review', icon: '3' },
+  { key: 'PENDING_REVIEW', label: 'ผู้ตรวจสอบ', icon: '3' },
   { key: 'WAITING_BOSS_APPROVAL', label: 'Boss', icon: '4' },
-  { key: 'WAITING_SUPER_BOSS_APPROVAL', label: 'Super Boss', icon: '5' },
-  { key: 'COMPLETED', label: 'Done', icon: '6' },
+  { key: 'WAITING_SUPER_BOSS_APPROVAL', label: 'หัวหน้างาน', icon: '5' },
+  { key: 'COMPLETED', label: 'เสร็จสิ้น', icon: '6' },
 ];
 
 const STATUS_STAGE_INDEX: Record<TaskStatus, number> = {
@@ -128,7 +128,7 @@ function durationText(createdAt: string, endAt?: string): string {
   const start = new Date(createdAt).getTime();
   const end = new Date(endAt ?? Date.now()).getTime();
   const days = Math.max(0, Math.floor((end - start) / 86400000));
-  return `${days} days`;
+  return `${days} วัน`;
 }
 
 function ageStyle(days: number): string {
@@ -139,11 +139,11 @@ function ageStyle(days: number): string {
 
 function getActionHint(task: Task, activeRole?: string): { text: string; color: string; icon: string } | null {
   const s = task.status;
-  if (activeRole === 'DOCCON' && s === 'SUBMITTED_TO_DOCCON') return { text: 'Waiting for format review', icon: '🔍', color: '#00c2a8' };
-  if (activeRole === 'REVIEWER' && s === 'PENDING_REVIEW') return { text: 'Waiting for content review', icon: '📝', color: '#00c2a8' };
-  if (activeRole === 'BOSS' && s === 'WAITING_BOSS_APPROVAL') return { text: 'Waiting for approval', icon: '✍️', color: '#00c2a8' };
-  if (activeRole === 'SUPER_BOSS' && s === 'WAITING_SUPER_BOSS_APPROVAL') return { text: 'Waiting for final approval', icon: '👑', color: '#00c2a8' };
-  if (activeRole === 'STAFF' && REJECTED_STATUSES.has(s)) return { text: 'Rejected - update and resubmit', icon: '🔁', color: '#ef4444' };
+  if (activeRole === 'DOCCON' && s === 'SUBMITTED_TO_DOCCON') return { text: 'รอตรวจรูปแบบ', icon: '🔍', color: '#00c2a8' };
+  if (activeRole === 'REVIEWER' && s === 'PENDING_REVIEW') return { text: 'รอตรวจเนื้อหา', icon: '📝', color: '#00c2a8' };
+  if (activeRole === 'BOSS' && s === 'WAITING_BOSS_APPROVAL') return { text: 'รอผู้สั่งงานอนุมัติ', icon: '✍️', color: '#00c2a8' };
+  if (activeRole === 'SUPER_BOSS' && s === 'WAITING_SUPER_BOSS_APPROVAL') return { text: 'รอหัวหน้างานอนุมัติ', icon: '👑', color: '#00c2a8' };
+  if (activeRole === 'STAFF' && REJECTED_STATUSES.has(s)) return { text: 'ตีกลับแล้ว รอแก้ไขและส่งใหม่', icon: '🔁', color: '#ef4444' };
   return null;
 }
 
@@ -218,18 +218,18 @@ export default function TaskCard({ task, onClick, activeRole, isCompletedView = 
 
         {isCompletedView ? (
           <div className="space-y-2 mt-1 text-[0.72rem]">
-            <p className="text-[#6b7f96]">Command: <span className="text-[#0d1b2e] font-semibold">{task.title}</span></p>
-            <p className="text-[#6b7f96]">Latest file: <span className="text-[#0d1b2e] font-semibold">{task.drive_file_name ?? '-'}</span></p>
+            <p className="text-[#6b7f96]">คำสั่ง: <span className="text-[#0d1b2e] font-semibold">{task.title}</span></p>
+            <p className="text-[#6b7f96]">ชื่อไฟล์สุดท้าย: <span className="text-[#0d1b2e] font-semibold">{task.drive_file_name ?? '-'}</span></p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[#6b7f96]">
-              <p>Doc code: <span className="font-semibold text-[#374f6b]">{task.doc_ref ?? '-'}</span></p>
-              <p>Owner: <span className="font-semibold text-[#374f6b]">{task.officer?.display_name ?? '-'}</span></p>
-              <p>Reviewer: <span className="font-semibold text-[#374f6b]">{task.reviewer?.display_name ?? '-'}</span></p>
-              <p>Date: <span className="font-semibold text-[#374f6b]">{formatDate(task.completed_at ?? task.updated_at)}</span></p>
-              <p>Duration: <span className="font-semibold text-[#374f6b]">{durationText(task.created_at, task.completed_at ?? task.updated_at)}</span></p>
+              <p>รหัสเอกสาร: <span className="font-semibold text-[#374f6b]">{task.doc_ref ?? '-'}</span></p>
+              <p>ผู้ดำเนินการ: <span className="font-semibold text-[#374f6b]">{task.officer?.display_name ?? '-'}</span></p>
+              <p>ผู้ตรวจสอบ: <span className="font-semibold text-[#374f6b]">{task.reviewer?.display_name ?? '-'}</span></p>
+              <p>วันที่เสร็จ: <span className="font-semibold text-[#374f6b]">{formatDate(task.completed_at ?? task.updated_at)}</span></p>
+              <p>ระยะเวลา: <span className="font-semibold text-[#374f6b]">{durationText(task.created_at, task.completed_at ?? task.updated_at)}</span></p>
             </div>
             {task.superseded_by && task.status === 'COMPLETED' && (
               <div className="mt-2 px-3 py-2 rounded-md text-[0.72rem] bg-amber-50 border border-amber-200 text-amber-700">
-                A newer document already exists for this code. Download is disabled on this old card.
+                มีเอกสารใหม่ของรหัสนี้แล้ว จึงไม่สามารถดาวน์โหลดไฟล์จากการ์ดเก่าได้
               </div>
             )}
           </div>
@@ -252,13 +252,12 @@ export default function TaskCard({ task, onClick, activeRole, isCompletedView = 
             <PipelineBar status={task.status} />
 
             {task.doc_ref && (
-              <p className="text-xs text-[#6b7f96] mt-1">Doc code: <span className="font-semibold text-[#374f6b]">{task.doc_ref}</span></p>
+              <p className="text-xs text-[#6b7f96] mt-1">รหัสเอกสาร: <span className="font-semibold text-[#374f6b]">{task.doc_ref}</span></p>
             )}
 
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.72rem] text-[#6b7f96] mt-2">
-              <span>Owner: {task.officer?.display_name ?? '-'}</span>
-              <span>Reviewer: {task.reviewer?.display_name ?? '-'}</span>
-              {activeRole === 'DOCCON' && task.doccon_checked && <span className="text-green-600 font-medium">Checked</span>}
+              <span>ผู้ดำเนินการ: {task.officer?.display_name ?? '-'}</span>
+              <span>ผู้ตรวจสอบ: {task.reviewer?.display_name ?? '-'}</span>
             </div>
 
             {task.latest_comment && (
@@ -270,17 +269,19 @@ export default function TaskCard({ task, onClick, activeRole, isCompletedView = 
                   color: isRejected ? '#991b1b' : '#92400e',
                 }}
               >
-                Comment: {task.latest_comment}
+                หมายเหตุ: {task.latest_comment}
               </div>
             )}
           </>
         )}
       </div>
 
-      <div className="flex items-center justify-between px-3.5 py-2.5 border-t" style={{ background: '#f8fafc', borderColor: '#e2e8f0', borderRadius: '0 0 12px 12px' }}>
-        <span className="text-[0.7rem] text-[#6b7f96]">Updated {formatDate(task.updated_at)}</span>
-        <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(age)}`}>⏱ {age} days</span>
-      </div>
+      {!isCompletedView && (
+        <div className="flex items-center justify-between px-3.5 py-2.5 border-t" style={{ background: '#f8fafc', borderColor: '#e2e8f0', borderRadius: '0 0 12px 12px' }}>
+          <span className="text-[0.7rem] text-[#6b7f96]">อัปเดต {formatDate(task.updated_at)}</span>
+          <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(age)}`}>⏱ {age} วัน</span>
+        </div>
+      )}
     </button>
   );
 }

@@ -3,7 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, AuthError, handleAuthError } from '@/lib/auth/guards';
 import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
-import { deleteFilePermanent } from '@/lib/google-drive/files';
+import { deleteFilePermanent, trashFile } from '@/lib/google-drive/files';
 
 type StatusAction =
   | 'submit'
@@ -81,6 +81,19 @@ export async function PATCH(
       uploadedBy?: string;
       isPdf?: boolean;
     }> | null) ?? [];
+    const removeFileFromDrive = async (fileId: string) => {
+      try {
+        await deleteFilePermanent(fileId);
+        return;
+      } catch {
+        // fallback below
+      }
+      try {
+        await trashFile(fileId);
+      } catch {
+        // ignore drive cleanup failures
+      }
+    };
 
     // ─── คำนวณ status ใหม่ ──────────────────────────────────────────────
     switch (action) {
@@ -96,7 +109,7 @@ export async function PATCH(
         else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
         // เมื่อส่งงานใหม่ ลบ PDF อ้างอิงที่เคยแนบมา (PDF ใช้ประกอบตีกลับเท่านั้น)
         if (task.ref_file_id) {
-          try { await deleteFilePermanent(task.ref_file_id); } catch { /* ignore drive errors */ }
+          await removeFileFromDrive(task.ref_file_id);
           updates.ref_file_id = null;
           updates.ref_file_name = null;
         }
@@ -144,6 +157,7 @@ export async function PATCH(
       }
       case 'doccon_reject': {
         if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "ส่งตรวจรูปแบบ"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'DOCCON_REJECTED';
         break;
       }
@@ -156,6 +170,7 @@ export async function PATCH(
       case 'reviewer_reject': {
         if (task.reviewer_id !== dbUser.id) throw new AuthError('ไม่ใช่ผู้ตรวจสอบงานนี้', 403);
         if (task.status !== 'PENDING_REVIEW') throw new AuthError('สถานะต้องเป็น "รอตรวจสอบเนื้อหา"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'REVIEWER_REJECTED';
         break;
       }
@@ -168,6 +183,7 @@ export async function PATCH(
       case 'boss_reject': {
         if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สร้างงานนี้', 403);
         if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติหัวหน้า"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'BOSS_REJECTED';
         break;
       }
@@ -190,6 +206,7 @@ export async function PATCH(
       }
       case 'super_boss_reject': {
         if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติผู้บริหาร"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'SUPER_BOSS_REJECTED';
         break;
       }
@@ -239,7 +256,7 @@ export async function PATCH(
       'super_boss_approve',
     ]);
     if (clearRefPdfOnForward.has(action) && task.ref_file_id && updates.ref_file_id === undefined) {
-      try { await deleteFilePermanent(task.ref_file_id); } catch { /* ignore drive errors */ }
+      await removeFileFromDrive(task.ref_file_id);
       updates.ref_file_id = null;
       updates.ref_file_name = null;
     }

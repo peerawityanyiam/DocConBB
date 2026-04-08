@@ -60,7 +60,7 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
     },
     {
       key: 'completed',
-      label: 'Completed',
+      label: 'เสร็จแล้ว',
       filter: (t, userId) => t.officer_id === userId && t.status === 'COMPLETED',
       useActionCard: false,
     },
@@ -94,7 +94,7 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
     },
     {
       key: 'completed',
-      label: 'Completed',
+      label: 'เสร็จแล้ว',
       filter: (t, userId) => t.reviewer_id === userId && t.status === 'COMPLETED',
       useActionCard: false,
     },

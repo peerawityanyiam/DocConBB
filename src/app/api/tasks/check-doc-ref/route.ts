@@ -3,7 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
 
 // GET /api/tasks/check-doc-ref?doc_ref=FIN-001&task_id=xxx
-// Returns { exists: boolean, task_code?: string, title?: string }
+// Returns { exists: boolean, file_name?: string, date?: string }
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser('tracking');
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     let query = admin
       .from('tasks')
-      .select('id, task_code, title, status')
+      .select('id, drive_file_name, title, updated_at, completed_at, status')
       .eq('doc_ref', docRef)
       .neq('status', 'CANCELLED')
       .limit(1);
@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
 
     if (found) {
       const t = tasks![0];
-      return NextResponse.json({ exists: true, task_code: t.task_code, title: t.title });
+      return NextResponse.json({
+        exists: true,
+        file_name: t.drive_file_name ?? t.title,
+        date: t.completed_at ?? t.updated_at,
+      });
     }
 
     return NextResponse.json({ exists: false });

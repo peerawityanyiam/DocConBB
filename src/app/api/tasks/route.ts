@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
     let query = admin
       .from('tasks')
       .select(TASK_SELECT)
-      .eq('is_archived', false)
       .order('updated_at', { ascending: false });
 
     switch (role) {
@@ -35,13 +34,15 @@ export async function GET(request: NextRequest) {
         query = query.eq('reviewer_id', dbUser.id);
         break;
       case 'BOSS':
-        query = query.eq('created_by', dbUser.id);
+        query = query.eq('created_by', dbUser.id).eq('is_archived', false);
         break;
       case 'DOCCON':
         // DOCCON sees all active tasks
+        query = query.eq('is_archived', false);
         break;
       case 'SUPER_BOSS':
         // SUPER_BOSS tracking should see all active tasks (same as DOCCON)
+        query = query.eq('is_archived', false);
         break;
       case 'completed': {
         const userRolesSet = new Set(user.roles);
@@ -63,7 +64,9 @@ export async function GET(request: NextRequest) {
         break;
       }
       default:
-        query = query.or(`officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`);
+        query = query
+          .or(`officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`)
+          .eq('is_archived', false);
     }
 
     const { data: tasks, error } = await query;
