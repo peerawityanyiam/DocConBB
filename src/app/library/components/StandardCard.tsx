@@ -106,7 +106,7 @@ export default function StandardCard({
   const driveUrl = standard.drive_file_id
     ? `https://drive.google.com/file/d/${standard.drive_file_id}/view`
     : null;
-  const openUrl = driveUrl ?? (standard.url || null);
+  const openUrl = standard.url || driveUrl || null;
 
   const pill = statusPill(docStatus, standard.is_link, standard.always_open);
   const info = !standard.is_link ? infoMsg(docStatus, standard.start_date) : null;
