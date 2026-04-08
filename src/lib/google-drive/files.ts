@@ -105,6 +105,37 @@ export async function uploadFile(
   return { id: res.data.id!, name: res.data.name! };
 }
 
+export async function convertExcelToSpreadsheet(
+  folderId: string,
+  fileName: string,
+  mimeType: string,
+  body: Buffer | ReadableStream
+): Promise<{ id: string; name: string; webViewLink: string | null }> {
+  const { Readable } = await import('stream');
+  const readable = Buffer.isBuffer(body) ? Readable.from(body) : Readable.fromWeb(body as never);
+  const normalizedName = fileName.replace(/\.(xlsx|xls)$/i, '');
+
+  const res = await drive().files.create({
+    requestBody: {
+      name: normalizedName,
+      parents: [folderId],
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+    },
+    media: {
+      mimeType,
+      body: readable,
+    },
+    fields: 'id,name,webViewLink',
+    supportsAllDrives: true,
+  });
+
+  return {
+    id: res.data.id!,
+    name: res.data.name ?? normalizedName,
+    webViewLink: res.data.webViewLink ?? null,
+  };
+}
+
 export async function listFilesInFolder(folderId: string) {
   const res = await drive().files.list({
     q: `'${folderId}' in parents and trashed=false`,

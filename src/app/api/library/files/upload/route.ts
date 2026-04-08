@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
-import { uploadFile } from '@/lib/google-drive/files';
+import { convertExcelToSpreadsheet, uploadFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 
-const SHARED_FOLDER_ID = process.env.GOOGLE_SHARED_FOLDER_ID!;
+// Fixed library upload folder (requested behavior to mirror GAS flow)
+const LIBRARY_UPLOAD_FOLDER_ID = '10Ithv7g75Sd0he6IuVP6Nwk0IIVCFw1i';
 
 // POST /api/library/files/upload — อัปโหลดไฟล์ผ่าน Service Account
 export async function POST(request: NextRequest) {
@@ -39,14 +40,35 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // อัปโหลดไปยัง Google Drive
-    const folderId = SHARED_FOLDER_ID || 'root';
-    const { id: driveFileId, name: driveFileName } = await uploadFile(
-      folderId,
-      file.name,
-      file.type || 'application/octet-stream',
-      buffer
-    );
+    // Upload all library files into the fixed shared folder
+    const folderId = LIBRARY_UPLOAD_FOLDER_ID;
+    const lowerName = file.name.toLowerCase();
+    const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+
+    let driveFileId: string;
+    let driveFileName: string;
+    let viewUrl: string;
+    if (isExcel) {
+      const converted = await convertExcelToSpreadsheet(
+        folderId,
+        file.name,
+        file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        buffer
+      );
+      driveFileId = converted.id;
+      driveFileName = converted.name;
+      viewUrl = converted.webViewLink ?? `https://docs.google.com/spreadsheets/d/${driveFileId}/edit`;
+    } else {
+      const uploaded = await uploadFile(
+        folderId,
+        file.name,
+        file.type || 'application/octet-stream',
+        buffer
+      );
+      driveFileId = uploaded.id;
+      driveFileName = uploaded.name;
+      viewUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
+    }
 
     // ตั้งสิทธิ์ public (anyoneWithLink)
     await setFilePublic(driveFileId);
@@ -79,12 +101,14 @@ export async function POST(request: NextRequest) {
       .update({
         drive_file_id: driveFileId,
         drive_file_name: driveFileName,
+        url: viewUrl,
+        is_link: true,
         updated_at: new Date().toISOString(),
       })
       .eq('id', standardId);
 
     // บันทึกใน uploaded_files
-    const ext = file.name.split('.').pop()?.toUpperCase() ?? 'FILE';
+    const ext = isExcel ? 'GSHEET' : (file.name.split('.').pop()?.toUpperCase() ?? 'FILE');
     const { data: fileRecord, error: insertErr } = await admin
       .from('uploaded_files')
       .insert({
@@ -107,7 +131,7 @@ export async function POST(request: NextRequest) {
       file: fileRecord,
       driveFileId,
       driveFileName,
-      viewUrl: `https://drive.google.com/file/d/${driveFileId}/view`,
+      viewUrl,
     }, { status: 201 });
   } catch (err) {
     return handleAuthError(err);
