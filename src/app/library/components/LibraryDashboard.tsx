@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import StandardCard, { type Standard } from './StandardCard';
 import AdminSettingsModal from './AdminSettingsModal';
 import UploadModal from './UploadModal';
+import ImportExcelModal from './ImportExcelModal';
 import type { AppRole } from '@/lib/auth/guards';
 import { calculateDocStatus } from '@/lib/utils/status';
 
@@ -13,14 +14,14 @@ interface LibraryDashboardProps {
 }
 
 type FilterStatus = 'all' | 'open' | 'expired' | 'locked';
-type SortValue = 'name_asc' | 'name_desc' | 'status' | 'close_date';
+type SortValue = 'default' | 'name_asc' | 'name_desc' | 'status' | 'close_date';
 
 export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashboardProps) {
   const [standards, setStandards] = useState<Standard[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterStatus>('all');
-  const [sort, setSort] = useState<SortValue>('name_asc');
+  const [sort, setSort] = useState<SortValue>('default');
   const [settingsTarget, setSettingsTarget] = useState<Standard | null>(null);
   const [settingsMode, setSettingsMode] = useState<'create' | 'edit'>('create');
   const [uploadTarget, setUploadTarget] = useState<Standard | null>(null);
@@ -34,6 +35,7 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
   const [linkName, setLinkName] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [addLinkLoading, setAddLinkLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const isDoccon = userRoles.includes('DOCCON') || userRoles.includes('SUPER_ADMIN');
 
@@ -172,6 +174,7 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
               className="border border-[#e5e7eb] rounded-lg text-[13px] text-[#111827] bg-white outline-none cursor-pointer transition-colors focus:border-[#3b82f6]"
               style={{ padding: '9px 14px' }}
             >
+              <option value="default">ค่าเริ่มต้น</option>
               <option value="name_asc">ชื่อ ก→ฮ</option>
               <option value="name_desc">ชื่อ ฮ→ก</option>
               <option value="status">สถานะ (เปิดก่อน)</option>
@@ -197,6 +200,15 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
                 🔗 เพิ่มลิงก์
               </button>
             </div>
+          )}
+          {isDoccon && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border-none text-[13px] font-semibold cursor-pointer transition-all whitespace-nowrap text-white shadow-[0_2px_8px_rgba(22,163,74,0.25)] hover:-translate-y-px"
+              style={{ background: '#16a34a', padding: '9px 18px' }}
+            >
+              📊 นำเข้า Excel
+            </button>
           )}
         </div>
 
@@ -255,6 +267,12 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
         standard={uploadTarget}
         onClose={() => setUploadTarget(null)}
         onUploaded={fetchStandards}
+      />
+
+      <ImportExcelModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={fetchStandards}
       />
 
       {/* Delete confirm (matches ref #deleteOverlay) */}
