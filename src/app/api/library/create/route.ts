@@ -2,6 +2,7 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
 import { checkFolderExists, copyTemplate } from '@/lib/google-drive/files';
+import { grantAccess } from '@/lib/google-drive/permissions';
 
 const LIBRARY_FOLDER_ID = '10Ithv7g75Sd0he6IuVP6Nwk0IIVCFw1i';
 const LIBRARY_TEMPLATE_ID = process.env.GOOGLE_LIBRARY_TEMPLATE_ID || '1HKO-Nfg3bV0QbP2WTK4V2R_eoywruNrolxOjVJS8mjo';
@@ -62,7 +63,52 @@ export async function POST(request: NextRequest) {
       try {
         const copied = await copyTemplate(LIBRARY_TEMPLATE_ID, normalizedName, LIBRARY_FOLDER_ID);
         driveFileId = copied.id;
-        finalUrl = copied.url || `https://docs.google.com/spreadsheets/d/${copied.id}/edit`;
+        finalUrl = `https://docs.google.com/spreadsheets/d/${copied.id}/edit`;
+
+        // ให้ผู้สร้างแก้ไขได้แน่นอน
+        try {
+          await grantAccess(copied.id, user.email, 'writer');
+        } catch {
+          // skip: may already have permission from shared drive
+        }
+
+        // ให้ DocCon/SuperAdmin ของ project library มีสิทธิ์ writer ด้วย
+        try {
+          const { data: libraryProject } = await admin
+            .from('projects')
+            .select('id')
+            .eq('slug', 'library')
+            .single();
+
+          if (libraryProject?.id) {
+            const { data: roleRows } = await admin
+              .from('user_project_roles')
+              .select('users!inner(email)')
+              .eq('project_id', libraryProject.id)
+              .in('role', ['DOCCON', 'SUPER_ADMIN']);
+
+            const emails = Array.from(
+              new Set(
+                (roleRows ?? [])
+                  .map((r: { users?: { email?: string } | Array<{ email?: string }> }) => {
+                    if (Array.isArray(r.users)) return r.users[0]?.email?.trim().toLowerCase();
+                    return r.users?.email?.trim().toLowerCase();
+                  })
+                  .filter((email): email is string => Boolean(email))
+              )
+            );
+
+            for (const email of emails) {
+              try {
+                await grantAccess(copied.id, email, 'writer');
+              } catch {
+                // ignore duplicate permission / policy conflict per user
+              }
+            }
+          }
+        } catch {
+          // non-blocking: file is already created and linked
+        }
       } catch (copyErr) {
         const copyMsg = copyErr instanceof Error ? copyErr.message : 'ไม่สามารถคัดลอก Template ได้';
         return NextResponse.json({ error: `สร้างไฟล์เอกสารไม่สำเร็จ: ${copyMsg}` }, { status: 500 });
