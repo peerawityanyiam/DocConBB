@@ -180,7 +180,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const [docRefChecking, setDocRefChecking] = useState(false);
   const docRefTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDocRefEditing, setIsDocRefEditing] = useState(!(task.doc_ref ?? '').trim());
-  const [isDocRefEditing, setIsDocRefEditing] = useState(!(task.doc_ref ?? '').trim());
 
   // Debounced doc_ref check
   useEffect(() => {
