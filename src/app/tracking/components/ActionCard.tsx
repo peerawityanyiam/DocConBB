@@ -336,7 +336,15 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   }
 
   const hasDocxSelected = !!selectedWordFile && selectedWordFile.name.toLowerCase().endsWith('.docx');
-  const requiresRejectReason = ['doccon_reject', 'reviewer_reject', 'boss_reject', 'super_boss_reject', 'cancel'].includes(rejectActionKey);
+  const requiresRejectReason = [
+    'doccon_reject',
+    'reviewer_reject',
+    'boss_reject',
+    'super_boss_reject',
+    'boss_send_to_doccon',
+    'super_boss_send_to_doccon',
+    'cancel',
+  ].includes(rejectActionKey);
 
   /* ── Is this a pipeline-only card (DocCon tracking sub-tab)? ── */
   const isPipelineView = activeRole === 'DOCCON' && activeSubTab === 'tracking';

@@ -190,6 +190,7 @@ export async function PATCH(
       case 'boss_send_to_doccon': {
         if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สร้างงานนี้', 403);
         if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติหัวหน้า"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการส่งตรวจใหม่', 400);
         newStatus = 'SUBMITTED_TO_DOCCON';
         break;
       }
@@ -212,6 +213,7 @@ export async function PATCH(
       }
       case 'super_boss_send_to_doccon': {
         if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติผู้บริหาร"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการส่งตรวจใหม่', 400);
         newStatus = 'SUBMITTED_TO_DOCCON';
         break;
       }
