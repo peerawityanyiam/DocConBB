@@ -38,7 +38,7 @@ export async function GET() {
       if (!grouped.has(ref)) {
         grouped.set(ref, {
           doc_ref: ref,
-          latestTitle: t.title,
+          latestTitle: t.drive_file_name ?? t.title,
           latestTaskCode: t.task_code,
           latestDriveFileId: t.drive_file_id ?? null,
           latestDriveFileName: t.drive_file_name ?? null,
@@ -52,7 +52,7 @@ export async function GET() {
       entry.tasks.push({
         id: t.id,
         task_code: t.task_code,
-        title: t.title,
+        title: t.drive_file_name ?? t.title,
         completed_at: t.completed_at,
       });
     }

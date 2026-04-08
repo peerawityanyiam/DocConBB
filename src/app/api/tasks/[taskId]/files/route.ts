@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
-import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists } from '@/lib/google-drive/files';
+import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists, trashFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 
 const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
@@ -170,18 +170,35 @@ export async function POST(
     const isPdf = ext === 'pdf';
     const now = new Date().toISOString();
     const updates: Record<string, unknown> = { updated_at: now };
+    const cleanupWarnings: string[] = [];
+
+    async function removeOldFile(fileId: string, label: 'DOCX' | 'PDF') {
+      try {
+        await deleteFilePermanent(fileId);
+        return;
+      } catch (deleteErr) {
+        console.warn(`[FILE_UPLOAD] Permanent delete failed for ${label} ${fileId}, fallback to trash`, deleteErr);
+      }
+
+      try {
+        await trashFile(fileId);
+      } catch (trashErr) {
+        console.error(`[FILE_UPLOAD] Failed to remove old ${label} ${fileId}`, trashErr);
+        cleanupWarnings.push(`remove_old_${label.toLowerCase()}_failed`);
+      }
+    }
 
     if (isPdf) {
       // PDF → ไฟล์อ้างอิง (ref) — replace old PDF only
       if (task.ref_file_id && task.ref_file_id !== driveFileId) {
-        try { await deleteFilePermanent(task.ref_file_id); } catch { /* ignore */ }
+        await removeOldFile(task.ref_file_id, 'PDF');
       }
       updates.ref_file_id = driveFileId;
       updates.ref_file_name = driveFileName;
     } else {
       // DOCX → ไฟล์หลัก — replace old DOCX only, keep ref PDF intact
       if (task.drive_file_id && task.drive_file_id !== driveFileId) {
-        try { await deleteFilePermanent(task.drive_file_id); } catch { /* ignore */ }
+        await removeOldFile(task.drive_file_id, 'DOCX');
       }
       updates.drive_file_id = driveFileId;
       updates.drive_file_name = driveFileName;
@@ -216,6 +233,7 @@ export async function POST(
       driveFileName,
       isPdf,
       viewUrl: `https://drive.google.com/file/d/${driveFileId}/view`,
+      cleanupWarnings,
     }, { status: 201 });
   } catch (err) {
     if (err instanceof AuthError) return handleAuthError(err);

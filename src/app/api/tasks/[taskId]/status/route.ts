@@ -230,6 +230,20 @@ export async function PATCH(
       ? [...(task.comment_history ?? []), { text: comment.trim(), by: user.email, byName: dbUser.display_name, at: now }]
       : task.comment_history;
 
+    // เมื่องานถูกส่งต่อ/อนุมัติแล้ว ให้ล้างไฟล์ PDF อ้างอิงที่ใช้ประกอบการแก้ไข
+    const clearRefPdfOnForward = new Set<StatusAction>([
+      'submit',
+      'doccon_approve',
+      'reviewer_approve',
+      'boss_approve',
+      'super_boss_approve',
+    ]);
+    if (clearRefPdfOnForward.has(action) && task.ref_file_id && updates.ref_file_id === undefined) {
+      try { await deleteFilePermanent(task.ref_file_id); } catch { /* ignore drive errors */ }
+      updates.ref_file_id = null;
+      updates.ref_file_name = null;
+    }
+
     // ─── อัปเดต ─────────────────────────────────────────────────────────
     const { error: updateErr } = await admin
       .from('tasks')
