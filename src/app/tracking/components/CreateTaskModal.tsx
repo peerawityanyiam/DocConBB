@@ -29,9 +29,11 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [wordFile, setWordFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const wordInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -45,31 +47,25 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   function reset() {
     setTitle(''); setDetail(''); setOfficerId(''); setReviewerId(''); setError('');
-    setFile(null); setUploadProgress(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setWordFile(null); setPdfFile(null); setUploadProgress(null);
+    if (wordInputRef.current) wordInputRef.current.value = '';
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleWordChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0];
     if (!selected) return;
-
-    const ext = selected.name.toLowerCase().split('.').pop();
-    if (!['docx', 'pdf'].includes(ext ?? '')) {
-      setError('รองรับเฉพาะไฟล์ .docx และ .pdf');
-      return;
-    }
-    if (selected.size > MAX_FILE_SIZE) {
-      setError('ขนาดไฟล์ต้องไม่เกิน 50MB');
-      return;
-    }
-
-    setError('');
-    setFile(selected);
+    if (!selected.name.toLowerCase().endsWith('.docx')) { setError('รองรับเฉพาะ .docx'); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError('ขนาดไฟล์ต้องไม่เกิน 50MB'); return; }
+    setError(''); setWordFile(selected);
   }
 
-  function removeFile() {
-    setFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('รองรับเฉพาะ .pdf'); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError('ขนาดไฟล์ต้องไม่เกิน 50MB'); return; }
+    setError(''); setPdfFile(selected);
   }
 
   function uploadFileWithProgress(taskId: string, fileToUpload: File): Promise<void> {
@@ -123,10 +119,14 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
 
-      // 2) Upload file if selected
-      if (file) {
+      // 2) Upload files if selected
+      if (wordFile) {
         setUploadProgress(0);
-        await uploadFileWithProgress(data.id, file);
+        await uploadFileWithProgress(data.id, wordFile);
+      }
+      if (pdfFile) {
+        setUploadProgress(0);
+        await uploadFileWithProgress(data.id, pdfFile);
       }
 
       reset();
@@ -207,39 +207,45 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             </div>
           </div>
 
-          {/* File attachment (matches ref upload zone) */}
-          <div>
-            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">
+          {/* File attachments — word + pdf */}
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-[#0d1b2e]">
               แนบไฟล์เอกสาร <span className="text-[#6b7f96] font-normal">(ไม่บังคับ)</span>
             </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".docx,.pdf"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {!file ? (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-[#cbd5e1] rounded-xl px-4 py-5 flex flex-col items-center gap-2 text-sm text-[#94a3b8] hover:border-[#00c2a8] hover:bg-[#e0faf7] transition-all cursor-pointer"
-              >
-                <span className="text-2xl">📎</span>
-                <span>คลิกเพื่อเลือกไฟล์</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 bg-[#dcfce7] border border-[#bbf7d0] rounded-lg px-3 py-2">
-                <span>📄</span>
-                <span className="text-sm text-[#15803d] font-semibold truncate flex-1">{file.name}</span>
-                <span className="text-xs text-[#6b7f96] shrink-0">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>
-                <button type="button" onClick={removeFile}
-                  className="text-[#6b7f96] hover:text-red-500 text-lg leading-none shrink-0" title="ลบไฟล์">&times;</button>
-              </div>
-            )}
-            <p className="text-xs text-[#6b7f96] mt-1.5 flex items-center gap-1">
-              ℹ️ รองรับ Word (.docx) และ PDF (.pdf)
-            </p>
+            {/* Word */}
+            <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
+              <label className="text-xs font-semibold text-[#374f6b] mb-1.5 block">📄 ไฟล์ Word (.docx)</label>
+              <input
+                ref={wordInputRef}
+                type="file"
+                accept=".docx"
+                onChange={handleWordChange}
+                className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+              {wordFile && (
+                <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
+                  <span>✅ {wordFile.name}</span>
+                  <button type="button" onClick={() => { setWordFile(null); if (wordInputRef.current) wordInputRef.current.value = ''; }} className="text-red-400 hover:text-red-600">✕</button>
+                </div>
+              )}
+            </div>
+            {/* PDF */}
+            <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
+              <label className="text-xs font-semibold text-[#374f6b] mb-1.5 block">📋 ไฟล์ PDF (.pdf)</label>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={handlePdfChange}
+                className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer"
+              />
+              {pdfFile && (
+                <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
+                  <span>✅ {pdfFile.name}</span>
+                  <button type="button" onClick={() => { setPdfFile(null); if (pdfInputRef.current) pdfInputRef.current.value = ''; }} className="text-red-400 hover:text-red-600">✕</button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Upload progress */}

@@ -45,46 +45,52 @@ export async function POST(
     const { data: task } = await admin.from('tasks').select('*').eq('id', taskId).single();
     if (!task) return NextResponse.json({ error: 'ไม่พบงาน' }, { status: 404 });
 
-    // ── ตรวจสอบสิทธิ์อัปโหลดตาม role + status (ตาม reference GAS) ──
+    // ── ตรวจสอบสิทธิ์อัปโหลดตาม relationship + role + status ──
     const { data: userRoleRows } = await admin
       .from('user_roles')
       .select('role')
       .eq('user_id', dbUser.id);
     const userRolesSet = new Set((userRoleRows ?? []).map(r => r.role));
 
-    // All roles can upload both .docx and .pdf at their actionable statuses
+    const s = task.status;
+    const isOfficer = task.officer_id === dbUser.id;
+    const isReviewer = task.reviewer_id === dbUser.id;
+    const isCreator = task.created_by === dbUser.id;
+
+    // สถานะที่แต่ละ role อัปโหลดได้
     const officerStatuses = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
-    const docconStatuses = ['SUBMITTED_TO_DOCCON'];
-    const reviewerStatuses = ['PENDING_REVIEW'];
-    const bossStatuses = ['WAITING_BOSS_APPROVAL'];
-    const superBossStatuses = ['WAITING_SUPER_BOSS_APPROVAL'];
 
     let canUpload = false;
 
-    if (userRolesSet.has('STAFF') && task.officer_id === dbUser.id && officerStatuses.includes(task.status)) {
-      canUpload = true;
-    }
-    if (userRolesSet.has('DOCCON') && docconStatuses.includes(task.status)) {
-      canUpload = true;
-    }
-    if (userRolesSet.has('REVIEWER') && reviewerStatuses.includes(task.status) && task.reviewer_id === dbUser.id) {
-      canUpload = true;
-    }
-    if (userRolesSet.has('BOSS') && bossStatuses.includes(task.status)) {
-      canUpload = true;
-    }
-    if (userRolesSet.has('SUPER_BOSS') && superBossStatuses.includes(task.status)) {
-      canUpload = true;
-    }
-    if (userRolesSet.has('SUPER_ADMIN')) {
-      canUpload = true;
-    }
+    // เจ้าหน้าที่ (officer) — เช็คจาก relationship ไม่ต้องมี role ก็ได้
+    if (isOfficer && officerStatuses.includes(s)) canUpload = true;
+    // DocCon
+    if ((userRolesSet.has('DOCCON')) && s === 'SUBMITTED_TO_DOCCON') canUpload = true;
+    // Reviewer — เช็คจาก relationship
+    if (isReviewer && s === 'PENDING_REVIEW') canUpload = true;
+    // Boss (ผู้สั่งงาน) — เช็คจาก creator
+    if (isCreator && s === 'WAITING_BOSS_APPROVAL') canUpload = true;
+    // SuperBoss
+    if ((userRolesSet.has('SUPER_BOSS')) && s === 'WAITING_SUPER_BOSS_APPROVAL') canUpload = true;
+    // SuperAdmin
+    if (userRolesSet.has('SUPER_ADMIN')) canUpload = true;
 
     if (!canUpload) {
       const rolesStr = Array.from(userRolesSet).join(', ') || 'none';
       return NextResponse.json({
-        error: `คุณไม่มีสิทธิ์อัปโหลดไฟล์ในสถานะนี้ (roles: ${rolesStr}, status: ${task.status}, officer_id: ${task.officer_id}, user_id: ${dbUser.id})`,
+        error: `คุณไม่มีสิทธิ์อัปโหลดไฟล์ในสถานะนี้ (roles: ${rolesStr}, status: ${s}, officer: ${isOfficer}, reviewer: ${isReviewer}, creator: ${isCreator})`,
       }, { status: 403 });
+    }
+
+    // PDF logic: PDF ใช้ประกอบการตีกลับเท่านั้น
+    // - เฉพาะ DocCon/Reviewer/Boss/SuperBoss ที่กำลังจะตีกลับ ส่ง PDF ได้
+    // - เจ้าหน้าที่ที่ถูกตีกลับ ส่ง PDF ไม่ได้ (ต้องแก้ตามสั่ง ส่ง word เท่านั้น)
+    const isPdfFile = ext === 'pdf';
+    if (isPdfFile) {
+      const pdfAllowedStatuses = ['SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'];
+      if (!pdfAllowedStatuses.includes(s)) {
+        return NextResponse.json({ error: 'สถานะนี้อัปโหลดได้เฉพาะไฟล์ .docx เท่านั้น (PDF ใช้ประกอบการตีกลับ)' }, { status: 400 });
+      }
     }
 
     // สร้าง/หา task folder ใน Shared Drive

@@ -82,14 +82,23 @@ export async function PATCH(
         if (task.officer_id !== dbUser.id) throw new AuthError('ไม่ใช่ผู้รับผิดชอบงานนี้', 403);
         const submitFrom: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
         if (!submitFrom.includes(task.status)) throw new AuthError('ไม่สามารถส่งงานได้ในสถานะนี้', 400);
+        // ต้องมีไฟล์ word แนบก่อนส่ง
+        if (!task.drive_file_id) throw new AuthError('กรุณาอัปโหลดไฟล์ Word ก่อนส่งงาน', 400);
         // ตาม reference: SBOSS_REJ→WAIT_SBOSS, BOSS_REJ→WAIT_BOSS (ข้าม DocCon/Reviewer)
         if (task.status === 'SUPER_BOSS_REJECTED') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (task.status === 'BOSS_REJECTED') newStatus = 'WAITING_BOSS_APPROVAL';
         else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
+        // เมื่อส่งงานใหม่ ลบ PDF อ้างอิงที่เคยแนบมา (PDF ใช้ประกอบตีกลับเท่านั้น)
+        if (task.ref_file_id) {
+          updates.ref_file_id = null;
+          updates.ref_file_name = null;
+        }
         break;
       }
       case 'doccon_approve': {
         if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "ส่งตรวจรูปแบบ"', 400);
+        // ต้องใส่รหัสเอกสาร (ยกเว้นมีอยู่แล้ว)
+        if (!doc_ref && !task.doc_ref) throw new AuthError('กรุณาระบุรหัสเอกสาร (doc_ref) ก่อนอนุมัติ', 400);
         // ค้นย้อนหลังใน status_history หา note sentBackToDocconBy:*
         const history = (task.status_history as Array<{status?: string; note?: string}>) ?? [];
         let sentBackBy = '';

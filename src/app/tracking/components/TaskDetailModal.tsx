@@ -621,50 +621,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                     </div>
                   )}
 
-                  {/* File Upload Zone */}
-                  {canUploadFile && uploadCtx && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-[#6b7f96]">อัปโหลดไฟล์</p>
-                      <div
-                        onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-                        onDragLeave={() => setIsDragOver(false)}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
-                          isDragOver
-                            ? 'border-[#00c2a8] bg-[#e0faf7]'
-                            : 'border-[#e2e8f0] hover:border-[#00c2a8] bg-[#f8fafc] hover:bg-[#e0faf7]'
-                        }`}
-                      >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept={uploadCtx.acceptPdf ? '.docx,.pdf' : '.docx'}
-                          onChange={handleFileInputChange}
-                          className="hidden"
-                        />
-                        {uploadProgress !== null ? (
-                          <div className="space-y-2">
-                            <p className="text-sm text-[#374f6b]">กำลังอัปโหลด... {uploadProgress}%</p>
-                            <div className="w-full bg-[#e2e8f0] rounded-full" style={{ height: '6px' }}>
-                              <div className="rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%`, height: '6px', background: '#00c2a8' }} />
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <p className="text-2xl mb-2 text-[#94a3b8]">📎</p>
-                            <p className="text-sm text-[#6b7f96]">
-                              ลากไฟล์มาวางที่นี่ หรือ <span className="text-[#00c2a8] font-semibold">คลิกเพื่อเลือกไฟล์</span>
-                            </p>
-                            <p className="text-xs text-[#94a3b8] mt-1">{uploadCtx.hint}</p>
-                          </>
-                        )}
-                      </div>
-                      {uploadError && (
-                        <p className="text-xs text-[#ef4444]">{uploadError}</p>
-                      )}
-                    </div>
-                  )}
+                  {/* Upload zone removed — use ActionCard inline actions instead */}
 
                   {/* Checklist indicators */}
                   <div className="flex gap-4 text-xs">
@@ -725,102 +682,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                     </div>
                   )}
 
-                  {/* Actions */}
-                  {(() => {
-                    const availableActions = getAvailableActions(task, userRoles, userId);
-                    if (!availableActions.length) return null;
-                    return (
-                      <div className="border-t border-slate-100 pt-4">
-                        <p className="text-xs font-medium text-slate-500 mb-3">การดำเนินการ</p>
-                        <div className="flex flex-wrap gap-2">
-                          {availableActions.map(a => (
-                            <button key={a.action} onClick={async () => {
-                              setPendingAction(a);
-                              setActionError('');
-                              setDocRefCheck(null);
-                              setPreCheckResult(null);
-                              if (a.action === 'super_boss_approve' && task) {
-                                setPreCheckLoading(true);
-                                try {
-                                  const res = await fetch(`/api/tasks/${task.id}/pre-check`);
-                                  if (res.ok) {
-                                    setPreCheckResult(await res.json());
-                                  }
-                                } catch {
-                                  // ignore pre-check errors
-                                } finally {
-                                  setPreCheckLoading(false);
-                                }
-                              }
-                            }}
-                              className={`px-4 py-2 text-sm rounded-lg transition-colors ${ACTION_STYLE[a.style]}`}>
-                              {a.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Action confirm panel */}
-                  {pendingAction && (
-                    <div className="border border-yellow-300 bg-yellow-50 rounded-xl p-4 space-y-3">
-                      <p className="text-sm font-medium text-slate-800">ยืนยัน: {pendingAction.label}</p>
-                      {pendingAction.confirmText && (
-                        <p className="text-xs text-slate-600">{pendingAction.confirmText}</p>
-                      )}
-                      {pendingAction.needsDocRef && (
-                        <div>
-                          <label className="block text-xs text-slate-600 mb-1">เลขที่เอกสาร (doc_ref)</label>
-                          <input type="text" value={docRef} onChange={e => setDocRef(e.target.value)}
-                            placeholder="เช่น QP-001-2025"
-                            className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" />
-                          {/* DocRef check result */}
-                          {docRefChecking && (
-                            <p className="text-xs text-slate-400 mt-1">กำลังตรวจสอบ...</p>
-                          )}
-                          {docRefCheck && !docRefChecking && (
-                            docRefCheck.exists ? (
-                              <div className="mt-1 p-2 bg-orange-50 border border-orange-200 rounded-lg">
-                                <p className="text-xs text-orange-700 font-medium">
-                                  ⚠️ เลขที่เอกสารนี้มีในระบบแล้ว
-                                </p>
-                                {docRefCheck.task_code && (
-                                  <p className="text-xs text-orange-600 mt-0.5">
-                                    งาน: {docRefCheck.task_code} — {docRefCheck.title}
-                                  </p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-green-600 mt-1">✓ เลขที่เอกสารใช้ได้</p>
-                            )
-                          )}
-                        </div>
-                      )}
-                      {pendingAction.needsComment && (
-                        <div>
-                          <label className="block text-xs text-[#6b7f96] font-bold mb-1">ระบุเหตุผล / ข้อที่ต้องแก้ไข <span className="text-[#ef4444]">*</span></label>
-                          <textarea value={comment} onChange={e => setComment(e.target.value)} rows={3}
-                            placeholder="เช่น หน้าปกไม่ครบ, ต้องแก้ข้อ 3.2 ..."
-                            className="w-full border border-[#e2e8f0] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8] resize-none" />
-                          {pendingAction.needsComment && !comment.trim() && (
-                            <p className="text-xs text-[#ef4444] mt-1">กรุณาระบุเหตุผล</p>
-                          )}
-                        </div>
-                      )}
-                      {actionError && <p className="text-xs text-red-600">{actionError}</p>}
-                      <div className="flex gap-2">
-                        <button onClick={handleAction} disabled={actionLoading || (pendingAction.needsComment && !comment.trim())}
-                          className="px-4 py-1.5 bg-[#0d1b2e] hover:bg-[#1a3a5c] text-white text-sm rounded-lg disabled:opacity-50 font-semibold transition-colors">
-                          {actionLoading ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
-                        </button>
-                        <button onClick={() => { setPendingAction(null); setActionError(''); setDocRefCheck(null); setComment(''); }}
-                          className="px-4 py-1.5 bg-white border border-[#e2e8f0] text-[#374f6b] text-sm rounded-lg hover:bg-[#f8fafc]">
-                          ยกเลิก
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  {/* Actions removed — use ActionCard inline actions instead */}
                 </div>
               )}
 

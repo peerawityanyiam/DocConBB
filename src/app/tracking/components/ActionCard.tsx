@@ -254,8 +254,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     }
   }
 
-  /* ── Staff: submit with optional file upload first ── */
+  /* ── Staff: submit (must have file already uploaded) ── */
   async function handleStaffSubmit() {
+    if (!task.drive_file_id && !selectedWordFile) {
+      setActionError('กรุณาอัปโหลดไฟล์ Word ก่อนส่งงาน');
+      return;
+    }
     if (selectedWordFile) {
       handleFileUpload(selectedWordFile, task.id, () => {
         setSelectedWordFile(null);
@@ -267,8 +271,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     }
   }
 
-  /* ── DocCon approve ── */
+  /* ── DocCon approve — require doc_ref ── */
   async function handleDocConApprove() {
+    if (!docRef.trim() && !task.doc_ref) {
+      setActionError('กรุณาระบุรหัสเอกสารก่อน');
+      return;
+    }
     executeAction('doccon_approve');
   }
 
@@ -324,22 +332,13 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     executeAction(rejectActionKey, comment);
   }
 
+  // Auto-upload on file select (no separate button)
   function onWordFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     setSelectedWordFile(file);
     setUploadError('');
-  }
-
-  function onPdfFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setSelectedPdfFile(file);
-    setUploadError('');
-  }
-
-  // Upload word file attachment
-  function handleWordUpload() {
-    if (selectedWordFile) {
-      handleFileUpload(selectedWordFile, task.id, () => {
+    if (file) {
+      handleFileUpload(file, task.id, () => {
         setSelectedWordFile(null);
         if (wordInputRef.current) wordInputRef.current.value = '';
         onUpdated();
@@ -347,10 +346,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     }
   }
 
-  // Upload pdf file attachment
-  function handlePdfUpload() {
-    if (selectedPdfFile) {
-      handleFileUpload(selectedPdfFile, task.id, () => {
+  function onPdfFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedPdfFile(file);
+    setUploadError('');
+    if (file) {
+      handleFileUpload(file, task.id, () => {
         setSelectedPdfFile(null);
         if (pdfInputRef.current) pdfInputRef.current.value = '';
         onUpdated();
@@ -490,52 +491,37 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {/* ──  ROLE-SPECIFIC INLINE ACTIONS  ──  */}
           {/* ══════════════════════════════════════ */}
 
-          {/* ── STAFF: dual file input + submit button ── */}
+          {/* ── STAFF: word upload only + submit ── */}
           {activeRole === 'STAFF' && isStaffActionable(task, userId) && (
-            <div className="mt-2 space-y-2">
-              {/* Word upload */}
-              <div>
-                <label className="text-xs font-medium text-gray-700 mb-1 block">📄 อัปโหลด Word (.docx):</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={wordInputRef}
-                    type="file"
-                    accept=".docx"
-                    onChange={onWordFileChange}
-                    className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                  />
-                  {selectedWordFile && (
-                    <button onClick={handleWordUpload} className="text-xs text-blue-600 hover:underline">อัปโหลด</button>
-                  )}
-                </div>
-              </div>
-              {/* PDF upload */}
-              <div>
-                <label className="text-xs font-medium text-gray-700 mb-1 block">📋 อัปโหลด PDF (.pdf):</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={pdfInputRef}
-                    type="file"
-                    accept=".pdf"
-                    onChange={onPdfFileChange}
-                    className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                  />
-                  {selectedPdfFile && (
-                    <button onClick={handlePdfUpload} className="text-xs text-amber-600 hover:underline">อัปโหลด</button>
-                  )}
-                </div>
+            <div className="mt-2 space-y-3">
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                  📄 อัปโหลดไฟล์ Word (.docx) {!task.drive_file_id && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  ref={wordInputRef}
+                  type="file"
+                  accept=".docx"
+                  onChange={onWordFileChange}
+                  className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                />
+                <p className="text-[0.65rem] text-gray-400 mt-1">รองรับเฉพาะ Word (.docx)</p>
               </div>
               {uploadProgress !== null && (
-                <div>
-                  <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#00c2a8] transition-all" style={{ width: `${uploadProgress}%` }} />
+                <div className="px-1">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                    <span>กำลังอัปโหลด...</span><span>{uploadProgress}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#00c2a8] transition-all rounded-full" style={{ width: `${uploadProgress}%` }} />
                   </div>
                 </div>
               )}
-              {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+              {uploadError && <p className="text-xs text-red-600 px-1">{uploadError}</p>}
+              {actionError && <p className="text-xs text-red-600 px-1">{actionError}</p>}
               <button
                 onClick={handleStaffSubmit}
-                disabled={actionLoading || uploadProgress !== null}
+                disabled={actionLoading || uploadProgress !== null || (!task.drive_file_id && !selectedWordFile)}
                 className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
               >
                 {actionLoading ? 'กำลังส่ง...' : '✈ ส่งงาน'}
@@ -546,77 +532,63 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {/* ── DOCCON: รอตรวจ sub-tab ── */}
           {activeRole === 'DOCCON' && activeSubTab === 'pending' && task.status === 'SUBMITTED_TO_DOCCON' && (
             <div className="mt-2 space-y-3">
-              {/* Doc ref input */}
-              <div>
-                <label className="text-xs font-medium text-gray-700 mb-1 block"># รหัสเอกสาร:</label>
+              {/* Doc ref input — required before approve */}
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block"># รหัสเอกสาร: <span className="text-red-500">*</span></label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={docRef}
                     onChange={e => setDocRef(e.target.value)}
-                    placeholder="เช่น TM-0001"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400"
+                    placeholder="กรอกรหัสเอกสาร เช่น FIN - 001"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400 bg-white"
                   />
                   <button
-                    onClick={() => { /* trigger check */ }}
-                    className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200"
+                    onClick={() => { /* auto debounce handles check */ }}
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 shrink-0"
                   >
                     🔍 ตรวจสอบ
                   </button>
                 </div>
                 {docRefChecking && <p className="text-xs text-gray-400 mt-1">กำลังตรวจสอบ...</p>}
                 {docRefCheck?.exists && (
-                  <p className="text-xs text-red-600 mt-1">⚠️ ซ้ำกับ {docRefCheck.task_code} - {docRefCheck.title}</p>
+                  <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                    <p className="text-xs text-amber-700 font-medium">⚠️ รหัสนี้มีอยู่แล้ว: {docRefCheck.task_code} — {docRefCheck.title}</p>
+                    <p className="text-[0.65rem] text-amber-600 mt-0.5">หากเป็นการแก้ไขฉบับเดิม ให้กดผ่านได้เลย</p>
+                  </div>
                 )}
                 {docRefCheck && !docRefCheck.exists && docRef.trim() && (
-                  <p className="text-xs text-green-600 mt-1">✅ ไม่ซ้ำ</p>
+                  <p className="text-xs text-green-600 mt-1">✅ รหัสไม่ซ้ำ</p>
+                )}
+                {!docRef.trim() && !task.doc_ref && (
+                  <p className="text-xs text-red-500 mt-1">กรุณากรอกรหัสเอกสารก่อนกดผ่านรูปแบบ</p>
                 )}
               </div>
 
-              {/* Optional attachments — dual upload */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-700 block">📎 แนบไฟล์ที่มีรอยแก้ (ไม่บังคับ):</label>
-                <div>
-                  <span className="text-xs text-gray-500">Word (.docx):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={wordInputRef}
-                      type="file"
-                      accept=".docx"
-                      onChange={onWordFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedWordFile && (
-                      <button onClick={handleWordUpload} className="text-xs text-teal-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500">PDF (.pdf):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={pdfInputRef}
-                      type="file"
-                      accept=".pdf"
-                      onChange={onPdfFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedPdfFile && (
-                      <button onClick={handlePdfUpload} className="text-xs text-teal-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
+              {/* Optional word attachment (auto-upload on select) */}
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ที่มีรอยแก้ (ไม่บังคับ):</label>
+                <input
+                  ref={wordInputRef}
+                  type="file"
+                  accept=".docx,.pdf"
+                  onChange={onWordFileChange}
+                  className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
+                />
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
                 {uploadProgress !== null && (
-                  <div className="mt-1"><div className="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>
+                  <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
                 {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
+
+              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
 
               {/* Action buttons */}
               <div className="flex gap-2">
                 <button
                   onClick={handleDocConApprove}
-                  disabled={actionLoading}
+                  disabled={actionLoading || (!docRef.trim() && !task.doc_ref)}
                   className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
                   {actionLoading ? '...' : '✓ ผ่านรูปแบบ'}
@@ -635,43 +607,22 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {/* ── REVIEWER ── */}
           {activeRole === 'REVIEWER' && task.status === 'PENDING_REVIEW' && task.reviewer_id === userId && (
             <div className="mt-2 space-y-3">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-700 block">📎 แนบไฟล์ที่มีรอยแก้/คอมเมนต์ (ไม่บังคับ):</label>
-                <div>
-                  <span className="text-xs text-gray-500">Word (.docx):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={wordInputRef}
-                      type="file"
-                      accept=".docx"
-                      onChange={onWordFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedWordFile && (
-                      <button onClick={handleWordUpload} className="text-xs text-indigo-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500">PDF (.pdf):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={pdfInputRef}
-                      type="file"
-                      accept=".pdf"
-                      onChange={onPdfFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedPdfFile && (
-                      <button onClick={handlePdfUpload} className="text-xs text-indigo-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ที่มีรอยแก้/คอมเมนต์ (ไม่บังคับ):</label>
+                <input
+                  ref={wordInputRef}
+                  type="file"
+                  accept=".docx,.pdf"
+                  onChange={onWordFileChange}
+                  className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                />
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
                 {uploadProgress !== null && (
-                  <div className="mt-1"><div className="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>
+                  <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
                 {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
+              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
               <div className="flex gap-2">
                 <button
                   onClick={handleReviewerApprove}
@@ -694,43 +645,22 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {/* ── BOSS ── */}
           {activeRole === 'BOSS' && task.status === 'WAITING_BOSS_APPROVAL' && task.created_by === userId && (
             <div className="mt-2 space-y-3">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-700 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
-                <div>
-                  <span className="text-xs text-gray-500">Word (.docx):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={wordInputRef}
-                      type="file"
-                      accept=".docx"
-                      onChange={onWordFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedWordFile && (
-                      <button onClick={handleWordUpload} className="text-xs text-purple-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500">PDF (.pdf):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={pdfInputRef}
-                      type="file"
-                      accept=".pdf"
-                      onChange={onPdfFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedPdfFile && (
-                      <button onClick={handlePdfUpload} className="text-xs text-purple-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
+                <input
+                  ref={wordInputRef}
+                  type="file"
+                  accept=".docx,.pdf"
+                  onChange={onWordFileChange}
+                  className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
+                />
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
                 {uploadProgress !== null && (
-                  <div className="mt-1"><div className="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>
+                  <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
                 {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
+              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
               <button
                 onClick={handleBossApprove}
                 disabled={actionLoading}
@@ -760,43 +690,22 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {/* ── SUPER_BOSS ── */}
           {activeRole === 'SUPER_BOSS' && task.status === 'WAITING_SUPER_BOSS_APPROVAL' && (
             <div className="mt-2 space-y-3">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-700 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
-                <div>
-                  <span className="text-xs text-gray-500">Word (.docx):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={wordInputRef}
-                      type="file"
-                      accept=".docx"
-                      onChange={onWordFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedWordFile && (
-                      <button onClick={handleWordUpload} className="text-xs text-pink-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500">PDF (.pdf):</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <input
-                      ref={pdfInputRef}
-                      type="file"
-                      accept=".pdf"
-                      onChange={onPdfFileChange}
-                      className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50"
-                    />
-                    {selectedPdfFile && (
-                      <button onClick={handlePdfUpload} className="text-xs text-pink-600 hover:underline">อัปโหลด</button>
-                    )}
-                  </div>
-                </div>
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
+                <input
+                  ref={wordInputRef}
+                  type="file"
+                  accept=".docx,.pdf"
+                  onChange={onWordFileChange}
+                  className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 cursor-pointer"
+                />
+                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf)</p>
                 {uploadProgress !== null && (
-                  <div className="mt-1"><div className="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>
+                  <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
                 {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
               </div>
+              {actionError && <p className="text-xs text-red-600">{actionError}</p>}
               <button
                 onClick={handleSuperBossApprove}
                 disabled={actionLoading}
