@@ -1,29 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
+import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
 
+// GET /api/tasks/check-doc-ref?doc_ref=FIN-001&task_id=xxx
+// Returns { exists: boolean, task_code?: string, title?: string }
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser('tracking');
-    requireRole(user, ['DOCCON']);
+    if (!user) return NextResponse.json({ exists: false }, { status: 401 });
 
-    const ref = request.nextUrl.searchParams.get('ref')?.trim();
-    if (!ref) return NextResponse.json({ docRef: '', found: false, matches: [] });
+    const docRef = request.nextUrl.searchParams.get('doc_ref')?.trim();
+    const taskId = request.nextUrl.searchParams.get('task_id')?.trim();
+
+    if (!docRef) return NextResponse.json({ exists: false });
 
     const admin = await createServiceRoleClient();
-    const { data: tasks } = await admin
+
+    let query = admin
       .from('tasks')
-      .select('id, title, status, completed_at')
-      .eq('doc_ref', ref);
+      .select('id, task_code, title, status')
+      .eq('doc_ref', docRef)
+      .neq('status', 'CANCELLED')
+      .limit(1);
 
-    const matches = (tasks ?? []).map(t => ({
-      taskId: t.id,
-      title: t.title,
-      status: t.status,
-      completedAt: t.completed_at ?? '',
-    }));
+    // Exclude the current task itself
+    if (taskId) {
+      query = query.neq('id', taskId);
+    }
 
-    return NextResponse.json({ docRef: ref, found: matches.length > 0, matches });
+    const { data: tasks } = await query;
+    const found = (tasks ?? []).length > 0;
+
+    if (found) {
+      const t = tasks![0];
+      return NextResponse.json({ exists: true, task_code: t.task_code, title: t.title });
+    }
+
+    return NextResponse.json({ exists: false });
   } catch (err) {
     return handleAuthError(err);
   }

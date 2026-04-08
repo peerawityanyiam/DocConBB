@@ -287,9 +287,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     await uploadThenExecute('submit');
   }
 
-  /* ── DocCon approve — require doc_ref ── */
+  /* ── DocCon approve — require doc_ref (unless sent back from Boss where it's already set) ── */
   async function handleDocConApprove() {
-    if (!docRef.trim() && !task.doc_ref) {
+    if (!docconSentBackFromBoss && !docRef.trim() && !task.doc_ref) {
       setActionError('กรุณาระบุรหัสเอกสารก่อน');
       return;
     }
@@ -543,8 +543,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {/* ── DOCCON: รอตรวจ sub-tab ── */}
           {activeRole === 'DOCCON' && activeSubTab === 'pending' && task.status === 'SUBMITTED_TO_DOCCON' && (
             <div className="mt-2 space-y-3">
-              {/* Doc ref input — required before approve */}
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              {/* Doc ref input — required before approve (hidden when sent back from Boss) */}
+              {!docconSentBackFromBoss && <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block"># รหัสเอกสาร: <span className="text-red-500">*</span></label>
                 <div className="flex gap-2">
                   <input
@@ -558,8 +558,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {docRefChecking && <p className="text-xs text-gray-400 mt-1">กำลังตรวจสอบ...</p>}
                 {docRefCheck?.exists && (
                   <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-md">
-                    <p className="text-xs text-amber-700 font-medium">⚠️ รหัสนี้มีอยู่แล้ว: {docRefCheck.task_code} — {docRefCheck.title}</p>
-                    <p className="text-[0.65rem] text-amber-600 mt-0.5">หากเป็นการแก้ไขฉบับเดิม ให้กดผ่านได้เลย</p>
+                    <p className="text-xs text-amber-700 font-medium">⚠️ รหัสซ้ำ — มีเอกสาร: {docRefCheck.task_code} — {docRefCheck.title}</p>
+                    <p className="text-[0.65rem] text-amber-600 mt-0.5">โปรดตรวจสอบให้มั่นใจว่าเป็นการแก้ไขเอกสารฉบับเดิมหรือไม่ (กดผ่านได้หากใช่)</p>
                   </div>
                 )}
                 {docRefCheck && !docRefCheck.exists && docRef.trim() && (
@@ -568,7 +568,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {!docRef.trim() && !task.doc_ref && (
                   <p className="text-xs text-red-500 mt-1">กรุณากรอกรหัสเอกสารก่อนกดผ่านรูปแบบ</p>
                 )}
-              </div>
+              </div>}
 
               {/* Optional file attachment */}
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
@@ -595,7 +595,16 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
               )}
 
-              {/* Action buttons */}
+              {/* Action buttons: sent-back from Boss → only forward, no reject */}
+              {docconSentBackFromBoss ? (
+                <button
+                  onClick={handleDocConApprove}
+                  disabled={isBlocked}
+                  className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✈ ส่งต่อกลับ'}
+                </button>
+              ) : (
               <div className="flex gap-2">
                 <button
                   onClick={handleDocConApprove}
@@ -612,6 +621,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   ↩ ส่งกลับแก้ไข
                 </button>
               </div>
+              )}
             </div>
           )}
 

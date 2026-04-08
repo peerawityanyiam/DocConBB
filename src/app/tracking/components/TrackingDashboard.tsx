@@ -58,12 +58,7 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       },
       useActionCard: false,
     },
-    {
-      key: 'completed',
-      label: 'เสร็จสิ้น',
-      filter: (t, userId) => t.officer_id === userId && t.status === 'COMPLETED',
-      useActionCard: false,
-    },
+    // Bug 5/8: STAFF has no completed sub-tab
   ],
   DOCCON: [
     {
@@ -92,12 +87,7 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       filter: (t, userId) => t.status === 'PENDING_REVIEW' && t.reviewer_id === userId,
       useActionCard: true,
     },
-    {
-      key: 'completed',
-      label: 'เสร็จสิ้น',
-      filter: (t, userId) => t.reviewer_id === userId && t.status === 'COMPLETED',
-      useActionCard: false,
-    },
+    // Bug 5/8: REVIEWER has no completed sub-tab
   ],
   BOSS: [
     {
@@ -112,12 +102,6 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       filter: (t, userId) => t.created_by === userId && !['COMPLETED', 'CANCELLED'].includes(t.status),
       useActionCard: false,
     },
-    {
-      key: 'completed',
-      label: 'เสร็จสิ้น',
-      filter: (t, userId) => t.created_by === userId && t.status === 'COMPLETED',
-      useActionCard: false,
-    },
   ],
   SUPER_BOSS: [
     {
@@ -127,9 +111,10 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       useActionCard: true,
     },
     {
-      key: 'completed',
-      label: 'เสร็จสิ้น',
-      filter: (t) => t.status === 'COMPLETED',
+      // Bug 4: replace completed with tracking all tasks
+      key: 'tracking',
+      label: 'ติดตามงานทั้งหมด',
+      filter: (t) => !['CANCELLED'].includes(t.status),
       useActionCard: false,
     },
   ],
@@ -301,23 +286,26 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
               )}
             </button>
           ))}
-          <button onClick={() => setActiveTab('completed')}
-            className={`px-4 py-1.5 text-xs rounded-full font-semibold tracking-wide border transition-all shadow-sm ${
-              activeTab === 'completed'
-                ? 'bg-[#00c2a8] text-white border-[#00c2a8] shadow-[0_2px_8px_rgba(0,194,168,0.3)]'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-            }`}>
-            เสร็จแล้ว
-            {(tabCounts['completed'] ?? 0) > 0 && (
-              <span className={`ml-1.5 inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 text-[0.6rem] font-bold rounded-full ${
+          {/* Bug 8: completed pill only for DOCCON, BOSS, SUPER_BOSS */}
+          {(userRoles.includes('DOCCON') || userRoles.includes('BOSS') || userRoles.includes('SUPER_BOSS')) && (
+            <button onClick={() => setActiveTab('completed')}
+              className={`px-4 py-1.5 text-xs rounded-full font-semibold tracking-wide border transition-all shadow-sm ${
                 activeTab === 'completed'
-                  ? 'bg-white/30 text-white'
-                  : 'bg-slate-200 text-slate-600'
+                  ? 'bg-[#00c2a8] text-white border-[#00c2a8] shadow-[0_2px_8px_rgba(0,194,168,0.3)]'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
               }`}>
-                {tabCounts['completed']}
-              </span>
-            )}
-          </button>
+              เสร็จแล้ว
+              {(tabCounts['completed'] ?? 0) > 0 && (
+                <span className={`ml-1.5 inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 text-[0.6rem] font-bold rounded-full ${
+                  activeTab === 'completed'
+                    ? 'bg-white/30 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {tabCounts['completed']}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       )}
 
@@ -337,7 +325,8 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
               📊 ภาพรวม
             </button>
           )}
-          {userRoles.includes('DOCCON') && activeTab === 'DOCCON' && (
+          {/* Bug 6: report visible to DOCCON, BOSS, SUPER_BOSS */}
+          {(userRoles.includes('DOCCON') || userRoles.includes('BOSS') || userRoles.includes('SUPER_BOSS')) && (
             <button onClick={() => setShowReport(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-lg transition-colors shadow-sm">
               📈 รายงาน

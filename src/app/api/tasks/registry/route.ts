@@ -13,7 +13,7 @@ export async function GET() {
     // ดึง tasks ที่เสร็จแล้วและมี doc_ref
     const { data: tasks, error } = await admin
       .from('tasks')
-      .select('id, task_code, title, doc_ref, completed_at')
+      .select('id, task_code, title, doc_ref, completed_at, drive_file_id, drive_file_name')
       .eq('status', 'COMPLETED')
       .not('doc_ref', 'is', null)
       .order('doc_ref', { ascending: true })
@@ -26,6 +26,8 @@ export async function GET() {
       doc_ref: string;
       latestTitle: string;
       latestTaskCode: string;
+      latestDriveFileId: string | null;
+      latestDriveFileName: string | null;
       completedAt: string | null;
       versionCount: number;
       tasks: { id: string; task_code: string; title: string; completed_at: string | null }[];
@@ -38,6 +40,8 @@ export async function GET() {
           doc_ref: ref,
           latestTitle: t.title,
           latestTaskCode: t.task_code,
+          latestDriveFileId: t.drive_file_id ?? null,
+          latestDriveFileName: t.drive_file_name ?? null,
           completedAt: t.completed_at,
           versionCount: 0,
           tasks: [],

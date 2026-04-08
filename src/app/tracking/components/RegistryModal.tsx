@@ -18,6 +18,8 @@ interface RegistryEntry {
   doc_ref: string;
   latestTitle: string;
   latestTaskCode: string;
+  latestDriveFileId: string | null;
+  latestDriveFileName: string | null;
   completedAt: string | null;
   versionCount: number;
   tasks: RegistryTask[];
@@ -135,7 +137,17 @@ export default function RegistryModal({ open, onClose }: RegistryModalProps) {
                       </span>
                     </div>
                     <div className="col-span-4 text-sm text-slate-700 truncate">
-                      {entry.latestTitle}
+                      {entry.latestDriveFileId ? (
+                        <a
+                          href={`https://drive.google.com/file/d/${entry.latestDriveFileId}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-700 hover:text-blue-800 hover:underline font-medium"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          📄 {entry.latestTitle}
+                        </a>
+                      ) : entry.latestTitle}
                     </div>
                     <div className="col-span-2 text-center">
                       <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 text-xs font-semibold rounded-full bg-slate-100 text-slate-600">

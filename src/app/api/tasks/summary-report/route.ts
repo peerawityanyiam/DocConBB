@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const user = await getAuthUser('tracking');
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    requireRole(user, ['BOSS', 'SUPER_BOSS']);
+    requireRole(user, ['BOSS', 'SUPER_BOSS', 'DOCCON']);
 
     const admin = await createServiceRoleClient();
 
