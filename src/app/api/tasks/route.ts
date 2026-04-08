@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     let query = admin
       .from('tasks')
-      .select('id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by')
+      .select('id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, status_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by')
       .eq('is_archived', false)
       .order('updated_at', { ascending: false });
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
         let completedQuery = admin
           .from('tasks')
-          .select('id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by')
+          .select('id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, status_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by')
           .in('status', ['COMPLETED', 'CANCELLED'])
           .order('updated_at', { ascending: false })
           .limit(100);

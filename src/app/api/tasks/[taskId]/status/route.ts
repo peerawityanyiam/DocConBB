@@ -3,6 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, AuthError, handleAuthError } from '@/lib/auth/guards';
 import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
+import { deleteFilePermanent } from '@/lib/google-drive/files';
 
 type StatusAction =
   | 'submit'
@@ -90,6 +91,7 @@ export async function PATCH(
         else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
         // เมื่อส่งงานใหม่ ลบ PDF อ้างอิงที่เคยแนบมา (PDF ใช้ประกอบตีกลับเท่านั้น)
         if (task.ref_file_id) {
+          try { await deleteFilePermanent(task.ref_file_id); } catch { /* ignore drive errors */ }
           updates.ref_file_id = null;
           updates.ref_file_name = null;
         }

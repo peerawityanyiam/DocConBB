@@ -73,6 +73,13 @@ export async function trashFile(fileId: string): Promise<void> {
   });
 }
 
+export async function deleteFilePermanent(fileId: string): Promise<void> {
+  await drive().files.delete({
+    fileId,
+    supportsAllDrives: true,
+  });
+}
+
 export async function uploadFile(
   folderId: string,
   fileName: string,

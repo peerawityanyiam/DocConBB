@@ -79,12 +79,6 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       useActionCard: false,
     },
     {
-      key: 'completed',
-      label: 'เสร็จสิ้น',
-      filter: (t) => t.status === 'COMPLETED',
-      useActionCard: false,
-    },
-    {
       key: 'registry',
       label: 'ทะเบียนเอกสาร',
       filter: () => false, // special tab — opens registry modal

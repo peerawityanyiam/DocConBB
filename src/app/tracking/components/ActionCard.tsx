@@ -252,9 +252,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setActionLoading(true);
     setActionError('');
     setUploadError('');
+    let fileUploaded = false;
     try {
       if (selectedWordFile) {
         await uploadFileAsync(selectedWordFile);
+        fileUploaded = true;
         setSelectedWordFile(null);
         if (wordInputRef.current) wordInputRef.current.value = '';
       }
@@ -262,19 +264,24 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       onUpdated();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาด';
-      setActionError(msg);
+      if (!fileUploaded && selectedWordFile) {
+        // upload failed — clear selection so user can pick again
+        setSelectedWordFile(null);
+        if (wordInputRef.current) wordInputRef.current.value = '';
+        setUploadError(msg);
+      } else {
+        setActionError(msg);
+      }
     } finally {
       setActionLoading(false);
       setUploadProgress(null);
     }
   }
 
-  /* ── STAFF: submit (upload first if new file selected) ── */
+  /* ── STAFF: always requires a new file ── */
   async function handleStaffSubmit() {
-    const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
-    // On rejection statuses, must upload new file. On ASSIGNED, ok if already has file.
-    if (!selectedWordFile && (isRejectedStatus || !task.drive_file_id)) {
-      setActionError('กรุณาอัปโหลดไฟล์ Word ก่อนส่งงาน');
+    if (!selectedWordFile) {
+      setActionError('กรุณาเลือกไฟล์ Word (.docx) ก่อนส่งงาน');
       return;
     }
     await uploadThenExecute('submit');
@@ -321,9 +328,19 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const hasRefFile = !!task.ref_file_id;
   const refFileUrl = hasRefFile ? `https://drive.google.com/file/d/${task.ref_file_id}/view` : null;
 
-  /* ── Derived state for staff submit button ── */
+  /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
-  const staffCanSubmit = selectedWordFile !== null || (!isRejectedStatus && !!task.drive_file_id);
+  const staffCanSubmit = selectedWordFile !== null;
+
+  /* ── Bug 4: Derive who sent back for rejected statuses ── */
+  const lastHistoryEntry = task.status_history?.slice().reverse().find(h => h.status === task.status);
+  const sentBackByName = lastHistoryEntry?.changedByName;
+
+  /* ── Bug 5: DocCon context — is this a "sent back from Boss/SuperBoss"? ── */
+  const docconSentBackFromBoss = task.status === 'SUBMITTED_TO_DOCCON' &&
+    !!(task.status_history?.slice().reverse().find(
+      h => h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')
+    ));
 
   /* ── Is boss cancel available? ── */
   const bossCanCancel = activeRole === 'BOSS' &&
@@ -413,12 +430,31 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
             )}
           </div>
 
-          {/* Latest comment (rejection reason) */}
-          {task.latest_comment && REJECTED_STATUSES.has(task.status) && (
-            <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-red-50 border-l-[3px] border-red-400 text-red-800">
-              💬 {task.latest_comment}
+          {/* Latest comment (rejection reason) + who sent back */}
+          {/* Rejected: show who sent back + comment */}
+          {REJECTED_STATUSES.has(task.status) && (
+            <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-red-50 border-l-[3px] border-red-400 text-red-800 space-y-0.5">
+              {sentBackByName && (
+                <p className="font-semibold">↩ ส่งกลับโดย: {sentBackByName}</p>
+              )}
+              {task.latest_comment && (
+                <p>💬 {task.latest_comment}</p>
+              )}
             </div>
           )}
+
+          {/* SUBMITTED_TO_DOCCON: show who sent it back (Boss/SuperBoss context) */}
+          {docconSentBackFromBoss && (() => {
+            const sentBackEntry = task.status_history?.slice().reverse().find(
+              h => h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')
+            );
+            return sentBackEntry ? (
+              <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-amber-50 border-l-[3px] border-amber-400 text-amber-800">
+                ↩ ส่งกลับตรวจรูปแบบโดย: <span className="font-semibold">{sentBackEntry.changedByName}</span>
+                {task.latest_comment && <p className="mt-0.5">💬 {task.latest_comment}</p>}
+              </div>
+            ) : null;
+          })()}
 
           {/* Pipeline visualization (DocCon tracking tab) */}
           {isPipelineView && <PipelineViz status={task.status} />}
@@ -461,7 +497,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
                   📄 {isRejectedStatus ? 'อัปโหลดไฟล์ Word ที่แก้ไขแล้ว' : 'อัปโหลดไฟล์ Word (.docx)'}
-                  {(isRejectedStatus || !task.drive_file_id) && <span className="text-red-500">*</span>}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   ref={wordInputRef}
@@ -470,16 +506,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
-                {selectedWordFile && (
+                {selectedWordFile ? (
                   <p className="text-xs text-green-700 mt-1.5 flex items-center gap-1">
                     ✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span>
                   </p>
-                )}
-                {!selectedWordFile && task.drive_file_id && !isRejectedStatus && (
-                  <p className="text-[0.65rem] text-gray-400 mt-1">มีไฟล์เดิมแล้ว — เลือกใหม่เพื่อแทนที่ หรือส่งได้เลย</p>
-                )}
-                {(isRejectedStatus || !task.drive_file_id) && !selectedWordFile && (
-                  <p className="text-[0.65rem] text-red-500 mt-1">กรุณาเลือกไฟล์ Word ก่อนส่งงาน</p>
+                ) : (
+                  <p className="text-[0.65rem] text-red-500 mt-1">กรุณาเลือกไฟล์ Word (.docx) เพื่อส่งงาน</p>
                 )}
               </div>
 
@@ -544,14 +576,16 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 <input
                   ref={wordInputRef}
                   type="file"
-                  accept=".docx,.pdf"
+                  accept={docconSentBackFromBoss ? '.docx' : '.docx,.pdf'}
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
                 />
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
                 )}
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
+                <p className="text-[0.65rem] text-gray-400 mt-1">
+                  {docconSentBackFromBoss ? 'Word (.docx) เท่านั้น (งานที่ส่งกลับจาก Boss)' : 'Word (.docx) หรือ PDF (.pdf)'} — จะอัปโหลดพร้อมกับการดำเนินการ
+                </p>
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}

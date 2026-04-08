@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
-import { uploadFile, getOrCreateFolder, trashFile, checkFolderExists } from '@/lib/google-drive/files';
+import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 
 const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
@@ -61,19 +61,21 @@ export async function POST(
     const officerStatuses = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
 
     let canUpload = false;
+    // Also check roles from the auth token (user_project_roles), not just user_roles table
+    const authRolesSet = new Set(user.roles);
 
     // เจ้าหน้าที่ (officer) — เช็คจาก relationship ไม่ต้องมี role ก็ได้
     if (isOfficer && officerStatuses.includes(s)) canUpload = true;
-    // DocCon
-    if ((userRolesSet.has('DOCCON')) && s === 'SUBMITTED_TO_DOCCON') canUpload = true;
+    // Boss (ผู้สั่งงาน) — อัปโหลดได้ทั้ง ASSIGNED (ตอนสร้างงาน) และ WAITING_BOSS_APPROVAL
+    if (isCreator && (s === 'ASSIGNED' || s === 'WAITING_BOSS_APPROVAL')) canUpload = true;
+    // DocCon — check both tables
+    if ((userRolesSet.has('DOCCON') || authRolesSet.has('DOCCON')) && s === 'SUBMITTED_TO_DOCCON') canUpload = true;
     // Reviewer — เช็คจาก relationship
     if (isReviewer && s === 'PENDING_REVIEW') canUpload = true;
-    // Boss (ผู้สั่งงาน) — เช็คจาก creator
-    if (isCreator && s === 'WAITING_BOSS_APPROVAL') canUpload = true;
-    // SuperBoss
-    if ((userRolesSet.has('SUPER_BOSS')) && s === 'WAITING_SUPER_BOSS_APPROVAL') canUpload = true;
+    // SuperBoss — check both tables
+    if ((userRolesSet.has('SUPER_BOSS') || authRolesSet.has('SUPER_BOSS')) && s === 'WAITING_SUPER_BOSS_APPROVAL') canUpload = true;
     // SuperAdmin
-    if (userRolesSet.has('SUPER_ADMIN')) canUpload = true;
+    if (userRolesSet.has('SUPER_ADMIN') || authRolesSet.has('SUPER_ADMIN')) canUpload = true;
 
     if (!canUpload) {
       const rolesStr = Array.from(userRolesSet).join(', ') || 'none';
@@ -84,12 +86,28 @@ export async function POST(
 
     // PDF logic: PDF ใช้ประกอบการตีกลับเท่านั้น
     // - เฉพาะ DocCon/Reviewer/Boss/SuperBoss ที่กำลังจะตีกลับ ส่ง PDF ได้
+    // - Boss (creator) สร้างงานใหม่สถานะ ASSIGNED สามารถแนบ PDF ได้
     // - เจ้าหน้าที่ที่ถูกตีกลับ ส่ง PDF ไม่ได้ (ต้องแก้ตามสั่ง ส่ง word เท่านั้น)
     const isPdfFile = ext === 'pdf';
     if (isPdfFile) {
       const pdfAllowedStatuses = ['SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'];
-      if (!pdfAllowedStatuses.includes(s)) {
+      // Allow PDF at ASSIGNED if the uploader is the task creator (Boss creating a task)
+      const isCreatorUploadingAtAssigned = isCreator && s === 'ASSIGNED';
+      if (!pdfAllowedStatuses.includes(s) && !isCreatorUploadingAtAssigned) {
         return NextResponse.json({ error: 'สถานะนี้อัปโหลดได้เฉพาะไฟล์ .docx เท่านั้น (PDF ใช้ประกอบการตีกลับ)' }, { status: 400 });
+      }
+      // Bug 5: DocCon cannot upload PDF when task was sent back from Boss/SuperBoss
+      if (s === 'SUBMITTED_TO_DOCCON' && (userRolesSet.has('DOCCON') || authRolesSet.has('DOCCON')) && !isCreator) {
+        const history = (task.status_history as Array<{status?: string; note?: string}>) ?? [];
+        // Find last SUBMITTED_TO_DOCCON entry with sentBackToDocconBy note
+        for (let i = history.length - 1; i >= 0; i--) {
+          const h = history[i];
+          if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) {
+            return NextResponse.json({ error: 'เมื่องานถูกส่งกลับจาก Boss/Super Boss อัปโหลดได้เฉพาะไฟล์ .docx เท่านั้น' }, { status: 400 });
+          }
+          // Stop searching once we hit a non-sentBack entry at SUBMITTED_TO_DOCCON
+          if (h.status === 'SUBMITTED_TO_DOCCON') break;
+        }
       }
     }
 
@@ -156,14 +174,14 @@ export async function POST(
     if (isPdf) {
       // PDF → ไฟล์อ้างอิง (ref) — replace old PDF only
       if (task.ref_file_id && task.ref_file_id !== driveFileId) {
-        try { await trashFile(task.ref_file_id); } catch { /* ignore */ }
+        try { await deleteFilePermanent(task.ref_file_id); } catch { /* ignore */ }
       }
       updates.ref_file_id = driveFileId;
       updates.ref_file_name = driveFileName;
     } else {
       // DOCX → ไฟล์หลัก — replace old DOCX only, keep ref PDF intact
       if (task.drive_file_id && task.drive_file_id !== driveFileId) {
-        try { await trashFile(task.drive_file_id); } catch { /* ignore */ }
+        try { await deleteFilePermanent(task.drive_file_id); } catch { /* ignore */ }
       }
       updates.drive_file_id = driveFileId;
       updates.drive_file_name = driveFileName;
