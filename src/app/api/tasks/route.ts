@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient, createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
 
-// GET /api/tasks?role=BOSS  — ดึง tasks ตาม role
+const TASK_SELECT = 'id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, status_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by, superseded_by';
+
+// GET /api/tasks?role=BOSS
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser('tracking');
@@ -11,7 +13,6 @@ export async function GET(request: NextRequest) {
     const role = request.nextUrl.searchParams.get('role');
     const admin = await createServiceRoleClient();
 
-    // หา DB user id
     const { data: dbUser } = await admin
       .from('users')
       .select('id')
@@ -22,43 +23,36 @@ export async function GET(request: NextRequest) {
 
     let query = admin
       .from('tasks')
-      .select('id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, status_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by')
+      .select(TASK_SELECT)
       .eq('is_archived', false)
       .order('updated_at', { ascending: false });
 
-    // กรองตาม role
     switch (role) {
       case 'STAFF':
         query = query.eq('officer_id', dbUser.id);
         break;
       case 'REVIEWER':
-        query = query.eq('reviewer_id', dbUser.id).eq('status', 'PENDING_REVIEW');
+        query = query.eq('reviewer_id', dbUser.id);
         break;
       case 'BOSS':
         query = query.eq('created_by', dbUser.id);
         break;
       case 'DOCCON':
-        // DocCon เห็นทุก task ที่ยังไม่ archive
+        // DOCCON sees all active tasks
         break;
       case 'SUPER_BOSS':
-        query = query.eq('status', 'WAITING_SUPER_BOSS_APPROVAL');
+        // SUPER_BOSS tracking should see all active tasks (same as DOCCON)
         break;
       case 'completed': {
-        // ดึงงานที่เสร็จ/ยกเลิก — กรองตาม role ของผู้ใช้
-        const { data: userRoleRows } = await admin
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', dbUser.id);
-        const userRolesSet = new Set((userRoleRows ?? []).map(r => r.role));
+        const userRolesSet = new Set(user.roles);
 
         let completedQuery = admin
           .from('tasks')
-          .select('id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, status_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by')
-          .in('status', ['COMPLETED', 'CANCELLED'])
+          .select(TASK_SELECT)
+          .eq('status', 'COMPLETED')
           .order('updated_at', { ascending: false })
           .limit(100);
 
-        // DOCCON/SUPER_ADMIN เห็นทั้งหมด, คนอื่นเห็นเฉพาะที่เกี่ยวข้อง
         if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_ADMIN')) {
           completedQuery = completedQuery.or(
             `officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`
@@ -69,18 +63,17 @@ export async function GET(request: NextRequest) {
         break;
       }
       default:
-        // ไม่ระบุ role → เห็นที่เกี่ยวข้องทั้งหมด
         query = query.or(`officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`);
     }
 
     const { data: tasks, error } = await query;
     if (error) throw error;
 
-    // ดึงชื่อผู้ใช้ที่เกี่ยวข้อง
+    const taskRows = tasks ?? [];
     const userIds = [...new Set([
-      ...tasks.map(t => t.officer_id),
-      ...tasks.map(t => t.reviewer_id),
-      ...tasks.map(t => t.created_by),
+      ...taskRows.map(t => t.officer_id),
+      ...taskRows.map(t => t.reviewer_id),
+      ...taskRows.map(t => t.created_by),
     ].filter(Boolean))];
 
     const { data: usersData } = await admin
@@ -90,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     const usersMap = Object.fromEntries((usersData ?? []).map(u => [u.id, u]));
 
-    const result = tasks.map(t => ({
+    const result = taskRows.map(t => ({
       ...t,
       officer: usersMap[t.officer_id] ?? null,
       reviewer: usersMap[t.reviewer_id] ?? null,
@@ -103,7 +96,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/tasks — สร้าง task ใหม่ (BOSS only)
+// POST /api/tasks - create task (BOSS only)
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser('tracking');
@@ -118,7 +111,6 @@ export async function POST(request: NextRequest) {
 
     const admin = await createServiceRoleClient();
 
-    // หา creator id
     const { data: creator } = await admin
       .from('users')
       .select('id, display_name')

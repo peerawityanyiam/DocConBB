@@ -76,6 +76,11 @@ export async function PATCH(
     const now = new Date().toISOString();
     let newStatus: TaskStatus = task.status;
     const updates: Record<string, unknown> = {};
+    const fileHistory = (task.file_history as Array<{
+      uploadedAt?: string;
+      uploadedBy?: string;
+      isPdf?: boolean;
+    }> | null) ?? [];
 
     // ─── คำนวณ status ใหม่ ──────────────────────────────────────────────
     switch (action) {
@@ -102,13 +107,32 @@ export async function PATCH(
         // ต้องใส่รหัสเอกสาร (ยกเว้นมีอยู่แล้ว)
         if (!doc_ref && !task.doc_ref) throw new AuthError('กรุณาระบุรหัสเอกสาร (doc_ref) ก่อนอนุมัติ', 400);
         // ค้นย้อนหลังใน status_history หา note sentBackToDocconBy:*
-        const history = (task.status_history as Array<{status?: string; note?: string}>) ?? [];
+        const history = (task.status_history as Array<{status?: string; note?: string; changedAt?: string}>) ?? [];
         let sentBackBy = '';
+        let sentBackAt = '';
         for (let i = history.length - 1; i >= 0; i--) {
           const h = history[i];
           if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) {
             sentBackBy = h.note;
+            sentBackAt = h.changedAt ?? '';
             break;
+          }
+          if (h.status === 'SUBMITTED_TO_DOCCON') break;
+        }
+        if (sentBackBy) {
+          const latestFile = fileHistory[fileHistory.length - 1];
+          if (!latestFile || latestFile.isPdf) {
+            throw new AuthError('กรุณาอัปโหลดไฟล์ Word (.docx) ก่อนส่งกลับไปอนุมัติ', 400);
+          }
+          if (latestFile.uploadedBy && latestFile.uploadedBy !== user.email) {
+            throw new AuthError('ต้องอัปโหลดไฟล์ Word ด้วยบัญชี DocCon คนปัจจุบันก่อนส่งกลับไปอนุมัติ', 400);
+          }
+          if (
+            sentBackAt
+            && latestFile.uploadedAt
+            && new Date(latestFile.uploadedAt).getTime() < new Date(sentBackAt).getTime()
+          ) {
+            throw new AuthError('กรุณาอัปโหลดไฟล์ Word ใหม่หลังได้รับงานตีกลับ ก่อนส่งกลับไปอนุมัติ', 400);
           }
         }
         if (sentBackBy.includes('SUPER_BOSS')) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';

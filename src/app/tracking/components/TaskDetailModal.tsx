@@ -405,6 +405,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
   const ageDays = task ? calcAgeDays(task.created_at) : 0;
   const ageColor = ageDays > 14 ? 'bg-red-100 text-red-700' : ageDays > 7 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600';
+  const isSupersededCompleted = !!task && task.status === 'COMPLETED' && !!task.superseded_by;
 
   const filteredStaffForReassign = reassignField === 'officer_id'
     ? staffList.filter(u => u.role === 'STAFF')
@@ -577,13 +578,19 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                     </div>
                   )}
 
+                  {isSupersededCompleted && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
+                      มีเอกสารใหม่ทับรหัสเดียวกันแล้ว จึงไม่อนุญาตโหลด Word จากรายการนี้
+                    </div>
+                  )}
+
                   {/* Main file display */}
                   {task.drive_file_name && (
                     <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <span className="text-blue-500">📎</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-slate-500">ไฟล์แนบ</p>
-                        {task.drive_file_id ? (
+                        {task.drive_file_id && !isSupersededCompleted ? (
                           <a
                             href={`https://drive.google.com/file/d/${task.drive_file_id}/view`}
                             target="_blank"
@@ -592,6 +599,8 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           >
                             {task.drive_file_name}
                           </a>
+                        ) : isSupersededCompleted ? (
+                          <p className="text-sm font-medium text-slate-500 truncate">{task.drive_file_name} (ไม่อนุญาตให้โหลด)</p>
                         ) : (
                           <p className="text-sm font-medium text-blue-700 truncate">{task.drive_file_name}</p>
                         )}
@@ -682,7 +691,11 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
               {/* Files Tab */}
               {tab === 'files' && (
                 <div className="space-y-3">
-                  {(task.file_history ?? []).length === 0 ? (
+                  {isSupersededCompleted ? (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
+                      ปิดลิงก์ดาวน์โหลดไฟล์จากการ์ดเก่า เนื่องจากมีเอกสารใหม่แล้ว
+                    </div>
+                  ) : (task.file_history ?? []).length === 0 ? (
                     <p className="text-sm text-slate-400 italic text-center py-4">ยังไม่มีประวัติไฟล์</p>
                   ) : (
                     <div className="space-y-2">

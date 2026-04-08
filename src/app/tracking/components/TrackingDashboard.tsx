@@ -58,7 +58,12 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       },
       useActionCard: false,
     },
-    // Bug 5/8: STAFF has no completed sub-tab
+    {
+      key: 'completed',
+      label: 'Completed',
+      filter: (t, userId) => t.officer_id === userId && t.status === 'COMPLETED',
+      useActionCard: false,
+    },
   ],
   DOCCON: [
     {
@@ -87,7 +92,12 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       filter: (t, userId) => t.status === 'PENDING_REVIEW' && t.reviewer_id === userId,
       useActionCard: true,
     },
-    // Bug 5/8: REVIEWER has no completed sub-tab
+    {
+      key: 'completed',
+      label: 'Completed',
+      filter: (t, userId) => t.reviewer_id === userId && t.status === 'COMPLETED',
+      useActionCard: false,
+    },
   ],
   BOSS: [
     {
@@ -114,7 +124,7 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       // Bug 4: replace completed with tracking all tasks
       key: 'tracking',
       label: 'ติดตามงานทั้งหมด',
-      filter: (t) => !['CANCELLED'].includes(t.status),
+      filter: (t) => !['COMPLETED', 'CANCELLED'].includes(t.status),
       useActionCard: false,
     },
   ],
@@ -211,6 +221,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
   const searchFiltered = tasks.filter(t =>
     !search.trim()
     || t.title.toLowerCase().includes(search.toLowerCase())
+    || (t.drive_file_name ?? '').toLowerCase().includes(search.toLowerCase())
     || t.task_code.toLowerCase().includes(search.toLowerCase())
     || (t.doc_ref ?? '').toLowerCase().includes(search.toLowerCase())
   );
@@ -261,6 +272,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         : currentSubTab?.key === 'completed'
           ? `เสร็จสิ้น (${filtered.length})`
           : `${filtered.length} รายการ`;
+  const isCompletedView = isCompletedTab || currentSubTab?.key === 'completed';
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-5">
@@ -439,6 +451,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
                 onClick={t => setSelectedTaskId(t.id)}
                 activeRole={isCompletedTab ? undefined : (activeTab as string)}
                 userId={userId}
+                isCompletedView={isCompletedView}
               />
             );
           })}
