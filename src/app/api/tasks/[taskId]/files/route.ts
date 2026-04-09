@@ -245,6 +245,11 @@ export async function POST(
     if (err instanceof AuthError) return handleAuthError(err);
     console.error('[FILE_UPLOAD_ERROR]', err);
     const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัปโหลดไฟล์';
+    if (/unauthorized_client/i.test(message)) {
+      return NextResponse.json({
+        error: 'ตั้งค่า Google Service Account ไม่ถูกต้องสำหรับการ impersonate กรุณาใช้โหมด service account ปกติ (ปิด GOOGLE_ENABLE_IMPERSONATION) หรือให้ผู้ดูแลระบบเปิด Domain-wide Delegation ก่อน',
+      }, { status: 500 });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
