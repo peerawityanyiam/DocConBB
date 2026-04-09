@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import TaskCard, { type Task } from './TaskCard';
 import ActionCard from './ActionCard';
@@ -145,6 +145,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
   const [showRegistry, setShowRegistry] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+  const countsRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [completedRange, setCompletedRange] = useState<CompletedRange>('all');
   const [completedSort, setCompletedSort] = useState<CompletedSort>('completed_date');
 
@@ -161,38 +162,15 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
 
   // Fetch task counts for badges — show only actionable tasks per role
   const fetchTabCounts = useCallback(async () => {
-    const counts: Record<string, number> = {};
-    await Promise.all(
-      [...availableTabs.map(t => t.role), 'completed' as const].map(async (role) => {
-        try {
-          const res = await fetch(`/api/tasks?role=${role}`);
-          if (res.ok) {
-            const data: Task[] = await res.json();
-            // Filter to actionable tasks only for badge counts
-            const actionable = data.filter(t => {
-              switch (role) {
-                case 'STAFF':
-                  return t.officer_id === userId && ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'].includes(t.status);
-                case 'DOCCON':
-                  return t.status === 'SUBMITTED_TO_DOCCON';
-                case 'REVIEWER':
-                  return t.status === 'PENDING_REVIEW' && t.reviewer_id === userId;
-                case 'BOSS':
-                  return t.status === 'WAITING_BOSS_APPROVAL' && t.created_by === userId;
-                case 'SUPER_BOSS':
-                  return t.status === 'WAITING_SUPER_BOSS_APPROVAL';
-                default:
-                  return true;
-              }
-            });
-            counts[role] = actionable.length;
-          }
-        } catch { /* ignore */ }
-      })
-    );
-    setTabCounts(counts);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userRoles.join(','), userId]);
+    try {
+      const res = await fetch('/api/tasks/counts', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data: { counts?: Record<string, number> } = await res.json();
+      if (data.counts) setTabCounts(data.counts);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => { fetchTabCounts(); }, [fetchTabCounts]);
 
@@ -209,18 +187,33 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
+  const refreshTasksAndCounts = useCallback(() => {
+    fetchTasks();
+    fetchTabCounts();
+  }, [fetchTasks, fetchTabCounts]);
+
   // Realtime subscription
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel('tasks-dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        fetchTasks();
-        fetchTabCounts();
+        if (countsRefreshTimerRef.current) {
+          clearTimeout(countsRefreshTimerRef.current);
+        }
+        countsRefreshTimerRef.current = setTimeout(() => {
+          refreshTasksAndCounts();
+        }, 500);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchTasks, fetchTabCounts]);
+    return () => {
+      if (countsRefreshTimerRef.current) {
+        clearTimeout(countsRefreshTimerRef.current);
+        countsRefreshTimerRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [refreshTasksAndCounts]);
 
   // Apply search filter
   const searchFiltered = tasks.filter(t =>
@@ -511,7 +504,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
                   activeSubTab={activeSubTab}
                   userId={userId}
                   userRoles={userRoles}
-                  onUpdated={() => { fetchTasks(); fetchTabCounts(); }}
+                  onUpdated={refreshTasksAndCounts}
                   onOpenHistory={(id) => setSelectedTaskId(id)}
                 />
               );
@@ -527,7 +520,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
                 userId={userId}
                 isCompletedView={isCompletedView}
                 userRoles={userRoles}
-                onChecklistUpdated={() => { fetchTasks(); fetchTabCounts(); }}
+                onChecklistUpdated={refreshTasksAndCounts}
               />
             );
           })}
@@ -545,7 +538,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         userRoles={userRoles}
         userId={userId}
         onClose={() => setSelectedTaskId(null)}
-        onUpdated={() => { fetchTasks(); fetchTabCounts(); }}
+        onUpdated={refreshTasksAndCounts}
       />
       <DashboardModal
         open={showDashboard}

@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser } from '@/lib/auth/guards';
 import TrackingDashboard from './components/TrackingDashboard';
 
@@ -9,21 +8,10 @@ export default async function TrackingPage() {
   const user = await getAuthUser('tracking');
   if (!user) redirect('/login');
 
-  const admin = await createServiceRoleClient();
-
-  // หา DB user id จาก email
-  const { data: dbUser } = await admin
-    .from('users')
-    .select('id')
-    .eq('email', user.email)
-    .single();
-
-  if (!dbUser) redirect('/login');
-
   return (
     <TrackingDashboard
       userRoles={user.roles}
-      userId={dbUser.id}
+      userId={user.id}
       userEmail={user.email}
     />
   );

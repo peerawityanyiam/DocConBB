@@ -12,14 +12,7 @@ export async function GET(request: NextRequest) {
 
     const role = request.nextUrl.searchParams.get('role');
     const admin = await createServiceRoleClient();
-
-    const { data: dbUser } = await admin
-      .from('users')
-      .select('id')
-      .eq('email', user.email)
-      .single();
-
-    if (!dbUser) return NextResponse.json([]);
+    const dbUserId = user.id;
 
     let query = admin
       .from('tasks')
@@ -28,13 +21,13 @@ export async function GET(request: NextRequest) {
 
     switch (role) {
       case 'STAFF':
-        query = query.eq('officer_id', dbUser.id);
+        query = query.eq('officer_id', dbUserId).eq('is_archived', false);
         break;
       case 'REVIEWER':
-        query = query.eq('reviewer_id', dbUser.id);
+        query = query.eq('reviewer_id', dbUserId).eq('is_archived', false);
         break;
       case 'BOSS':
-        query = query.eq('created_by', dbUser.id).eq('is_archived', false);
+        query = query.eq('created_by', dbUserId).eq('is_archived', false);
         break;
       case 'DOCCON':
         // DOCCON sees all active tasks
@@ -56,7 +49,7 @@ export async function GET(request: NextRequest) {
 
         if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_ADMIN')) {
           completedQuery = completedQuery.or(
-            `officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`
+            `officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`
           );
         }
 
@@ -65,7 +58,7 @@ export async function GET(request: NextRequest) {
       }
       default:
         query = query
-          .or(`officer_id.eq.${dbUser.id},reviewer_id.eq.${dbUser.id},created_by.eq.${dbUser.id}`)
+          .or(`officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`)
           .eq('is_archived', false);
     }
 
