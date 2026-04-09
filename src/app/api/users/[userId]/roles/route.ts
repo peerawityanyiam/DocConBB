@@ -9,15 +9,16 @@ export async function GET(
 ) {
   try {
     const user = await getAuthUser('tracking');
-    requireRole(user, ['SUPER_ADMIN']);
+    requireRole(user, ['DOCCON', 'SUPER_ADMIN']);
 
     const { userId } = await params;
     const admin = await createServiceRoleClient();
 
     const { data, error } = await admin
       .from('user_project_roles')
-      .select('id, role, project_id, projects(slug, name)')
-      .eq('user_id', userId);
+      .select('id, role, project_id, projects!inner(slug, name)')
+      .eq('user_id', userId)
+      .eq('projects.slug', 'tracking');
 
     if (error) throw error;
     return NextResponse.json(data ?? []);
@@ -33,7 +34,7 @@ export async function POST(
 ) {
   try {
     const currentUser = await getAuthUser('tracking');
-    requireRole(currentUser, ['SUPER_ADMIN']);
+    requireRole(currentUser, ['DOCCON', 'SUPER_ADMIN']);
 
     const { userId } = await params;
     const { project_id, role } = await request.json() as { project_id: string; role: string };
@@ -43,6 +44,16 @@ export async function POST(
     }
 
     const admin = await createServiceRoleClient();
+
+    const { data: trackingProject } = await admin
+      .from('projects')
+      .select('id')
+      .eq('slug', 'tracking')
+      .single();
+
+    if (!trackingProject || project_id !== trackingProject.id) {
+      return NextResponse.json({ error: 'กำหนดสิทธิ์ได้เฉพาะระบบติดตามเอกสาร' }, { status: 400 });
+    }
 
     // หา id ของ assigner
     const supabase = await createServerSupabaseClient();
@@ -84,12 +95,22 @@ export async function DELETE(
 ) {
   try {
     const currentUser = await getAuthUser('tracking');
-    requireRole(currentUser, ['SUPER_ADMIN']);
+    requireRole(currentUser, ['DOCCON', 'SUPER_ADMIN']);
 
     const { userId } = await params;
     const { project_id, role } = await request.json() as { project_id: string; role: string };
 
     const admin = await createServiceRoleClient();
+
+    const { data: trackingProject } = await admin
+      .from('projects')
+      .select('id')
+      .eq('slug', 'tracking')
+      .single();
+
+    if (!trackingProject || project_id !== trackingProject.id) {
+      return NextResponse.json({ error: 'จัดการสิทธิ์ได้เฉพาะระบบติดตามเอกสาร' }, { status: 400 });
+    }
     const { error } = await admin
       .from('user_project_roles')
       .delete()

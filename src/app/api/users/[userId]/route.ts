@@ -9,7 +9,7 @@ export async function PATCH(
 ) {
   try {
     const user = await getAuthUser('tracking');
-    requireRole(user, ['SUPER_ADMIN']);
+    requireRole(user, ['DOCCON', 'SUPER_ADMIN']);
 
     const { userId } = await params;
     const body = await request.json();

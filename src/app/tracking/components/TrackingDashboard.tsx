@@ -452,6 +452,8 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
                 activeRole={isCompletedTab ? undefined : (activeTab as string)}
                 userId={userId}
                 isCompletedView={isCompletedView}
+                userRoles={userRoles}
+                onChecklistUpdated={() => { fetchTasks(); fetchTabCounts(); }}
               />
             );
           })}

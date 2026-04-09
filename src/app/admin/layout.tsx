@@ -24,9 +24,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // ตรวจสอบ SUPER_ADMIN ใน project ใดก็ได้
   const { data: adminRole } = await admin
     .from('user_project_roles')
-    .select('id')
+    .select('id, projects!inner(slug)')
     .eq('user_id', dbUser.id)
-    .eq('role', 'SUPER_ADMIN')
+    .eq('projects.slug', 'tracking')
+    .in('role', ['DOCCON', 'SUPER_ADMIN'])
     .limit(1);
 
   if (!adminRole?.length) redirect('/tracking');

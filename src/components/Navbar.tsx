@@ -5,9 +5,13 @@ import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 
+const DOCUMENT_CONTROL_GAS_URL =
+  process.env.NEXT_PUBLIC_DOCUMENT_CONTROL_GAS_URL ||
+  'https://accounts.google.com/AccountChooser?continue=https://script.google.com/a/macros/medicine.psu.ac.th/s/AKfycbx0oytFnXvNDaMfPkfLTUQKd8zr-uHpNhuaJNv2csLnM3pKADaWxpa0laQcVciTvRe-/exec';
+
 const NAV_ITEMS = [
   { href: '/tracking', label: 'ติดตามเอกสาร' },
-  { href: '/library', label: 'คลังเอกสาร' },
+  { href: DOCUMENT_CONTROL_GAS_URL, label: 'คลังเอกสาร' },
   { href: '/admin', label: 'จัดการผู้ใช้' },
 ];
 

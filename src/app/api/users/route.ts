@@ -6,14 +6,17 @@ import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
 export async function GET() {
   try {
     const user = await getAuthUser('tracking');
-    requireRole(user, ['SUPER_ADMIN']);
+    requireRole(user, ['DOCCON', 'SUPER_ADMIN']);
 
     const admin = await createServiceRoleClient();
 
     const [{ data: users, error: usersErr }, { data: roles, error: rolesErr }] =
       await Promise.all([
         admin.from('users').select('*').order('display_name'),
-        admin.from('user_project_roles').select('user_id, role, project_id, projects(slug, name)'),
+        admin
+          .from('user_project_roles')
+          .select('user_id, role, project_id, projects!inner(slug, name)')
+          .eq('projects.slug', 'tracking'),
       ]);
 
     if (usersErr) throw usersErr;
@@ -43,7 +46,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser('tracking');
-    requireRole(user, ['SUPER_ADMIN']);
+    requireRole(user, ['DOCCON', 'SUPER_ADMIN']);
 
     const body = await request.json();
     const { email, display_name } = body as { email: string; display_name: string };

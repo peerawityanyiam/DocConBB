@@ -181,11 +181,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   const [preCheckResult, setPreCheckResult] = useState<PreCheckResult | null>(null);
   const [preCheckLoading, setPreCheckLoading] = useState(false);
 
-  // DocCon checklist state
-  const [checklistDriveUploaded, setChecklistDriveUploaded] = useState(false);
-  const [checklistSentToBranch, setChecklistSentToBranch] = useState(false);
-  const [checklistSaving, setChecklistSaving] = useState(false);
-
   const fetchTask = useCallback(async () => {
     if (!taskId) return;
     setLoading(true);
@@ -212,14 +207,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     setPreCheckLoading(false);
     fetchTask();
   }, [fetchTask]);
-
-  // Sync checklist state when task loads/changes
-  useEffect(() => {
-    if (task) {
-      setChecklistDriveUploaded(!!task.drive_uploaded);
-      setChecklistSentToBranch(!!task.sent_to_branch);
-    }
-  }, [task]);
 
   // DocRef duplicate check with debounce
   useEffect(() => {
@@ -631,58 +618,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                   )}
 
                   {/* Upload zone removed — use ActionCard inline actions instead */}
-
-                  {/* DocCon post-completion checklist (only for DOCCON role on completed tasks) */}
-                  {userRoles.includes('DOCCON') && task.status === 'COMPLETED' && (
-                    <div className="border border-teal-200 bg-teal-50/50 rounded-xl p-4 space-y-3">
-                      <p className="text-xs font-bold text-teal-700 flex items-center gap-1.5">
-                        📋 Checklist หลังอนุมัติ (DocCon)
-                      </p>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checklistDriveUploaded}
-                          onChange={async (e) => {
-                            const val = e.target.checked;
-                            setChecklistDriveUploaded(val);
-                            setChecklistSaving(true);
-                            try {
-                              await fetch(`/api/tasks/${task.id}/checklist`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ drive_uploaded: val }),
-                              });
-                              fetchTask();
-                            } finally { setChecklistSaving(false); }
-                          }}
-                          className="accent-teal-600 w-4 h-4"
-                        />
-                        <span className="text-sm text-slate-700">อัปโหลดไฟล์ขึ้น Drive แล้ว</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checklistSentToBranch}
-                          onChange={async (e) => {
-                            const val = e.target.checked;
-                            setChecklistSentToBranch(val);
-                            setChecklistSaving(true);
-                            try {
-                              await fetch(`/api/tasks/${task.id}/checklist`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ sent_to_branch: val }),
-                              });
-                              fetchTask();
-                            } finally { setChecklistSaving(false); }
-                          }}
-                          className="accent-teal-600 w-4 h-4"
-                        />
-                        <span className="text-sm text-slate-700">ส่งหน่วยงานแล้ว</span>
-                      </label>
-                      {checklistSaving && <p className="text-xs text-slate-400">กำลังบันทึก...</p>}
-                    </div>
-                  )}
 
                   {/* Actions removed — use ActionCard inline actions instead */}
                 </div>

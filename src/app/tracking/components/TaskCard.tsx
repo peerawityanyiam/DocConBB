@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
+import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
 
 const PIPELINE_STAGES: { key: string; label: string; icon: string }[] = [
@@ -109,6 +111,8 @@ interface TaskCardProps {
   activeRole?: string;
   userId?: string;
   isCompletedView?: boolean;
+  userRoles?: AppRole[];
+  onChecklistUpdated?: () => void;
 }
 
 function formatDate(iso: string) {
@@ -195,17 +199,71 @@ function PipelineBar({ status }: { status: TaskStatus }) {
   );
 }
 
-export default function TaskCard({ task, onClick, activeRole, isCompletedView = false }: TaskCardProps) {
+export default function TaskCard({
+  task,
+  onClick,
+  activeRole,
+  isCompletedView = false,
+  userRoles = [],
+  onChecklistUpdated,
+}: TaskCardProps) {
   const age = daysAgo(task.created_at);
   const isRejected = REJECTED_STATUSES.has(task.status);
   const actionHint = getActionHint(task, activeRole);
   const needsAction = actionHint?.color === '#00c2a8' || actionHint?.color === '#ef4444';
   const headline = isCompletedView ? (task.drive_file_name ?? task.title) : task.title;
+  const canChecklistInCard = isCompletedView && task.status === 'COMPLETED' && userRoles.includes('DOCCON');
+
+  const [driveUploaded, setDriveUploaded] = useState(!!task.drive_uploaded);
+  const [sentToBranch, setSentToBranch] = useState(!!task.sent_to_branch);
+  const [savingKey, setSavingKey] = useState<'drive_uploaded' | 'sent_to_branch' | null>(null);
+
+  useEffect(() => {
+    setDriveUploaded(!!task.drive_uploaded);
+    setSentToBranch(!!task.sent_to_branch);
+  }, [task.drive_uploaded, task.sent_to_branch, task.id]);
+
+  async function updateChecklist(key: 'drive_uploaded' | 'sent_to_branch', value: boolean) {
+    const prevDrive = driveUploaded;
+    const prevSent = sentToBranch;
+
+    if (key === 'drive_uploaded') setDriveUploaded(value);
+    if (key === 'sent_to_branch') setSentToBranch(value);
+
+    setSavingKey(key);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/checklist`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      });
+
+      if (!res.ok) {
+        setDriveUploaded(prevDrive);
+        setSentToBranch(prevSent);
+        return;
+      }
+      onChecklistUpdated?.();
+    } catch {
+      setDriveUploaded(prevDrive);
+      setSentToBranch(prevSent);
+    } finally {
+      setSavingKey(null);
+    }
+  }
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick(task)}
-      className="w-full text-left bg-white rounded-xl shadow-[0_1px_3px_rgba(13,27,46,0.06),0_1px_2px_rgba(13,27,46,0.04)] hover:shadow-[0_4px_16px_rgba(13,27,46,0.09)] hover:-translate-y-px transition-all group"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick(task);
+        }
+      }}
+      className="w-full text-left bg-white rounded-xl shadow-[0_1px_3px_rgba(13,27,46,0.06),0_1px_2px_rgba(13,27,46,0.04)] hover:shadow-[0_4px_16px_rgba(13,27,46,0.09)] hover:-translate-y-px transition-all group cursor-pointer"
       style={{ border: '1px solid #e2e8f0', borderLeft: `4px solid ${BORDER_LEFT_STYLE[task.status]}`, borderRadius: '12px' }}
     >
       <div className="p-3.5">
@@ -230,6 +288,36 @@ export default function TaskCard({ task, onClick, activeRole, isCompletedView = 
             {task.superseded_by && task.status === 'COMPLETED' && (
               <div className="mt-2 px-3 py-2 rounded-md text-[0.72rem] bg-amber-50 border border-amber-200 text-amber-700">
                 มีเอกสารใหม่ของรหัสนี้แล้ว จึงไม่สามารถดาวน์โหลดไฟล์จากการ์ดเก่าได้
+              </div>
+            )}
+            {canChecklistInCard && (
+              <div
+                className="mt-2 border border-teal-200 bg-teal-50/50 rounded-lg p-2.5 space-y-1.5"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <p className="text-[0.68rem] font-semibold text-teal-700">📋 Checklist (DocCon)</p>
+                <label className="flex items-center gap-2 text-[0.72rem] text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={driveUploaded}
+                    onChange={(e) => updateChecklist('drive_uploaded', e.target.checked)}
+                    disabled={savingKey !== null}
+                    className="accent-teal-600 w-3.5 h-3.5"
+                  />
+                  อัปโหลดขึ้น Drive แล้ว
+                </label>
+                <label className="flex items-center gap-2 text-[0.72rem] text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={sentToBranch}
+                    onChange={(e) => updateChecklist('sent_to_branch', e.target.checked)}
+                    disabled={savingKey !== null}
+                    className="accent-teal-600 w-3.5 h-3.5"
+                  />
+                  ส่งหน่วยงานแล้ว
+                </label>
+                {savingKey && <p className="text-[0.65rem] text-slate-400">กำลังบันทึก...</p>}
               </div>
             )}
           </div>
@@ -282,6 +370,6 @@ export default function TaskCard({ task, onClick, activeRole, isCompletedView = 
           <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(age)}`}>⏱ {age} วัน</span>
         </div>
       )}
-    </button>
+    </div>
   );
 }

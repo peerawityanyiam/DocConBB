@@ -18,8 +18,16 @@ export default async function AdminPage() {
   // ดึงข้อมูลทั้งหมดพร้อมกัน
   const [{ data: users }, { data: roles }, { data: projects }] = await Promise.all([
     admin.from('users').select('*').order('display_name'),
-    admin.from('user_project_roles').select('user_id, role, project_id, projects(slug, name)'),
-    admin.from('projects').select('id, name, slug').eq('is_active', true).order('name'),
+    admin
+      .from('user_project_roles')
+      .select('user_id, role, project_id, projects!inner(slug, name)')
+      .eq('projects.slug', 'tracking'),
+    admin
+      .from('projects')
+      .select('id, name, slug')
+      .eq('is_active', true)
+      .eq('slug', 'tracking')
+      .order('name'),
   ]);
 
   // รวม roles เข้ากับ users
