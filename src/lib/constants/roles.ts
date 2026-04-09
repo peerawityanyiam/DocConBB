@@ -4,8 +4,8 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   STAFF: 'เจ้าหน้าที่',
   DOCCON: 'ผู้ควบคุมเอกสาร',
   REVIEWER: 'ผู้ตรวจสอบ',
-  BOSS: 'หัวหน้างาน',
-  SUPER_BOSS: 'ผู้บริหาร',
+  BOSS: 'ผู้สั่งงาน',
+  SUPER_BOSS: 'หัวหน้างาน',
   SUPER_ADMIN: 'ผู้ดูแลระบบ',
 };
 

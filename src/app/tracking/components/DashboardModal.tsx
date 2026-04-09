@@ -39,7 +39,7 @@ export default function DashboardModal({ open, onClose }: DashboardModalProps) {
     if (!open) return;
     setLoading(true);
     setError('');
-    fetch('/api/dashboard/stats')
+    fetch('/api/dashboard/stats', { cache: 'no-store' })
       .then(r => {
         if (!r.ok) throw new Error('โหลดข้อมูลไม่สำเร็จ');
         return r.json();
@@ -110,7 +110,7 @@ export default function DashboardModal({ open, onClose }: DashboardModalProps) {
                 onClick={() => {
                   setLoading(true);
                   setError('');
-                  fetch('/api/dashboard/stats')
+                  fetch('/api/dashboard/stats', { cache: 'no-store' })
                     .then(r => {
                       if (!r.ok) throw new Error('');
                       return r.json();

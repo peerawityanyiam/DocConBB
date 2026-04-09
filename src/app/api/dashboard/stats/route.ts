@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/dashboard/stats — สถิติภาพรวม
 export async function GET() {
   try {
@@ -12,8 +14,7 @@ export async function GET() {
 
     const { data: tasks } = await admin
       .from('tasks')
-      .select('status, is_archived')
-      .eq('is_archived', false);
+      .select('status');
 
     const counts: Record<string, number> = {};
     for (const t of tasks ?? []) {
