@@ -4,7 +4,7 @@ export const AUTH_CONFIG = {
   oauthQueryParams: { hd: 'medicine.psu.ac.th' },
   loginPath: '/login',
   callbackPath: '/callback',
-  defaultRedirect: '/tracking',
+  defaultRedirect: '/',
   publicPaths: ['/login', '/callback'],
 };
 

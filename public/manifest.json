@@ -1,10 +1,10 @@
 {
-  "id": "/tracking",
+  "id": "/",
   "name": "PSU Quality Document System",
   "short_name": "DocCon",
   "description": "Tracking and document control dashboard for quality documents.",
   "lang": "th",
-  "start_url": "/tracking",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
