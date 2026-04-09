@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
 
-const TASK_SELECT = 'id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, status_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by, superseded_by';
+const TASK_SELECT = 'id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, drive_uploaded, sent_to_branch, status_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by, superseded_by';
 
 // GET /api/tasks?role=BOSS
 export async function GET(request: NextRequest) {

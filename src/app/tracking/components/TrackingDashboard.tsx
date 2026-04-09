@@ -19,6 +19,8 @@ interface TrackingDashboardProps {
 }
 
 type TabKey = AppRole | 'completed';
+type CompletedRange = '1m' | '3m' | '6m' | '1y' | 'all';
+type CompletedSort = 'completed_date' | 'alpha';
 
 const ROLE_TABS: { role: AppRole; label: string; icon: string }[] = [
   { role: 'STAFF', label: 'เจ้าหน้าที่', icon: '📥' },
@@ -143,10 +145,13 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
   const [showRegistry, setShowRegistry] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+  const [completedRange, setCompletedRange] = useState<CompletedRange>('all');
+  const [completedSort, setCompletedSort] = useState<CompletedSort>('completed_date');
 
   const isCompletedTab = activeTab === 'completed';
   const subTabs = !isCompletedTab ? (ROLE_SUB_TABS[activeTab] ?? []) : [];
   const currentSubTab = subTabs.find(st => st.key === activeSubTab) ?? subTabs[0];
+  const isCompletedView = isCompletedTab || currentSubTab?.key === 'completed';
 
   // Reset sub-tab on role tab change
   useEffect(() => {
@@ -226,12 +231,51 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     || (t.doc_ref ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
-  // Apply sub-tab filter
-  const filtered = isCompletedTab
+  // Apply sub-tab filter first
+  const baseFiltered = isCompletedTab
     ? searchFiltered
     : currentSubTab
       ? searchFiltered.filter(t => currentSubTab.filter(t, userId))
       : searchFiltered;
+
+  const rangeWindowDays: Record<Exclude<CompletedRange, 'all'>, number> = {
+    '1m': 30,
+    '3m': 90,
+    '6m': 180,
+    '1y': 365,
+  };
+
+  const getCompletedTime = (task: Task) => {
+    const parsed = Date.parse(task.completed_at ?? task.updated_at ?? task.created_at);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const filtered = (() => {
+    if (!isCompletedView) {
+      return baseFiltered;
+    }
+
+    let next = [...baseFiltered];
+
+    if (completedRange !== 'all') {
+      const cutoff = Date.now() - (rangeWindowDays[completedRange] * 24 * 60 * 60 * 1000);
+      next = next.filter(t => getCompletedTime(t) >= cutoff);
+    }
+
+    if (completedSort === 'alpha') {
+      next.sort((a, b) =>
+        (a.drive_file_name ?? a.title).localeCompare(
+          (b.drive_file_name ?? b.title),
+          'th',
+          { sensitivity: 'base' },
+        ),
+      );
+    } else {
+      next.sort((a, b) => getCompletedTime(b) - getCompletedTime(a));
+    }
+
+    return next;
+  })();
 
   // Compute sub-tab counts
   const subTabCounts: Record<string, number> = {};
@@ -272,8 +316,6 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         : currentSubTab?.key === 'completed'
           ? `เสร็จสิ้น (${filtered.length})`
           : `${filtered.length} รายการ`;
-  const isCompletedView = isCompletedTab || currentSubTab?.key === 'completed';
-
   return (
     <div className="max-w-5xl mx-auto px-4 py-5">
       {/* Role Switcher - pill buttons */}
@@ -398,6 +440,36 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
           <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
         )}
       </div>
+
+      {isCompletedView && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+          <label className="text-xs font-semibold text-slate-600">
+            ช่วงเวลา
+            <select
+              value={completedRange}
+              onChange={(e) => setCompletedRange(e.target.value as CompletedRange)}
+              className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
+            >
+              <option value="1m">1 เดือน</option>
+              <option value="3m">3 เดือน</option>
+              <option value="6m">6 เดือน</option>
+              <option value="1y">1 ปี</option>
+              <option value="all">ทั้งหมด</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            เรียงลำดับ
+            <select
+              value={completedSort}
+              onChange={(e) => setCompletedSort(e.target.value as CompletedSort)}
+              className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
+            >
+              <option value="completed_date">วันที่เสร็จ (ล่าสุดก่อน)</option>
+              <option value="alpha">ตัวอักษร (ก-ฮ)</option>
+            </select>
+          </label>
+        </div>
+      )}
 
       {/* Section header */}
       {!isCompletedTab && (
