@@ -317,7 +317,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
           ? `เสร็จสิ้น (${filtered.length})`
           : `${filtered.length} รายการ`;
   return (
-    <div className="max-w-5xl mx-auto px-4 py-5">
+    <div className="max-w-5xl mx-auto px-4 py-5 overflow-x-hidden">
       {/* Role Switcher - pill buttons */}
       {availableTabs.length > 1 && (
         <div className="flex gap-1.5 flex-wrap mb-5">
@@ -364,7 +364,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
       )}
 
       {/* Header bar with action buttons */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between mb-4 pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <button onClick={() => fetchTasks()}
             className="p-1.5 text-slate-400 hover:text-slate-600 border border-slate-200 rounded-md text-xs transition-colors"
@@ -372,7 +372,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
             🔄
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:justify-end">
           {(userRoles.includes('BOSS') || userRoles.includes('DOCCON') || userRoles.includes('SUPER_BOSS')) && (
             <button onClick={() => setShowDashboard(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-lg transition-colors shadow-sm">
@@ -398,31 +398,33 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
 
       {/* Sub-tabs per role */}
       {!isCompletedTab && subTabs.length > 0 && (
-        <div className="flex border-b border-gray-200 mb-4">
-          {subTabs.map(st => {
-            const isActive = st.key === activeSubTab;
-            const count = subTabCounts[st.key];
-            return (
-              <button
-                key={st.key}
-                onClick={() => handleSubTabClick(st.key)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  isActive
-                    ? 'border-[#00c2a8] text-[#00c2a8]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {st.label}
-                {count !== undefined && count > 0 && (
-                  <span className={`ml-1.5 inline-flex items-center justify-center min-w-[1.2rem] h-5 px-1.5 text-[0.65rem] font-bold rounded-full ${
-                    isActive ? 'bg-[#00c2a8]/15 text-[#00c2a8]' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="border-b border-gray-200 mb-4 overflow-x-auto">
+          <div className="flex min-w-max">
+            {subTabs.map(st => {
+              const isActive = st.key === activeSubTab;
+              const count = subTabCounts[st.key];
+              return (
+                <button
+                  key={st.key}
+                  onClick={() => handleSubTabClick(st.key)}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    isActive
+                      ? 'border-[#00c2a8] text-[#00c2a8]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {st.label}
+                  {count !== undefined && count > 0 && (
+                    <span className={`ml-1.5 inline-flex items-center justify-center min-w-[1.2rem] h-5 px-1.5 text-[0.65rem] font-bold rounded-full ${
+                      isActive ? 'bg-[#00c2a8]/15 text-[#00c2a8]' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

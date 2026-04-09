@@ -1,12 +1,15 @@
 {
-  "name": "ระบบเอกสารคุณภาพ - รพ.สงขลานครินทร์",
-  "short_name": "DocTrack",
-  "description": "ระบบติดตามและจัดการเอกสารคุณภาพ",
+  "id": "/tracking",
+  "name": "PSU Quality Document System",
+  "short_name": "DocCon",
+  "description": "Tracking and document control dashboard for quality documents.",
+  "lang": "th",
   "start_url": "/tracking",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f0f4f8",
   "theme_color": "#0d1b2e",
-  "lang": "th",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -19,6 +22,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

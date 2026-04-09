@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -15,10 +15,17 @@ export const metadata: Metadata = {
   title: "ระบบเอกสารคุณภาพ - รพ.สงขลานครินทร์",
   description: "ระบบติดตามและจัดการเอกสารคุณภาพ โรงพยาบาลสงขลานครินทร์",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "DocTrack",
+    title: "DocCon",
   },
 };
 

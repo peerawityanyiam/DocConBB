@@ -276,14 +276,14 @@ export default function TaskCard({
 
         {isCompletedView ? (
           <div className="space-y-2 mt-1 text-[0.72rem]">
-            <p className="text-[#6b7f96]">คำสั่ง: <span className="text-[#0d1b2e] font-semibold">{task.title}</span></p>
-            <p className="text-[#6b7f96]">ชื่อไฟล์สุดท้าย: <span className="text-[#0d1b2e] font-semibold">{task.drive_file_name ?? '-'}</span></p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[#6b7f96]">
-              <p>รหัสเอกสาร: <span className="font-semibold text-[#374f6b]">{task.doc_ref ?? '-'}</span></p>
-              <p>ผู้ดำเนินการ: <span className="font-semibold text-[#374f6b]">{task.officer?.display_name ?? '-'}</span></p>
-              <p>ผู้ตรวจสอบ: <span className="font-semibold text-[#374f6b]">{task.reviewer?.display_name ?? '-'}</span></p>
-              <p>วันที่เสร็จ: <span className="font-semibold text-[#374f6b]">{formatDate(task.completed_at ?? task.updated_at)}</span></p>
-              <p>ระยะเวลา: <span className="font-semibold text-[#374f6b]">{durationText(task.created_at, task.completed_at ?? task.updated_at)}</span></p>
+            <p className="text-[#6b7f96] break-words">คำสั่ง: <span className="text-[#0d1b2e] font-semibold break-words">{task.title}</span></p>
+            <p className="text-[#6b7f96] break-words">ชื่อไฟล์สุดท้าย: <span className="text-[#0d1b2e] font-semibold break-all">{task.drive_file_name ?? '-'}</span></p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[#6b7f96]">
+              <p className="break-words">รหัสเอกสาร: <span className="font-semibold text-[#374f6b] break-words">{task.doc_ref ?? '-'}</span></p>
+              <p className="break-words">ผู้ดำเนินการ: <span className="font-semibold text-[#374f6b] break-words">{task.officer?.display_name ?? '-'}</span></p>
+              <p className="break-words">ผู้ตรวจสอบ: <span className="font-semibold text-[#374f6b] break-words">{task.reviewer?.display_name ?? '-'}</span></p>
+              <p className="break-words">วันที่เสร็จ: <span className="font-semibold text-[#374f6b]">{formatDate(task.completed_at ?? task.updated_at)}</span></p>
+              <p className="break-words">ระยะเวลา: <span className="font-semibold text-[#374f6b]">{durationText(task.created_at, task.completed_at ?? task.updated_at)}</span></p>
             </div>
             {task.superseded_by && task.status === 'COMPLETED' && (
               <div className="mt-2 px-3 py-2 rounded-md text-[0.72rem] bg-amber-50 border border-amber-200 text-amber-700">
