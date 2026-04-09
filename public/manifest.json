@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "PSU Quality Document System",
-  "short_name": "DocCon",
+  "name": "BBDC Document Control",
+  "short_name": "BBDC",
   "description": "Tracking and document control dashboard for quality documents.",
   "lang": "th",
   "start_url": "/",

@@ -31,10 +31,10 @@ function LoginContent() {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">
-            ระบบเอกสารคุณภาพ
+            ระบบสนับสนุนการทำงานคุณภาพ
           </h1>
           <p className="text-slate-500 text-sm">
-            โรงพยาบาลสงขลานครินทร์
+            หน่วยคลังเลือด รพ.สงขลานครินทร์
           </p>
         </div>
 
