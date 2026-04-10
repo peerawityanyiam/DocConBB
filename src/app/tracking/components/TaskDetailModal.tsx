@@ -176,6 +176,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [staffListLoading, setStaffListLoading] = useState(false);
   const [reassignLoading, setReassignLoading] = useState(false);
+  const [bossCancelReason, setBossCancelReason] = useState('');
+  const [bossCancelLoading, setBossCancelLoading] = useState(false);
+  const [bossCancelError, setBossCancelError] = useState('');
 
   // SuperBoss pre-check state
   const [preCheckResult, setPreCheckResult] = useState<PreCheckResult | null>(null);
@@ -205,6 +208,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     setReassignField(null);
     setPreCheckResult(null);
     setPreCheckLoading(false);
+    setBossCancelReason('');
+    setBossCancelLoading(false);
+    setBossCancelError('');
     fetchTask();
   }, [fetchTask]);
 
@@ -259,6 +265,37 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
       setActionError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleBossCancelFromDetail() {
+    if (!task) return;
+    if (!bossCancelReason.trim()) {
+      setBossCancelError('กรุณาระบุเหตุผลการยกเลิกงาน');
+      return;
+    }
+
+    setBossCancelLoading(true);
+    setBossCancelError('');
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel',
+          comment: bossCancelReason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
+
+      setBossCancelReason('');
+      onUpdated();
+      fetchTask();
+    } catch (err) {
+      setBossCancelError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+    } finally {
+      setBossCancelLoading(false);
     }
   }
 
@@ -387,6 +424,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     userRoles.includes('BOSS') &&
     task.created_by === userId &&
     !['COMPLETED', 'CANCELLED'].includes(task.status);
+  const canBossCancelInDetail = canReassign;
 
   if (!taskId) return null;
 
@@ -613,6 +651,34 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                         ) : (
                           <p className="text-sm font-medium text-orange-700 truncate">{task.ref_file_name}</p>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {canBossCancelInDetail && (
+                    <div className="border border-red-200 bg-red-50 rounded-lg p-3 space-y-2">
+                      <p className="text-sm font-semibold text-red-700">ยกเลิกงาน (ผู้สั่งงาน)</p>
+                      <textarea
+                        value={bossCancelReason}
+                        onChange={e => {
+                          setBossCancelReason(e.target.value);
+                          if (bossCancelError) setBossCancelError('');
+                        }}
+                        placeholder="ระบุเหตุผล เช่น สั่งงานผิดคน / สร้างงานซ้ำ"
+                        rows={2}
+                        className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 resize-none"
+                      />
+                      {bossCancelError && (
+                        <p className="text-xs text-red-600">⚠️ {bossCancelError}</p>
+                      )}
+                      <div className="flex justify-end">
+                        <button
+                          onClick={handleBossCancelFromDetail}
+                          disabled={bossCancelLoading || !bossCancelReason.trim()}
+                          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {bossCancelLoading ? 'กำลังยกเลิก...' : '🗑 ยกเลิกงาน'}
+                        </button>
                       </div>
                     </div>
                   )}

@@ -317,7 +317,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   function handleReviewerRejectClick() { setRejectActionKey('reviewer_reject'); setShowRejectModal(true); }
   function handleBossRejectClick() { setRejectActionKey('boss_reject'); setShowRejectModal(true); }
   function handleBossSendToDocCon() { setRejectActionKey('boss_send_to_doccon'); setShowRejectModal(true); }
-  function handleBossCancelClick() { setRejectActionKey('cancel'); setShowRejectModal(true); }
   function handleSuperBossRejectClick() { setRejectActionKey('super_boss_reject'); setShowRejectModal(true); }
   function handleSuperBossSendToDocCon() { setRejectActionKey('super_boss_send_to_doccon'); setShowRejectModal(true); }
 
@@ -343,7 +342,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     'super_boss_reject',
     'boss_send_to_doccon',
     'super_boss_send_to_doccon',
-    'cancel',
   ].includes(rejectActionKey);
 
   /* ── Is this a pipeline-only card (DocCon tracking sub-tab)? ── */
@@ -373,11 +371,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     }
     return false;
   })();
-
-  /* ── Is boss cancel available? ── */
-  const bossCanCancel = activeRole === 'BOSS' &&
-    task.created_by === userId &&
-    !['COMPLETED', 'CANCELLED'].includes(task.status);
 
   const isBlocked = actionLoading || uploadProgress !== null;
 
@@ -839,19 +832,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
             </div>
           )}
 
-          {/* ── BOSS: cancel (always available for creator, non-terminal tasks) ── */}
-          {bossCanCancel && (
-            <div className={`mt-3 ${task.status === 'WAITING_BOSS_APPROVAL' ? 'border-t border-gray-100 pt-3' : ''}`}>
-              <button
-                onClick={handleBossCancelClick}
-                disabled={isBlocked}
-                className="w-full py-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                🗑 ยกเลิกงาน
-              </button>
-            </div>
-          )}
-
           {/* Shared action error display (outside role blocks) */}
           {actionError && !['STAFF', 'DOCCON', 'REVIEWER', 'BOSS', 'SUPER_BOSS'].some(r => r === activeRole) && (
             <div className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">
@@ -864,8 +844,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       {/* Rejection / Cancel modal */}
       {showRejectModal && (
         <RejectModal
-          title={rejectActionKey === 'cancel' ? 'ยกเลิกงาน — ระบุเหตุผล' : rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่ง DocCon ตรวจใหม่' : 'ตีกลับเอกสาร'}
-          confirmLabel={rejectActionKey === 'cancel' ? 'ยืนยันยกเลิก' : rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่งตรวจใหม่' : 'ตีกลับ'}
+          title={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่ง DocCon ตรวจใหม่' : 'ตีกลับเอกสาร'}
+          confirmLabel={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่งตรวจใหม่' : 'ตีกลับ'}
           confirmStyle={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'warning' : 'danger'}
           requireComment={requiresRejectReason}
           onConfirm={handleRejectConfirm}
