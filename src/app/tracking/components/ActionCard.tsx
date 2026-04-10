@@ -576,7 +576,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                     type="text"
                     value={docRef}
                     onChange={e => setDocRef(e.target.value)}
-                    placeholder="กรอกรหัสเอกสาร เช่น FIN - 001"
+                    placeholder="กรอกรหัสเอกสาร เช่น TM-001"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400 bg-white"
                   />
                 </div>
@@ -604,7 +604,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                       value={docRef}
                       readOnly={!isDocRefEditing}
                       onChange={e => setDocRef(e.target.value)}
-                      placeholder="กรอกรหัสเอกสาร เช่น FIN - 001"
+                      placeholder="กรอกรหัสเอกสาร เช่น TM-001"
                       className={`flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400 ${isDocRefEditing ? 'bg-white' : 'bg-gray-100 text-gray-600'}`}
                     />
                     <button

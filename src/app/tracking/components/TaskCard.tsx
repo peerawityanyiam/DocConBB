@@ -212,6 +212,12 @@ export default function TaskCard({
   const actionHint = getActionHint(task, activeRole);
   const needsAction = actionHint?.color === '#00c2a8' || actionHint?.color === '#ef4444';
   const headline = isCompletedView ? (task.drive_file_name ?? task.title) : task.title;
+  const normalizedHeadline = headline.trim().toLowerCase();
+  const normalizedLastFileName = (task.drive_file_name ?? '').trim().toLowerCase();
+  const shouldShowLastFileNameRow =
+    isCompletedView &&
+    normalizedLastFileName.length > 0 &&
+    normalizedLastFileName !== normalizedHeadline;
   const canChecklistInCard = isCompletedView && task.status === 'COMPLETED' && userRoles.includes('DOCCON');
 
   const [driveUploaded, setDriveUploaded] = useState(!!task.drive_uploaded);
@@ -277,7 +283,9 @@ export default function TaskCard({
         {isCompletedView ? (
           <div className="space-y-2 mt-1 text-[0.72rem]">
             <p className="text-[#6b7f96] break-words">คำสั่ง: <span className="text-[#0d1b2e] font-semibold break-words">{task.title}</span></p>
-            <p className="text-[#6b7f96] break-words">ชื่อไฟล์สุดท้าย: <span className="text-[#0d1b2e] font-semibold break-all">{task.drive_file_name ?? '-'}</span></p>
+            {shouldShowLastFileNameRow && (
+              <p className="text-[#6b7f96] break-words">ชื่อไฟล์สุดท้าย: <span className="text-[#0d1b2e] font-semibold break-all">{task.drive_file_name}</span></p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[#6b7f96]">
               <p className="break-words">รหัสเอกสาร: <span className="font-semibold text-[#374f6b] break-words">{task.doc_ref ?? '-'}</span></p>
               <p className="break-words">ผู้ดำเนินการ: <span className="font-semibold text-[#374f6b] break-words">{task.officer?.display_name ?? '-'}</span></p>
