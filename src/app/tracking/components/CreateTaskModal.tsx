@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { buildPdfFromImages } from '@/lib/files/image-to-pdf';
+import { toFriendlyErrorMessage } from '@/lib/ui/friendly-error';
 
 interface UserOption {
   id: string;
@@ -37,12 +38,16 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   useEffect(() => {
     if (!open) return;
-    fetch('/api/tasks/staff-list')
-      .then(r => r.json())
-      .then((data: UserOption[]) => {
+    (async () => {
+      try {
+        const res = await fetch('/api/tasks/staff-list', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP_${res.status}`);
+        const data: UserOption[] = await res.json();
         setUsers(Array.isArray(data) ? data : []);
-      })
-      .catch(() => setError('โหลดรายชื่อผู้ใช้ไม่สำเร็จ'));
+      } catch (err) {
+        setError(toFriendlyErrorMessage(err, 'โหลดรายชื่อผู้ใช้ไม่สำเร็จ'));
+      }
+    })();
   }, [open]);
 
   function reset() {
@@ -90,7 +95,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       setPdfImageCount(selectedImages.length);
       if (pdfInputRef.current) pdfInputRef.current.value = '';
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ไม่สามารถรวมรูปเป็น PDF ได้');
+      setError(toFriendlyErrorMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
     } finally {
       setIsConvertingImages(false);
       e.target.value = '';
@@ -114,7 +119,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         } else {
           try {
             const data = JSON.parse(xhr.responseText);
-            reject(new Error(data.error ?? 'อัปโหลดไฟล์ไม่สำเร็จ'));
+            reject(new Error(toFriendlyErrorMessage(data.error, 'อัปโหลดไฟล์ไม่สำเร็จ')));
           } catch {
             reject(new Error('อัปโหลดไฟล์ไม่สำเร็จ'));
           }
@@ -162,7 +167,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setError(toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'));
     } finally {
       setLoading(false);
       setUploadProgress(null);
@@ -182,6 +187,19 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const imagePickerStatusText = isConvertingImages
     ? 'กำลังรวมภาพเป็น PDF...'
     : (pdfImageCount ? `เลือกรูปแล้ว ${pdfImageCount} รูป` : 'ยังไม่ได้เลือกไฟล์...');
+  const attachmentQueue = [
+    wordFile ? `Word: ${wordFile.name}` : null,
+    pdfFile ? `PDF: ${pdfDisplayName}` : null,
+  ].filter((item): item is string => item !== null);
+  const attachmentSummaryLabel = attachmentQueue.length > 0
+    ? attachmentQueue.join(' | ')
+    : 'ยังไม่ได้เลือกไฟล์แนบ';
+  const attachmentSummaryHint = attachmentQueue.length > 0
+    ? 'ระบบจะอัปโหลดไฟล์เหล่านี้ทันทีหลังสร้างงาน'
+    : 'เลือกไฟล์ Word / PDF หรือใช้ปุ่มแนบภาพเพื่อรวมเป็น PDF';
+  const submitDisabledReason = isConvertingImages
+    ? 'กรุณารอระบบรวมภาพเป็น PDF ให้เสร็จก่อน'
+    : (loading ? 'ระบบกำลังสร้างงานและอัปโหลดไฟล์ กรุณารอสักครู่' : '');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -217,7 +235,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">เจ้าหน้าที่ผู้รับงาน <span className="text-red-500">*</span></label>
               <select
@@ -251,6 +269,11 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             <label className="block text-sm font-semibold text-[#0d1b2e]">
               แนบไฟล์เอกสาร <span className="text-[#6b7f96] font-normal">(ไม่บังคับ)</span>
             </label>
+            <div className={`rounded-lg border px-3 py-2 text-xs ${attachmentQueue.length > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+              <p className="font-semibold">ไฟล์ที่พร้อมส่ง</p>
+              <p className="mt-0.5 break-all">{attachmentSummaryLabel}</p>
+              <p className="mt-0.5 text-[0.68rem] opacity-80">{attachmentSummaryHint}</p>
+            </div>
             {/* Word */}
             <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
               <label className="text-xs font-semibold text-[#374f6b] mb-1.5 block">📄 ไฟล์ Word (.docx)</label>
@@ -334,11 +357,17 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
               ยกเลิก
             </button>
             <button type="submit" disabled={loading || isConvertingImages}
+              title={submitDisabledReason || undefined}
               className="px-5 py-2 text-white font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors"
               style={{ background: '#00c2a8' }}>
               {loading ? (isUploading ? 'กำลังอัปโหลด...' : 'กำลังสร้าง...') : '📨 สร้างงาน'}
             </button>
           </div>
+          {submitDisabledReason && (
+            <p className="text-[0.68rem] text-amber-700 text-right">
+              ℹ {submitDisabledReason}
+            </p>
+          )}
         </form>
       </div>
     </div>

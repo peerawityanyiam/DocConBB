@@ -275,7 +275,7 @@ export default function TaskCard({
       <div className="p-3.5">
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-[#0d1b2e] text-sm leading-snug line-clamp-2">{headline}</h3>
+            <h3 className="font-bold text-[#0d1b2e] text-sm leading-snug line-clamp-2 break-words">{headline}</h3>
           </div>
           <StatusBadge status={task.status} size="sm" />
         </div>
@@ -373,7 +373,7 @@ export default function TaskCard({
       </div>
 
       {!isCompletedView && (
-        <div className="flex items-center justify-between px-3.5 py-2.5 border-t" style={{ background: '#f8fafc', borderColor: '#e2e8f0', borderRadius: '0 0 12px 12px' }}>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-t" style={{ background: '#f8fafc', borderColor: '#e2e8f0', borderRadius: '0 0 12px 12px' }}>
           <span className="text-[0.7rem] text-[#6b7f96]">อัปเดต {formatDate(task.updated_at)}</span>
           <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(age)}`}>⏱ {age} วัน</span>
         </div>

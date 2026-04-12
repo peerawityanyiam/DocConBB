@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import TaskCard, { type Task } from './TaskCard';
 import ActionCard from './ActionCard';
@@ -11,6 +11,7 @@ import RegistryModal from './RegistryModal';
 import SummaryReportModal from './SummaryReportModal';
 import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
+import { toFriendlyErrorMessage } from '@/lib/ui/friendly-error';
 
 interface TrackingDashboardProps {
   userRoles: AppRole[];
@@ -21,6 +22,7 @@ interface TrackingDashboardProps {
 type TabKey = AppRole | 'completed';
 type CompletedRange = '1m' | '3m' | '6m' | '1y' | 'all';
 type CompletedSort = 'completed_date' | 'alpha';
+const TASKS_PAGE_SIZE = 20;
 
 const ROLE_TABS: { role: AppRole; label: string; icon: string }[] = [
   { role: 'STAFF', label: 'เจ้าหน้าที่', icon: '📥' },
@@ -132,12 +134,37 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
   ],
 };
 
+function getCurrentGuideText(activeTab: TabKey, activeSubTab: string, isCompletedView: boolean): string {
+  if (isCompletedView) {
+    return 'แท็บเสร็จแล้วแสดงงานที่ปิดงานเรียบร้อย สามารถใช้ตัวกรองช่วงเวลาและการเรียงลำดับร่วมกันได้';
+  }
+
+  if (activeTab === 'STAFF' && activeSubTab === 'my_tasks') {
+    return 'งานในแท็บนี้ต้องแนบไฟล์ Word (.docx) ก่อนจึงจะกดส่งงานได้';
+  }
+  if (activeTab === 'DOCCON' && activeSubTab === 'pending') {
+    return 'งานรอตรวจต้องระบุรหัสเอกสารก่อนกดผ่านรูปแบบ หากถูกส่งกลับจากหัวหน้างานต้องแนบ Word ใหม่';
+  }
+  if (activeTab === 'REVIEWER' && activeSubTab === 'pending') {
+    return 'ผู้ตรวจสอบสามารถแนบไฟล์ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF ก่อนกดอนุมัติหรือส่งกลับแก้ไข';
+  }
+  if (activeTab === 'BOSS' && activeSubTab === 'pending') {
+    return 'ผู้สั่งงานอนุมัติ ตีกลับ หรือส่งให้ DocCon ตรวจใหม่ได้ โดยปุ่มจะเปิดเมื่อระบบพร้อมดำเนินการ';
+  }
+  if (activeTab === 'SUPER_BOSS' && activeSubTab === 'pending') {
+    return 'หัวหน้างานสามารถอนุมัติขั้นสุดท้าย หรือตีกลับเพื่อแก้ไขพร้อมระบุเหตุผลได้';
+  }
+
+  return 'เลือกแท็บงานที่ต้องการและกดการ์ดเพื่อดูรายละเอียดเพิ่มเติม';
+}
+
 export default function TrackingDashboard({ userRoles, userId, userEmail }: TrackingDashboardProps) {
   const availableTabs = ROLE_TABS.filter(t => userRoles.includes(t.role));
   const [activeTab, setActiveTab] = useState<TabKey>(availableTabs[0]?.role ?? 'completed');
   const [activeSubTab, setActiveSubTab] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -146,13 +173,19 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
   const [showReport, setShowReport] = useState(false);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   const countsRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchTasksAbortRef = useRef<AbortController | null>(null);
   const [completedRange, setCompletedRange] = useState<CompletedRange>('all');
   const [completedSort, setCompletedSort] = useState<CompletedSort>('completed_date');
+  const [visibleCount, setVisibleCount] = useState(TASKS_PAGE_SIZE);
+  const deferredSearch = useDeferredValue(search);
 
   const isCompletedTab = activeTab === 'completed';
   const subTabs = !isCompletedTab ? (ROLE_SUB_TABS[activeTab] ?? []) : [];
   const currentSubTab = subTabs.find(st => st.key === activeSubTab) ?? subTabs[0];
   const isCompletedView = isCompletedTab || currentSubTab?.key === 'completed';
+  const fetchScope = useMemo<'active' | 'completed'>(() => (
+    isCompletedView ? 'completed' : 'active'
+  ), [isCompletedView]);
 
   // Reset sub-tab on role tab change
   useEffect(() => {
@@ -176,16 +209,42 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
 
   const fetchTasks = useCallback(async () => {
     if (!activeTab) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/tasks?role=${activeTab}`);
-      if (res.ok) setTasks(await res.json());
-    } finally {
-      setLoading(false);
+    if (fetchTasksAbortRef.current) {
+      fetchTasksAbortRef.current.abort();
     }
-  }, [activeTab]);
+    const controller = new AbortController();
+    fetchTasksAbortRef.current = controller;
+    setLoading(true);
+    setListError('');
+    try {
+      const res = await fetch(`/api/tasks?role=${activeTab}&scope=${fetchScope}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`HTTP_${res.status}`);
+      setTasks(await res.json());
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return;
+      setListError(toFriendlyErrorMessage(err, 'โหลดรายการงานไม่สำเร็จ'));
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+      if (fetchTasksAbortRef.current === controller) {
+        fetchTasksAbortRef.current = null;
+      }
+    }
+  }, [activeTab, fetchScope]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
+  useEffect(() => {
+    return () => {
+      if (fetchTasksAbortRef.current) {
+        fetchTasksAbortRef.current.abort();
+      }
+    };
+  }, []);
 
   const refreshTasksAndCounts = useCallback(() => {
     fetchTasks();
@@ -215,21 +274,24 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     };
   }, [refreshTasksAndCounts]);
 
-  // Apply search filter
-  const searchFiltered = tasks.filter(t =>
-    !search.trim()
-    || t.title.toLowerCase().includes(search.toLowerCase())
-    || (t.drive_file_name ?? '').toLowerCase().includes(search.toLowerCase())
-    || t.task_code.toLowerCase().includes(search.toLowerCase())
-    || (t.doc_ref ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  const normalizedSearch = deferredSearch.trim().toLowerCase();
+  const searchFiltered = useMemo(() => (
+    tasks.filter((t) =>
+      !normalizedSearch
+      || t.title.toLowerCase().includes(normalizedSearch)
+      || (t.drive_file_name ?? '').toLowerCase().includes(normalizedSearch)
+      || t.task_code.toLowerCase().includes(normalizedSearch)
+      || (t.doc_ref ?? '').toLowerCase().includes(normalizedSearch)
+    )
+  ), [tasks, normalizedSearch]);
 
-  // Apply sub-tab filter first
-  const baseFiltered = isCompletedTab
-    ? searchFiltered
-    : currentSubTab
-      ? searchFiltered.filter(t => currentSubTab.filter(t, userId))
-      : searchFiltered;
+  const baseFiltered = useMemo(() => (
+    isCompletedTab
+      ? searchFiltered
+      : currentSubTab
+        ? searchFiltered.filter((t) => currentSubTab.filter(t, userId))
+        : searchFiltered
+  ), [currentSubTab, isCompletedTab, searchFiltered, userId]);
 
   const rangeWindowDays: Record<Exclude<CompletedRange, 'all'>, number> = {
     '1m': 30,
@@ -243,7 +305,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     return Number.isNaN(parsed) ? 0 : parsed;
   };
 
-  const filtered = (() => {
+  const filtered = useMemo(() => {
     if (!isCompletedView) {
       return baseFiltered;
     }
@@ -252,7 +314,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
 
     if (completedRange !== 'all') {
       const cutoff = Date.now() - (rangeWindowDays[completedRange] * 24 * 60 * 60 * 1000);
-      next = next.filter(t => getCompletedTime(t) >= cutoff);
+      next = next.filter((t) => getCompletedTime(t) >= cutoff);
     }
 
     if (completedSort === 'alpha') {
@@ -268,14 +330,27 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     }
 
     return next;
-  })();
+  }, [baseFiltered, completedRange, completedSort, isCompletedView]);
 
-  // Compute sub-tab counts
-  const subTabCounts: Record<string, number> = {};
-  for (const st of subTabs) {
-    if (st.key === 'registry') continue;
-    subTabCounts[st.key] = searchFiltered.filter(t => st.filter(t, userId)).length;
-  }
+  const subTabCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const st of subTabs) {
+      if (st.key === 'registry') continue;
+      counts[st.key] = searchFiltered.filter((t) => st.filter(t, userId)).length;
+    }
+    return counts;
+  }, [searchFiltered, subTabs, userId]);
+
+  useEffect(() => {
+    setVisibleCount(TASKS_PAGE_SIZE);
+  }, [activeTab, activeSubTab, normalizedSearch, completedRange, completedSort]);
+
+  const visibleTasks = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
+  );
+  const hasMoreTasks = visibleTasks.length < filtered.length;
+  const currentGuideText = getCurrentGuideText(activeTab, activeSubTab, isCompletedView);
 
   if (availableTabs.length === 0 && userRoles.length === 0) {
     return (
@@ -310,7 +385,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
           ? `เสร็จสิ้น (${filtered.length})`
           : `${filtered.length} รายการ`;
   return (
-    <div className="max-w-5xl mx-auto px-4 py-5 overflow-x-hidden">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-5 overflow-x-hidden">
       {/* Role Switcher - pill buttons */}
       {availableTabs.length > 1 && (
         <div className="flex gap-1.5 flex-wrap mb-5">
@@ -391,8 +466,8 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
 
       {/* Sub-tabs per role */}
       {!isCompletedTab && subTabs.length > 0 && (
-        <div className="border-b border-gray-200 mb-4 overflow-x-auto">
-          <div className="flex min-w-max">
+        <div className="w-full border-b border-gray-200 mb-4 overflow-x-auto">
+          <div className="flex min-w-max pb-1">
             {subTabs.map(st => {
               const isActive = st.key === activeSubTab;
               const count = subTabCounts[st.key];
@@ -436,8 +511,12 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         )}
       </div>
 
+      <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[0.72rem] text-sky-800">
+        ℹ {currentGuideText}
+      </div>
+
       {isCompletedView && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
           <label className="text-xs font-semibold text-slate-600">
             ช่วงเวลา
             <select
@@ -472,6 +551,12 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
       )}
 
       {/* Task list — single column */}
+      {listError && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          ⚠️ {listError}
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
@@ -491,7 +576,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         </div>
       ) : (
         <div className="space-y-4">
-          {filtered.map(task => {
+          {visibleTasks.map(task => {
             // Use ActionCard for action sub-tabs, TaskCard for pipeline/completed views
             const useAction = !isCompletedTab && currentSubTab?.useActionCard;
 
@@ -524,6 +609,14 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
               />
             );
           })}
+          {hasMoreTasks && (
+            <button
+              onClick={() => setVisibleCount((prev) => prev + TASKS_PAGE_SIZE)}
+              className="w-full py-2.5 rounded-lg border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors"
+            >
+              โหลดเพิ่ม ({filtered.length - visibleTasks.length} รายการ)
+            </button>
+          )}
         </div>
       )}
 

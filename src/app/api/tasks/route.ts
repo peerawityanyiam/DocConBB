@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const role = request.nextUrl.searchParams.get('role');
+    const scope = request.nextUrl.searchParams.get('scope') === 'completed' ? 'completed' : 'active';
     const admin = await createServiceRoleClient();
     const dbUserId = user.id;
 
@@ -21,16 +22,37 @@ export async function GET(request: NextRequest) {
 
     switch (role) {
       case 'STAFF':
-        // Include archived rows so STAFF completed tab can show finished tasks.
-        query = query.eq('officer_id', dbUserId);
+        if (scope === 'completed') {
+          query = query.eq('officer_id', dbUserId).eq('status', 'COMPLETED');
+        } else {
+          query = query
+            .eq('officer_id', dbUserId)
+            .eq('is_archived', false)
+            .neq('status', 'COMPLETED')
+            .neq('status', 'CANCELLED');
+        }
         break;
       case 'REVIEWER':
-        // Include archived rows so REVIEWER completed tab can show finished tasks.
-        query = query.eq('reviewer_id', dbUserId);
+        if (scope === 'completed') {
+          query = query.eq('reviewer_id', dbUserId).eq('status', 'COMPLETED');
+        } else {
+          query = query
+            .eq('reviewer_id', dbUserId)
+            .eq('is_archived', false)
+            .neq('status', 'COMPLETED')
+            .neq('status', 'CANCELLED');
+        }
         break;
       case 'BOSS':
-        // Include archived rows so BOSS history/completed views remain complete.
-        query = query.eq('created_by', dbUserId);
+        if (scope === 'completed') {
+          query = query.eq('created_by', dbUserId).eq('status', 'COMPLETED');
+        } else {
+          query = query
+            .eq('created_by', dbUserId)
+            .eq('is_archived', false)
+            .neq('status', 'COMPLETED')
+            .neq('status', 'CANCELLED');
+        }
         break;
       case 'DOCCON':
         // DOCCON sees all active tasks
@@ -47,8 +69,7 @@ export async function GET(request: NextRequest) {
           .from('tasks')
           .select(TASK_SELECT)
           .eq('status', 'COMPLETED')
-          .order('updated_at', { ascending: false })
-          .limit(100);
+          .order('updated_at', { ascending: false });
 
         if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_ADMIN')) {
           completedQuery = completedQuery.or(
