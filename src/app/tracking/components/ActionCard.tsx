@@ -380,6 +380,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       ? `${selectedWordFile.name} (${selectedImageCount} รูป)`
       : selectedWordFile.name)
     : '';
+  const imagePickerStatusText = isConvertingImages
+    ? 'กำลังรวมภาพเป็น PDF...'
+    : (selectedImageCount ? `เลือกรูปแล้ว ${selectedImageCount} รูป` : 'ยังไม่ได้เลือกไฟล์...');
   const requiresRejectReason = [
     'doccon_reject',
     'reviewer_reject',
@@ -696,14 +699,17 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                       onChange={onImageFilesChange}
                       className="hidden"
                     />
-                    <button
-                      type="button"
-                      onClick={openImagePicker}
-                      disabled={isBlocked}
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-teal-200 bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 disabled:opacity-50"
-                    >
-                      {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
-                    </button>
+                    <div className="mt-2 flex items-center gap-3 min-w-0 text-sm text-gray-600">
+                      <button
+                        type="button"
+                        onClick={openImagePicker}
+                        disabled={isBlocked}
+                        className="inline-flex items-center px-4 py-2 rounded-lg bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        🖼️ แนบภาพ
+                      </button>
+                      <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
+                    </div>
                   </>
                 )}
                 {selectedWordFile && (
@@ -771,14 +777,17 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onImageFilesChange}
                   className="hidden"
                 />
-                <button
-                  type="button"
-                  onClick={openImagePicker}
-                  disabled={isBlocked}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
-                >
-                  {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
-                </button>
+                <div className="mt-2 flex items-center gap-3 min-w-0 text-sm text-gray-600">
+                  <button
+                    type="button"
+                    onClick={openImagePicker}
+                    disabled={isBlocked}
+                    className="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-semibold hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    🖼️ แนบภาพ
+                  </button>
+                  <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
+                </div>
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
@@ -831,14 +840,17 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onImageFilesChange}
                   className="hidden"
                 />
-                <button
-                  type="button"
-                  onClick={openImagePicker}
-                  disabled={isBlocked}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-purple-200 bg-purple-50 text-purple-700 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
-                >
-                  {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
-                </button>
+                <div className="mt-2 flex items-center gap-3 min-w-0 text-sm text-gray-600">
+                  <button
+                    type="button"
+                    onClick={openImagePicker}
+                    disabled={isBlocked}
+                    className="inline-flex items-center px-4 py-2 rounded-lg bg-purple-50 text-purple-700 text-sm font-semibold hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    🖼️ แนบภาพ
+                  </button>
+                  <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
+                </div>
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
@@ -898,14 +910,17 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onImageFilesChange}
                   className="hidden"
                 />
-                <button
-                  type="button"
-                  onClick={openImagePicker}
-                  disabled={isBlocked}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-pink-200 bg-pink-50 text-pink-700 text-xs font-semibold hover:bg-pink-100 disabled:opacity-50"
-                >
-                  {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
-                </button>
+                <div className="mt-2 flex items-center gap-3 min-w-0 text-sm text-gray-600">
+                  <button
+                    type="button"
+                    onClick={openImagePicker}
+                    disabled={isBlocked}
+                    className="inline-flex items-center px-4 py-2 rounded-lg bg-pink-50 text-pink-700 text-sm font-semibold hover:bg-pink-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    🖼️ แนบภาพ
+                  </button>
+                  <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
+                </div>
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}

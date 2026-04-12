@@ -179,6 +179,9 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       ? `${pdfFile.name} (${pdfImageCount} รูป)`
       : pdfFile.name)
     : '';
+  const imagePickerStatusText = isConvertingImages
+    ? 'กำลังรวมภาพเป็น PDF...'
+    : (pdfImageCount ? `เลือกรูปแล้ว ${pdfImageCount} รูป` : 'ยังไม่ได้เลือกไฟล์...');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -283,17 +286,17 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 onChange={handleImageToPdfChange}
                 className="hidden"
               />
-              <button
-                type="button"
-                onClick={() => pdfImageInputRef.current?.click()}
-                disabled={loading || isConvertingImages}
-                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#fde68a] bg-[#fffbeb] text-[#b45309] text-xs font-semibold hover:bg-[#fef3c7] disabled:opacity-50"
-              >
-                {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
-              </button>
-              <p className="text-[0.65rem] text-[#6b7f96] mt-1">
-                หากอัปหลายรูป ระบบจะรวมเป็น PDF อัตโนมัติ
-              </p>
+              <div className="mt-2 flex items-center gap-3 min-w-0 text-sm text-gray-600">
+                <button
+                  type="button"
+                  onClick={() => pdfImageInputRef.current?.click()}
+                  disabled={loading || isConvertingImages}
+                  className="inline-flex items-center px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  🖼️ แนบภาพ
+                </button>
+                <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
+              </div>
               {pdfFile && (
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
                   <span>✅ {pdfDisplayName}</span>
