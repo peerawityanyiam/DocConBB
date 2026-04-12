@@ -653,14 +653,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
-                {selectedWordFile ? (
+                {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5 flex items-center gap-1">
                     ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
                   </p>
-                ) : (
-                  <p className="text-[0.65rem] text-red-500 mt-1">กรุณาเลือกไฟล์ Word (.docx) เพื่อส่งงาน</p>
                 )}
-                {renderAttachmentSummary('สำหรับขั้นตอนนี้รองรับเฉพาะไฟล์ Word (.docx)')}
+                {renderAttachmentSummary('ขั้นตอนนี้ต้องแนบไฟล์ Word (.docx)')}
               </div>
 
               {/* Upload progress */}
@@ -796,12 +794,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 )}
                 {renderAttachmentSummary(
                   docconSentBackFromBoss
-                    ? 'งานที่ส่งกลับจากหัวหน้างาน ต้องแนบ Word (.docx) เท่านั้น'
-                    : 'รองรับ Word (.docx), PDF (.pdf) หรือแนบภาพเพื่อรวมเป็น PDF'
+                    ? 'กรณีส่งกลับจากหัวหน้างาน ต้องแนบ Word (.docx)'
+                    : 'รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF'
                 )}
-                <p className="text-[0.65rem] text-gray-400 mt-1">
-                  {docconSentBackFromBoss ? 'Word (.docx) เท่านั้น (งานที่ส่งกลับจาก Boss)' : 'Word (.docx) หรือ PDF (.pdf)'} — จะอัปโหลดพร้อมกับการดำเนินการ
-                </p>
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
@@ -881,8 +876,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word (.docx), PDF (.pdf) หรือแนบภาพเพื่อรวมเป็น PDF')}
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
+                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF')}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
@@ -950,8 +944,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word (.docx), PDF (.pdf) หรือแนบภาพเพื่อรวมเป็น PDF')}
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
+                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF')}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
@@ -1027,8 +1020,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word (.docx), PDF (.pdf) หรือแนบภาพเพื่อรวมเป็น PDF')}
-                <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
+                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF')}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}

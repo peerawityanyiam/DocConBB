@@ -202,8 +202,15 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     : (loading ? 'ระบบกำลังสร้างงานและอัปโหลดไฟล์ กรุณารอสักครู่' : '');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-xl shadow-[0_12px_40px_rgba(13,27,46,0.13)] w-full max-w-lg border-none">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-3 sm:p-4"
+      onClick={() => { reset(); onClose(); }}
+    >
+      <div className="flex min-h-full items-start justify-center sm:items-center">
+        <div
+          className="bg-white rounded-xl shadow-[0_12px_40px_rgba(13,27,46,0.13)] w-full max-w-lg border-none max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header - matches ref modal with accent bg */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#e2e8f0]" style={{ background: '#00c2a8', borderRadius: '12px 12px 0 0' }}>
           <h2 className="text-[0.95rem] font-bold text-white flex items-center gap-2">
@@ -212,7 +219,8 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
           <button onClick={() => { reset(); onClose(); }} className="text-white/80 hover:text-white text-xl leading-none">&times;</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
           <div>
             <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">ชื่องาน <span className="text-red-500">*</span></label>
             <input
@@ -351,7 +359,10 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-[#e2e8f0]" style={{ paddingTop: '12px' }}>
+          </div>
+
+          <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-3 border-t border-[#e2e8f0]">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
             <button type="button" onClick={() => { reset(); onClose(); }}
               className="px-4 py-2 text-sm text-[#374f6b] border border-[#e2e8f0] rounded-lg hover:bg-[#f8fafc] font-semibold">
               ยกเลิก
@@ -364,11 +375,13 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             </button>
           </div>
           {submitDisabledReason && (
-            <p className="text-[0.68rem] text-amber-700 text-right">
+            <p className="text-[0.68rem] text-amber-700 text-right mt-2">
               ℹ {submitDisabledReason}
             </p>
           )}
+          </div>
         </form>
+      </div>
       </div>
     </div>
   );
