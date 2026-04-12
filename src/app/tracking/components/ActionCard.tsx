@@ -5,6 +5,7 @@ import StatusBadge from './StatusBadge';
 import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
+import { buildPdfFromImages } from '@/lib/files/image-to-pdf';
 
 /* ── Border colors per role context ── */
 const ROLE_BORDER_COLOR: Record<string, string> = {
@@ -170,8 +171,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   // File selection state — just tracks what user selected, NOT auto-uploaded
   const [selectedWordFile, setSelectedWordFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isConvertingImages, setIsConvertingImages] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const wordInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Action state
   const [actionLoading, setActionLoading] = useState(false);
@@ -334,6 +337,38 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setActionError('');
   }
 
+  async function onImageFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const images = Array.from(e.target.files ?? []);
+    if (!images.length) return;
+
+    setUploadError('');
+    setActionError('');
+    setIsConvertingImages(true);
+    try {
+      const nonImageFile = images.find((file) => !file.type.startsWith('image/'));
+      if (nonImageFile) {
+        throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
+      }
+
+      const pdfFromImages = await buildPdfFromImages(images);
+      if (pdfFromImages.size > 50 * 1024 * 1024) {
+        throw new Error('ไฟล์ PDF ที่รวมจากรูปมีขนาดเกิน 50MB');
+      }
+
+      setSelectedWordFile(pdfFromImages);
+      if (wordInputRef.current) wordInputRef.current.value = '';
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'ไม่สามารถรวมรูปเป็น PDF ได้');
+    } finally {
+      setIsConvertingImages(false);
+      e.target.value = '';
+    }
+  }
+
+  function openImagePicker() {
+    imageInputRef.current?.click();
+  }
+
   const hasDocxSelected = !!selectedWordFile && selectedWordFile.name.toLowerCase().endsWith('.docx');
   const requiresRejectReason = [
     'doccon_reject',
@@ -372,7 +407,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     return false;
   })();
 
-  const isBlocked = actionLoading || uploadProgress !== null;
+  const isBlocked = actionLoading || uploadProgress !== null || isConvertingImages;
 
   return (
     <>
@@ -641,6 +676,26 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
                 />
+                {!docconSentBackFromBoss && (
+                  <>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={onImageFilesChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={openImagePicker}
+                      disabled={isBlocked}
+                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-teal-200 bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 disabled:opacity-50"
+                    >
+                      {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
+                    </button>
+                  </>
+                )}
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
                 )}
@@ -698,6 +753,22 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
                 />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={onImageFilesChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={openImagePicker}
+                  disabled={isBlocked}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
+                >
+                  {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
+                </button>
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
                 )}
@@ -742,6 +813,22 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
                 />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={onImageFilesChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={openImagePicker}
+                  disabled={isBlocked}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-purple-200 bg-purple-50 text-purple-700 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
+                >
+                  {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
+                </button>
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
                 )}
@@ -793,6 +880,22 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   onChange={onWordFileChange}
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 cursor-pointer"
                 />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={onImageFilesChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={openImagePicker}
+                  disabled={isBlocked}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-pink-200 bg-pink-50 text-pink-700 text-xs font-semibold hover:bg-pink-100 disabled:opacity-50"
+                >
+                  {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
+                </button>
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
                 )}

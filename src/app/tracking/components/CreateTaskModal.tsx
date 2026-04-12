@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { buildPdfFromImages } from '@/lib/files/image-to-pdf';
 
 interface UserOption {
   id: string;
@@ -16,10 +17,6 @@ interface CreateTaskModalProps {
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ACCEPTED_TYPES = [
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/pdf',
-];
 
 export default function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
@@ -32,8 +29,10 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const [wordFile, setWordFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isConvertingImages, setIsConvertingImages] = useState(false);
   const wordInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const pdfImageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -47,9 +46,10 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   function reset() {
     setTitle(''); setDetail(''); setOfficerId(''); setReviewerId(''); setError('');
-    setWordFile(null); setPdfFile(null); setUploadProgress(null);
+    setWordFile(null); setPdfFile(null); setUploadProgress(null); setIsConvertingImages(false);
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (pdfInputRef.current) pdfInputRef.current.value = '';
+    if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
   }
 
   function handleWordChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -66,6 +66,33 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('รองรับเฉพาะ .pdf'); return; }
     if (selected.size > MAX_FILE_SIZE) { setError('ขนาดไฟล์ต้องไม่เกิน 50MB'); return; }
     setError(''); setPdfFile(selected);
+  }
+
+  async function handleImageToPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedImages = Array.from(e.target.files ?? []);
+    if (!selectedImages.length) return;
+
+    setError('');
+    setIsConvertingImages(true);
+    try {
+      const nonImageFile = selectedImages.find((file) => !file.type.startsWith('image/'));
+      if (nonImageFile) {
+        throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
+      }
+
+      const mergedPdf = await buildPdfFromImages(selectedImages);
+      if (mergedPdf.size > MAX_FILE_SIZE) {
+        throw new Error('ไฟล์ PDF ที่รวมจากรูปมีขนาดเกิน 50MB');
+      }
+
+      setPdfFile(mergedPdf);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ไม่สามารถรวมรูปเป็น PDF ได้');
+    } finally {
+      setIsConvertingImages(false);
+      e.target.value = '';
+    }
   }
 
   function uploadFileWithProgress(taskId: string, fileToUpload: File): Promise<void> {
@@ -142,7 +169,9 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   if (!open) return null;
 
-  const isUploading = uploadProgress !== null;
+  const isUploading = uploadProgress !== null || isConvertingImages;
+  const progressValue = uploadProgress ?? 0;
+  const uploadStatusLabel = isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : 'กำลังอัปโหลดไฟล์...';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -239,6 +268,25 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 onChange={handlePdfChange}
                 className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer"
               />
+              <input
+                ref={pdfImageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageToPdfChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => pdfImageInputRef.current?.click()}
+                disabled={loading || isConvertingImages}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#fde68a] bg-[#fffbeb] text-[#b45309] text-xs font-semibold hover:bg-[#fef3c7] disabled:opacity-50"
+              >
+                {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
+              </button>
+              <p className="text-[0.65rem] text-[#6b7f96] mt-1">
+                หากอัปหลายรูป ระบบจะรวมเป็น PDF อัตโนมัติ (เพิ่มได้ทั้งทีละรูปหรือหลายรูป)
+              </p>
               {pdfFile && (
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
                   <span>✅ {pdfFile.name}</span>
@@ -252,13 +300,13 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
           {isUploading && (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs text-[#6b7f96]">
-                <span>กำลังอัปโหลดไฟล์...</span>
-                <span>{uploadProgress}%</span>
+                <span>{uploadStatusLabel}</span>
+                <span>{isConvertingImages ? '-' : `${progressValue}%`}</span>
               </div>
               <div className="w-full bg-[#e2e8f0] rounded-full" style={{ height: '6px' }}>
                 <div
                   className="rounded-full transition-all duration-200"
-                  style={{ width: `${uploadProgress}%`, height: '6px', background: '#00c2a8' }}
+                  style={{ width: `${progressValue}%`, height: '6px', background: '#00c2a8' }}
                 />
               </div>
             </div>
@@ -275,7 +323,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
               className="px-4 py-2 text-sm text-[#374f6b] border border-[#e2e8f0] rounded-lg hover:bg-[#f8fafc] font-semibold">
               ยกเลิก
             </button>
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || isConvertingImages}
               className="px-5 py-2 text-white font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors"
               style={{ background: '#00c2a8' }}>
               {loading ? (isUploading ? 'กำลังอัปโหลด...' : 'กำลังสร้าง...') : '📨 สร้างงาน'}
