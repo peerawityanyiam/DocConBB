@@ -134,30 +134,6 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
   ],
 };
 
-function getCurrentGuideText(activeTab: TabKey, activeSubTab: string, isCompletedView: boolean): string {
-  if (isCompletedView) {
-    return 'แท็บเสร็จแล้วแสดงงานที่ปิดงานเรียบร้อย สามารถใช้ตัวกรองช่วงเวลาและการเรียงลำดับร่วมกันได้';
-  }
-
-  if (activeTab === 'STAFF' && activeSubTab === 'my_tasks') {
-    return 'งานในแท็บนี้ต้องแนบไฟล์ Word (.docx) ก่อนจึงจะกดส่งงานได้';
-  }
-  if (activeTab === 'DOCCON' && activeSubTab === 'pending') {
-    return 'งานรอตรวจต้องระบุรหัสเอกสารก่อนกดผ่านรูปแบบ หากถูกส่งกลับจากหัวหน้างานต้องแนบ Word ใหม่';
-  }
-  if (activeTab === 'REVIEWER' && activeSubTab === 'pending') {
-    return 'ผู้ตรวจสอบสามารถแนบไฟล์ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF ก่อนกดอนุมัติหรือส่งกลับแก้ไข';
-  }
-  if (activeTab === 'BOSS' && activeSubTab === 'pending') {
-    return 'ผู้สั่งงานอนุมัติ ตีกลับ หรือส่งให้ DocCon ตรวจใหม่ได้ โดยปุ่มจะเปิดเมื่อระบบพร้อมดำเนินการ';
-  }
-  if (activeTab === 'SUPER_BOSS' && activeSubTab === 'pending') {
-    return 'หัวหน้างานสามารถอนุมัติขั้นสุดท้าย หรือตีกลับเพื่อแก้ไขพร้อมระบุเหตุผลได้';
-  }
-
-  return 'เลือกแท็บงานที่ต้องการและกดการ์ดเพื่อดูรายละเอียดเพิ่มเติม';
-}
-
 export default function TrackingDashboard({ userRoles, userId, userEmail }: TrackingDashboardProps) {
   const availableTabs = ROLE_TABS.filter(t => userRoles.includes(t.role));
   const [activeTab, setActiveTab] = useState<TabKey>(availableTabs[0]?.role ?? 'completed');
@@ -350,8 +326,6 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     [filtered, visibleCount]
   );
   const hasMoreTasks = visibleTasks.length < filtered.length;
-  const currentGuideText = getCurrentGuideText(activeTab, activeSubTab, isCompletedView);
-
   if (availableTabs.length === 0 && userRoles.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
@@ -509,10 +483,6 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         {search && (
           <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
         )}
-      </div>
-
-      <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[0.72rem] text-sky-800">
-        ℹ {currentGuideText}
       </div>
 
       {isCompletedView && (

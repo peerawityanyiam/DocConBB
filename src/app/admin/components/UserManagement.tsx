@@ -220,21 +220,24 @@ export default function UserManagement({ initialUsers, projects, currentUserId }
                       >
                         แก้ไข
                       </button>
-                      {user.id !== currentUserId && (
-                        <button
-                          onClick={() => handleToggleActive(user)}
-                          disabled={togglingId === user.id}
-                          className={`px-3 py-1.5 text-xs rounded-lg transition-colors disabled:opacity-40 ${
-                            user.is_active
+                      <button
+                        onClick={() => handleToggleActive(user)}
+                        disabled={togglingId === user.id || user.id === currentUserId}
+                        className={`px-3 py-1.5 text-xs rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                          user.id === currentUserId
+                            ? 'bg-slate-100 text-slate-400'
+                            : user.is_active
                               ? 'bg-red-100 text-red-700 hover:bg-red-200'
                               : 'bg-green-100 text-green-700 hover:bg-green-200'
-                          }`}
-                        >
-                          {togglingId === user.id
-                            ? '...'
-                            : user.is_active ? 'ปิด' : 'เปิด'}
-                        </button>
-                      )}
+                        }`}
+                        title={user.id === currentUserId ? 'ไม่สามารถปิดใช้งานบัญชีตัวเองได้' : undefined}
+                      >
+                        {togglingId === user.id
+                          ? '...'
+                          : user.id === currentUserId
+                            ? 'บัญชีตัวเอง'
+                            : user.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+                      </button>
                     </div>
                   </td>
                 </tr>

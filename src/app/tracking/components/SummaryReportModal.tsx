@@ -84,8 +84,8 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
   if (!open) return null;
 
   const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <span className="text-slate-300 ml-1">&#8597;</span>;
-    return <span className="text-yellow-500 ml-1">{sortDir === 'asc' ? '&#9650;' : '&#9660;'}</span>;
+    if (sortKey !== col) return <span className="text-slate-300 ml-1">↕</span>;
+    return <span className="text-yellow-500 ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>;
   };
 
   return (
