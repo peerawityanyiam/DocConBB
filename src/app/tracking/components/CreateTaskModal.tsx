@@ -28,6 +28,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const [error, setError] = useState('');
   const [wordFile, setWordFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfImageCount, setPdfImageCount] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const wordInputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +47,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   function reset() {
     setTitle(''); setDetail(''); setOfficerId(''); setReviewerId(''); setError('');
-    setWordFile(null); setPdfFile(null); setUploadProgress(null); setIsConvertingImages(false);
+    setWordFile(null); setPdfFile(null); setPdfImageCount(null); setUploadProgress(null); setIsConvertingImages(false);
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (pdfInputRef.current) pdfInputRef.current.value = '';
     if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
@@ -65,7 +66,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     if (!selected) return;
     if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('รองรับเฉพาะ .pdf'); return; }
     if (selected.size > MAX_FILE_SIZE) { setError('ขนาดไฟล์ต้องไม่เกิน 50MB'); return; }
-    setError(''); setPdfFile(selected);
+    setError(''); setPdfFile(selected); setPdfImageCount(null);
   }
 
   async function handleImageToPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -86,6 +87,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       }
 
       setPdfFile(mergedPdf);
+      setPdfImageCount(selectedImages.length);
       if (pdfInputRef.current) pdfInputRef.current.value = '';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ไม่สามารถรวมรูปเป็น PDF ได้');
@@ -172,6 +174,11 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const isUploading = uploadProgress !== null || isConvertingImages;
   const progressValue = uploadProgress ?? 0;
   const uploadStatusLabel = isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : 'กำลังอัปโหลดไฟล์...';
+  const pdfDisplayName = pdfFile
+    ? (pdfImageCount && pdfFile.name.toLowerCase().endsWith('.pdf')
+      ? `${pdfFile.name} (${pdfImageCount} รูป)`
+      : pdfFile.name)
+    : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -285,12 +292,12 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
               </button>
               <p className="text-[0.65rem] text-[#6b7f96] mt-1">
-                หากอัปหลายรูป ระบบจะรวมเป็น PDF อัตโนมัติ (เพิ่มได้ทั้งทีละรูปหรือหลายรูป)
+                หากอัปหลายรูป ระบบจะรวมเป็น PDF อัตโนมัติ
               </p>
               {pdfFile && (
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
-                  <span>✅ {pdfFile.name}</span>
-                  <button type="button" onClick={() => { setPdfFile(null); if (pdfInputRef.current) pdfInputRef.current.value = ''; }} className="text-red-400 hover:text-red-600">✕</button>
+                  <span>✅ {pdfDisplayName}</span>
+                  <button type="button" onClick={() => { setPdfFile(null); setPdfImageCount(null); if (pdfInputRef.current) pdfInputRef.current.value = ''; }} className="text-red-400 hover:text-red-600">✕</button>
                 </div>
               )}
             </div>

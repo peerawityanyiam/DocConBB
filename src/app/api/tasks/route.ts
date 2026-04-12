@@ -21,13 +21,16 @@ export async function GET(request: NextRequest) {
 
     switch (role) {
       case 'STAFF':
-        query = query.eq('officer_id', dbUserId).eq('is_archived', false);
+        // Include archived rows so STAFF completed tab can show finished tasks.
+        query = query.eq('officer_id', dbUserId);
         break;
       case 'REVIEWER':
-        query = query.eq('reviewer_id', dbUserId).eq('is_archived', false);
+        // Include archived rows so REVIEWER completed tab can show finished tasks.
+        query = query.eq('reviewer_id', dbUserId);
         break;
       case 'BOSS':
-        query = query.eq('created_by', dbUserId).eq('is_archived', false);
+        // Include archived rows so BOSS history/completed views remain complete.
+        query = query.eq('created_by', dbUserId);
         break;
       case 'DOCCON':
         // DOCCON sees all active tasks

@@ -170,6 +170,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
   // File selection state — just tracks what user selected, NOT auto-uploaded
   const [selectedWordFile, setSelectedWordFile] = useState<File | null>(null);
+  const [selectedImageCount, setSelectedImageCount] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -273,6 +274,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         await uploadFileAsync(selectedWordFile);
         fileUploaded = true;
         setSelectedWordFile(null);
+        setSelectedImageCount(null);
         if (wordInputRef.current) wordInputRef.current.value = '';
       }
       await callStatusApi(actionKey, comment);
@@ -282,6 +284,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       if (!fileUploaded && selectedWordFile) {
         // upload failed — clear selection so user can pick again
         setSelectedWordFile(null);
+        setSelectedImageCount(null);
         if (wordInputRef.current) wordInputRef.current.value = '';
         setUploadError(msg);
       } else {
@@ -333,6 +336,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   function onWordFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     setSelectedWordFile(file);
+    setSelectedImageCount(null);
     setUploadError('');
     setActionError('');
   }
@@ -356,6 +360,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       }
 
       setSelectedWordFile(pdfFromImages);
+      setSelectedImageCount(images.length);
       if (wordInputRef.current) wordInputRef.current.value = '';
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'ไม่สามารถรวมรูปเป็น PDF ได้');
@@ -370,6 +375,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   }
 
   const hasDocxSelected = !!selectedWordFile && selectedWordFile.name.toLowerCase().endsWith('.docx');
+  const selectedFileDisplayName = selectedWordFile
+    ? (selectedImageCount && selectedWordFile.name.toLowerCase().endsWith('.pdf')
+      ? `${selectedWordFile.name} (${selectedImageCount} รูป)`
+      : selectedWordFile.name)
+    : '';
   const requiresRejectReason = [
     'doccon_reject',
     'reviewer_reject',
@@ -568,7 +578,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 />
                 {selectedWordFile ? (
                   <p className="text-xs text-green-700 mt-1.5 flex items-center gap-1">
-                    ✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span>
+                    ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
                   </p>
                 ) : (
                   <p className="text-[0.65rem] text-red-500 mt-1">กรุณาเลือกไฟล์ Word (.docx) เพื่อส่งงาน</p>
@@ -697,7 +707,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   </>
                 )}
                 {selectedWordFile && (
-                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 <p className="text-[0.65rem] text-gray-400 mt-1">
                   {docconSentBackFromBoss ? 'Word (.docx) เท่านั้น (งานที่ส่งกลับจาก Boss)' : 'Word (.docx) หรือ PDF (.pdf)'} — จะอัปโหลดพร้อมกับการดำเนินการ
@@ -770,7 +780,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
                 </button>
                 {selectedWordFile && (
-                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
                 {uploadProgress !== null && (
@@ -830,7 +840,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
                 </button>
                 {selectedWordFile && (
-                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
                 {uploadProgress !== null && (
@@ -897,7 +907,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   {isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : '🖼️ แนบภาพ'}
                 </button>
                 {selectedWordFile && (
-                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedWordFile.name}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 <p className="text-[0.65rem] text-gray-400 mt-1">Word (.docx) หรือ PDF (.pdf) — จะอัปโหลดพร้อมกับการดำเนินการ</p>
                 {uploadProgress !== null && (
