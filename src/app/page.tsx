@@ -11,15 +11,15 @@ const DOCUMENT_CONTROL_GAS_URL =
 
 const cards = [
   {
-    title: 'à¸£à¸°à¸šà¸šà¸•à¸´à¸”à¸•à¸²à¸¡à¹€à¸­à¸à¸ªà¸²à¸£',
-    icon: 'ðŸš€',
-    description: 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™ à¸ªà¸±à¹ˆà¸‡à¸‡à¸²à¸™ à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸„à¸§à¸²à¸¡à¸„à¸·à¸šà¸«à¸™à¹‰à¸²',
+    title: 'ระบบติดตามเอกสาร',
+    icon: '🚀',
+    description: 'ส่งงาน สั่งงาน และตรวจสอบความคืบหน้า',
     href: '/tracking',
   },
   {
     title: 'BB Document Control',
-    icon: 'ðŸ“‘',
-    description: 'à¸ˆà¸±à¸”à¸à¸²à¸£à¸£à¸°à¸šà¸šà¹€à¸­à¸à¸ªà¸²à¸£à¸„à¸¸à¸“à¸ à¸²à¸ž',
+    icon: '📑',
+    description: 'จัดการระบบเอกสารคุณภาพ',
     href: DOCUMENT_CONTROL_GAS_URL,
   },
 ];
@@ -29,25 +29,24 @@ export default async function Home() {
   if (!user) redirect('/login');
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8f9fa]" style={{ fontFamily: "'Sarabun', 'IBM Plex Sans Thai', sans-serif" }}>
-      {/* Navbar - matches ref: dark #212529 */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#212529] shadow-sm" style={{ height: '45px' }}>
-        <div className="max-w-[900px] mx-auto px-5 h-full flex items-center justify-between">
-          <span className="text-white/80 text-sm font-normal tracking-wide">
-            {user.email}
-          </span>
+    <div
+      className="flex min-h-screen flex-col bg-[#f8f9fa]"
+      style={{ fontFamily: "'Sarabun', 'IBM Plex Sans Thai', sans-serif" }}
+    >
+      <nav className="fixed left-0 right-0 top-0 z-50 bg-[#212529] shadow-sm" style={{ height: '45px' }}>
+        <div className="mx-auto flex h-full max-w-[900px] items-center justify-between px-5">
+          <span className="text-sm font-normal tracking-wide text-white/80">{user.email}</span>
           <LogoutButton />
         </div>
       </nav>
 
-      {/* Content - centered vertically */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4" style={{ paddingTop: '50px' }}>
+      <div className="flex flex-1 flex-col items-center justify-center px-4" style={{ paddingTop: '50px' }}>
         <div className="w-[90%] max-w-[900px] text-center">
-          <h1 className="text-[2.4rem] font-bold text-[#003366] mb-2.5" style={{ letterSpacing: '-0.5px' }}>
-            à¸ªà¸§à¸±à¸ªà¸”à¸µà¸„à¸£à¸±à¸š ðŸ‘‹
+          <h1 className="mb-2.5 text-[2.2rem] font-bold text-[#003366]" style={{ letterSpacing: '-0.5px' }}>
+            สวัสดีครับ 👋
           </h1>
-          <p className="text-[1.1rem] text-[#555] font-normal mb-12">
-            à¸¢à¸´à¸™à¸”à¸µà¸•à¹‰à¸­à¸™à¸£à¸±à¸šà¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸ªà¸™à¸±à¸šà¸ªà¸™à¸¸à¸™à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸„à¸¸à¸“à¸ à¸²à¸ž
+          <p className="mb-12 text-[1.05rem] font-normal text-[#555]">
+            ยินดีต้อนรับสู่ระบบสนับสนุนการทำงานคุณภาพ
           </p>
 
           <div className="grid gap-[30px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
@@ -59,11 +58,13 @@ export default async function Home() {
                 style={{ padding: '45px 35px' }}
               >
                 <span className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-[#0ea5a3]/40 opacity-0 transition-opacity duration-150 group-active:opacity-100" />
-                <div className="text-[45px] mb-6" style={{ filter: 'grayscale(20%)' }}>{card.icon}</div>
-                <h2 className="text-[1.5rem] font-semibold text-[#003366] mb-3 m-0">{card.title}</h2>
-                <p className="text-base text-[#666] leading-relaxed m-0">{card.description}</p>
+                <div className="mb-6 text-[45px]" style={{ filter: 'grayscale(20%)' }}>
+                  {card.icon}
+                </div>
+                <h2 className="m-0 mb-3 text-[1.5rem] font-semibold text-[#003366]">{card.title}</h2>
+                <p className="m-0 text-base leading-relaxed text-[#666]">{card.description}</p>
                 <span className="mt-6 rounded border border-[#e2e8f0] bg-[#f1f5f9] px-5 py-1.5 text-[0.85rem] font-semibold text-[#003366] transition-colors duration-150 group-active:bg-[#e2e8f0]">
-                  à¹€à¸‚à¹‰à¸²à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¸£à¸°à¸šà¸š
+                  เข้าสู่การใช้งาน
                 </span>
               </Link>
             ))}
@@ -71,20 +72,19 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Footer - matches ref */}
-      <footer className="w-full py-8 bg-white border-t border-[#eaeaea] text-center text-[0.9rem] text-[#777]">
+      <footer className="w-full border-t border-[#eaeaea] bg-white py-8 text-center text-[0.9rem] text-[#777]">
         <div>
-          à¸ªà¸‡à¸§à¸™à¸ªà¸´à¸—à¸˜à¸´à¹Œà¸à¸²à¸£à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¹€à¸‰à¸žà¸²à¸°{' '}
-          <span className="font-semibold text-[#333]">à¸«à¸™à¹ˆà¸§à¸¢à¸„à¸¥à¸±à¸‡à¹€à¸¥à¸·à¸­à¸”à¹à¸¥à¸°à¹€à¸§à¸Šà¸¨à¸²à¸ªà¸•à¸£à¹Œà¸šà¸£à¸´à¸à¸²à¸£à¹‚à¸¥à¸«à¸´à¸• à¹‚à¸£à¸‡à¸žà¸¢à¸²à¸šà¸²à¸¥à¸ªà¸‡à¸‚à¸¥à¸²à¸™à¸„à¸£à¸´à¸™à¸—à¸£à¹Œ</span>{' '}
-          à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™
+          สงวนสิทธิ์การใช้งานเฉพาะ{' '}
+          <span className="font-semibold text-[#333]">
+            หน่วยคลังเลือดและเวชศาสตร์บริการโลหิต โรงพยาบาลสงขลานครินทร์
+          </span>{' '}
+          เท่านั้น
         </div>
         <div className="mt-1">
-          à¸«à¸²à¸à¸žà¸šà¸›à¸±à¸à¸«à¸²à¸à¸²à¸£à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¸«à¸£à¸·à¸­à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸„à¸§à¸²à¸¡à¸Šà¹ˆà¸§à¸¢à¹€à¸«à¸¥à¸·à¸­ à¸à¸£à¸¸à¸“à¸²à¸•à¸´à¸”à¸•à¹ˆà¸­{' '}
-          <span className="text-[#003366] border-b border-[#ccc]">à¸œà¸¹à¹‰à¸”à¸¹à¹à¸¥à¸£à¸°à¸šà¸š</span>
+          หากพบปัญหาการใช้งานหรือต้องการความช่วยเหลือ กรุณาติดต่อ{' '}
+          <span className="border-b border-[#ccc] text-[#003366]">ผู้ดูแลระบบ</span>
         </div>
       </footer>
     </div>
   );
 }
-
-
