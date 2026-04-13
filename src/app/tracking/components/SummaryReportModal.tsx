@@ -33,6 +33,10 @@ interface SummaryReport {
 type SortKey = 'display_name' | 'activeTasks' | 'completedTasks' | 'cancelledTasks' | 'avgDaysToComplete';
 type SortDir = 'asc' | 'desc';
 
+function formatDaysValue(days: number): string {
+  return days.toFixed(1);
+}
+
 export default function SummaryReportModal({ open, onClose }: SummaryReportModalProps) {
   const [report, setReport] = useState<SummaryReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -239,7 +243,7 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
                                 </span>
                               </td>
                               <td className="text-center px-4 py-2.5 text-slate-600">
-                                {o.avgDaysToComplete !== null ? `${o.avgDaysToComplete} วัน` : '-'}
+                                {o.avgDaysToComplete !== null ? `${formatDaysValue(o.avgDaysToComplete)} วัน` : '-'}
                               </td>
                             </tr>
                           ))}
@@ -261,7 +265,7 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
                           {STATUS_LABELS[pa.status as TaskStatus] ?? pa.status}
                         </span>
                         <span className="text-slate-800 font-medium">
-                          {pa.avgDays} วัน <span className="text-xs text-slate-400">({pa.count} ครั้ง)</span>
+                          {formatDaysValue(pa.avgDays)} วัน <span className="text-xs text-slate-400">({pa.count} ครั้ง)</span>
                         </span>
                       </div>
                     ))}

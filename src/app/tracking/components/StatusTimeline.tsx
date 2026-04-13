@@ -30,6 +30,10 @@ function formatDateTime(iso: string) {
   });
 }
 
+function formatDaysValue(days: number): string {
+  return days.toFixed(1);
+}
+
 const NOTE_DISPLAY: Record<string, string> = {
   'sentBackBy:BOSS': 'ส่งกลับตรวจรูปแบบโดยหัวหน้า',
   'sentBackBy:SUPER_BOSS': 'ส่งกลับตรวจรูปแบบโดยผู้บริหาร',
@@ -96,7 +100,7 @@ export default function StatusTimeline({
               </p>
 
               {typeof stuckDays === 'number' && Number.isFinite(stuckDays) && (
-                <p className="text-[11px] text-slate-400 mt-1">ค้างขั้นนี้ {stuckDays} วัน</p>
+                <p className="text-[11px] text-slate-400 mt-1">ค้างขั้นนี้ {formatDaysValue(stuckDays)} วัน</p>
               )}
 
               {entry.note && !entry.note.startsWith('sentBackBy:') && entry.note !== 'สร้างงานใหม่' && (

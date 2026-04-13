@@ -67,7 +67,8 @@ function parseIsoMs(value?: string | null): number | null {
 }
 
 function safeNonNegativeDiffDays(diffMs: number): number {
-  return Math.max(0, Math.floor(Math.max(0, diffMs) / DAY_MS));
+  const normalizedMs = Math.max(0, diffMs);
+  return Number((normalizedMs / DAY_MS).toFixed(1));
 }
 
 function getTerminalTimeMs(options: StageSegmentOptions, nowMs: number): number {
@@ -199,4 +200,3 @@ export function getCurrentStageStuckInfo(params: {
     enteredAt: new Date(enteredMs).toISOString(),
   };
 }
-

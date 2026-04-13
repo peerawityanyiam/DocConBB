@@ -129,6 +129,10 @@ function daysAgo(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
+function formatDaysValue(days: number): string {
+  return days.toFixed(1);
+}
+
 function durationText(createdAt: string, endAt?: string): string {
   const start = new Date(createdAt).getTime();
   const end = new Date(endAt ?? Date.now()).getTime();
@@ -382,7 +386,7 @@ export default function TaskCard({
             {currentStageStuck && stuckStageLabel && (
               <p className="mt-2 text-[0.72rem] text-[#6b7f96]">
                 ⏱ ค้างที่ขั้น <span className="font-semibold text-[#374f6b]">{stuckStageLabel}</span> มา{' '}
-                <span className="font-semibold text-[#374f6b]">{currentStageStuck.days}</span> วัน
+                <span className="font-semibold text-[#374f6b]">{formatDaysValue(currentStageStuck.days)}</span> วัน
               </p>
             )}
           </>
@@ -392,7 +396,7 @@ export default function TaskCard({
       {!isCompletedView && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-t" style={{ background: '#f8fafc', borderColor: '#e2e8f0', borderRadius: '0 0 12px 12px' }}>
           <span className="text-[0.7rem] text-[#6b7f96]">อัปเดต {formatDate(task.updated_at)}</span>
-          <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(ageForBadge)}`}>⏱ {ageForBadge} วัน</span>
+          <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(ageForBadge)}`}>⏱ {formatDaysValue(ageForBadge)} วัน</span>
         </div>
       )}
     </div>

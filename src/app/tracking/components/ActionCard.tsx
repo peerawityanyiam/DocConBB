@@ -36,6 +36,10 @@ function formatDateThai(iso: string) {
   });
 }
 
+function formatDaysValue(days: number) {
+  return days.toFixed(1);
+}
+
 /* ── Pipeline visualization (for DocCon tracking tab) ── */
 const PIPELINE_STAGES: { key: string; label: string }[] = [
   { key: 'ASSIGNED', label: 'เจ้าหน้าที่' },
@@ -177,6 +181,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     completedAt: task.completed_at,
   });
   const stageStuckDays = currentStageStuck?.days ?? 0;
+  const stageStuckDaysLabel = formatDaysValue(stageStuckDays);
   const stageStuckLabel = currentStageStuck
     ? STATUS_LABELS[currentStageStuck.stage as TaskStatus]
     : '';
@@ -555,7 +560,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
                 {isPipelineView && currentStageStuck && (
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stageStuckDays > 7 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                    ค้าง {stageStuckDays} วัน
+                    ค้าง {stageStuckDaysLabel} วัน
                   </span>
                 )}
               </>
@@ -584,7 +589,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           {currentStageStuck && (
             <div className="mb-3 text-xs text-gray-500">
               ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-gray-700">{stageStuckLabel}</span> มา{' '}
-              <span className="font-semibold text-gray-700">{stageStuckDays}</span> วัน
+              <span className="font-semibold text-gray-700">{stageStuckDaysLabel}</span> วัน
             </div>
           )}
 
