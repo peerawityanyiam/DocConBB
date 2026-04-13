@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { createClient } from '@/lib/supabase/client';
 import { AUTH_CONFIG } from '@/lib/auth/config';
@@ -6,29 +6,29 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo, useState } from 'react';
 
 const ERROR_MESSAGES: Record<string, string> = {
-  domain: 'อนุญาตเฉพาะบัญชี @medicine.psu.ac.th เท่านั้น',
-  auth_failed: 'การยืนยันตัวตนล้มเหลว กรุณาลองใหม่',
-  no_code: 'ไม่พบรหัสยืนยัน กรุณาลองใหม่',
-  not_registered: 'บัญชีนี้ยังไม่ได้ลงทะเบียนในระบบ กรุณาติดต่อผู้ดูแลระบบ',
-  idle: 'ระบบออกจากบัญชีอัตโนมัติ เนื่องจากไม่มีการใช้งาน',
+  domain: 'à¸­à¸™à¸¸à¸à¸²à¸•à¹€à¸‰à¸žà¸²à¸°à¸šà¸±à¸à¸Šà¸µ @medicine.psu.ac.th à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™',
+  auth_failed: 'à¸à¸²à¸£à¸¢à¸·à¸™à¸¢à¸±à¸™à¸•à¸±à¸§à¸•à¸™à¸¥à¹‰à¸¡à¹€à¸«à¸¥à¸§ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆ',
+  no_code: 'à¹„à¸¡à¹ˆà¸žà¸šà¸£à¸«à¸±à¸ªà¸¢à¸·à¸™à¸¢à¸±à¸™ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆ',
+  not_registered: 'à¸šà¸±à¸à¸Šà¸µà¸™à¸µà¹‰à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¸¥à¸‡à¸—à¸°à¹€à¸šà¸µà¸¢à¸™à¹ƒà¸™à¸£à¸°à¸šà¸š à¸à¸£à¸¸à¸“à¸²à¸•à¸´à¸”à¸•à¹ˆà¸­à¸œà¸¹à¹‰à¸”à¸¹à¹à¸¥à¸£à¸°à¸šà¸š',
+  idle: 'à¸£à¸°à¸šà¸šà¸­à¸­à¸à¸ˆà¸²à¸à¸šà¸±à¸à¸Šà¸µà¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´ à¹€à¸™à¸·à¹ˆà¸­à¸‡à¸ˆà¸²à¸à¹„à¸¡à¹ˆà¸¡à¸µà¸à¸²à¸£à¹ƒà¸Šà¹‰à¸‡à¸²à¸™',
 };
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
-  const [loadingMode, setLoadingMode] = useState<'login' | 'switch' | null>(null);
+  const [loadingMode, setLoadingMode] = useState<'login' | null>(null);
   const [localError, setLocalError] = useState('');
 
   const errorMessage = useMemo(() => {
     if (localError) return localError;
     if (!error) return '';
-    return ERROR_MESSAGES[error] || 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+    return ERROR_MESSAGES[error] || 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸” à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆ';
   }, [error, localError]);
 
-  const startGoogleLogin = async (mode: 'login' | 'switch') => {
+  const startGoogleLogin = async () => {
     if (loadingMode) return;
     setLocalError('');
-    setLoadingMode(mode);
+    setLoadingMode('login');
     const supabase = createClient();
     try {
       // Shared-device safety: clear existing app session before starting OAuth
@@ -44,7 +44,7 @@ function LoginContent() {
         },
       });
     } catch {
-      setLocalError('เริ่มเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      setLocalError('à¹€à¸£à¸´à¹ˆà¸¡à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡');
       setLoadingMode(null);
     }
   };
@@ -64,37 +64,23 @@ function LoginContent() {
               BB Document Control
             </div>
             <h1 className="mt-4 text-2xl font-bold leading-tight sm:text-3xl">
-              ระบบสนับสนุนการทำงานคุณภาพ
+              à¸£à¸°à¸šà¸šà¸ªà¸™à¸±à¸šà¸ªà¸™à¸¸à¸™à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸„à¸¸à¸“à¸ à¸²à¸ž
             </h1>
             <p className="mt-2 text-sm text-cyan-100/90 sm:text-base">
-              หน่วยคลังเลือด รพ.สงขลานครินทร์
+              à¸«à¸™à¹ˆà¸§à¸¢à¸„à¸¥à¸±à¸‡à¹€à¸¥à¸·à¸­à¸” à¸£à¸ž.à¸ªà¸‡à¸‚à¸¥à¸²à¸™à¸„à¸£à¸´à¸™à¸—à¸£à¹Œ
             </p>
 
-            <div className="mt-7 space-y-3 text-sm text-white/90">
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5">•</span>
-                <p>รองรับการใช้งานหลายบทบาทในระบบเดียว</p>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5">•</span>
-                <p>เข้าสู่ระบบเฉพาะบัญชีองค์กรที่ได้รับสิทธิ์</p>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5">•</span>
-                <p>มีการออกจากระบบอัตโนมัติเมื่อไม่ใช้งาน</p>
-              </div>
-            </div>
           </section>
 
           <section className="rounded-3xl border border-slate-200/80 bg-white/95 p-6 shadow-[0_20px_55px_rgba(26,39,63,0.14)] backdrop-blur sm:p-8">
             <div className="mb-6 flex items-center gap-3">
               <div className="relative h-12 w-12 overflow-hidden rounded-2xl bg-gradient-to-br from-[#00c2a8] to-[#0d1b2e] text-white shadow-lg">
                 <span className="absolute left-2 top-1 text-[0.58rem] font-bold tracking-wide">BB</span>
-                <span className="absolute bottom-1.5 right-2 text-sm">📄</span>
+                <span className="absolute bottom-1.5 right-2 text-sm">ðŸ“„</span>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#2f68ff]">Secure Login</p>
-                <p className="text-sm font-semibold text-slate-800">เข้าสู่ระบบด้วยบัญชี Google</p>
+                <p className="text-sm font-semibold text-slate-800">à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸”à¹‰à¸§à¸¢à¸šà¸±à¸à¸Šà¸µ Google</p>
               </div>
             </div>
 
@@ -105,29 +91,17 @@ function LoginContent() {
             )}
 
             <button
-              onClick={() => void startGoogleLogin('login')}
+              onClick={() => void startGoogleLogin()}
               disabled={loadingMode !== null}
               className="group w-full rounded-xl bg-[#0d1b2e] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(13,27,46,0.28)] transition hover:bg-[#132e52] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="inline-flex items-center justify-center gap-2">
-                {loadingMode === 'login' ? 'กำลังเชื่อมต่อ...' : 'เข้าสู่ระบบด้วย Google'}
+                {loadingMode === 'login' ? 'à¸à¸³à¸¥à¸±à¸‡à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­...' : 'à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¹ˆà¸£à¸°à¸šà¸šà¸”à¹‰à¸§à¸¢ Google'}
               </span>
             </button>
 
-            <button
-              onClick={() => void startGoogleLogin('switch')}
-              disabled={loadingMode !== null}
-              className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loadingMode === 'switch' ? 'กำลังสลับบัญชี...' : 'สลับบัญชี / ใช้บัญชีอื่น'}
-            </button>
-
-            <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs leading-relaxed text-sky-800">
-              เหมาะสำหรับเครื่องที่มีหลายคนใช้งานร่วมกัน: ระบบจะล้าง session เดิมก่อนเริ่มเข้าสู่ระบบทุกครั้ง
-            </div>
-
             <p className="mt-5 text-center text-xs text-slate-400">
-              ใช้บัญชี @medicine.psu.ac.th เท่านั้น
+              à¹ƒà¸Šà¹‰à¸šà¸±à¸à¸Šà¸µ @medicine.psu.ac.th à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™
             </p>
           </section>
         </div>
@@ -140,10 +114,11 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-        <div className="text-white">กำลังโหลด...</div>
+        <div className="text-white">à¸à¸³à¸¥à¸±à¸‡à¹‚à¸«à¸¥à¸”...</div>
       </div>
     }>
       <LoginContent />
     </Suspense>
   );
 }
+
