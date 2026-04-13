@@ -1,7 +1,10 @@
 export const AUTH_CONFIG = {
   allowedDomain: process.env.ALLOWED_DOMAIN || 'medicine.psu.ac.th',
   oauthProvider: 'google' as const,
-  oauthQueryParams: { hd: 'medicine.psu.ac.th' },
+  oauthQueryParams: {
+    hd: 'medicine.psu.ac.th',
+    prompt: 'select_account',
+  },
   loginPath: '/login',
   callbackPath: '/callback',
   defaultRedirect: '/',

@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { AUTH_CONFIG } from '@/lib/auth/config';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
@@ -9,6 +10,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   auth_failed: 'การยืนยันตัวตนล้มเหลว กรุณาลองใหม่',
   no_code: 'ไม่พบรหัสยืนยัน กรุณาลองใหม่',
   not_registered: 'บัญชีนี้ยังไม่ได้ลงทะเบียนในระบบ กรุณาติดต่อผู้ดูแลระบบ',
+  idle: 'ระบบออกจากบัญชีอัตโนมัติ เนื่องจากไม่มีการใช้งาน',
 };
 
 function LoginContent() {
@@ -20,7 +22,7 @@ function LoginContent() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        queryParams: { hd: 'medicine.psu.ac.th' },
+        queryParams: AUTH_CONFIG.oauthQueryParams,
         redirectTo: `${window.location.origin}/callback`,
       },
     });
