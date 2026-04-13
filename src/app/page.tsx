@@ -17,7 +17,7 @@ const cards = [
     href: '/tracking',
   },
   {
-    title: 'BB document center',
+    title: 'Document Library',
     icon: '📑',
     description: 'จัดการระบบเอกสารคุณภาพ',
     href: DOCUMENT_CONTROL_GAS_URL,
