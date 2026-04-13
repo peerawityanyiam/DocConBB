@@ -733,7 +733,12 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
               {/* Timeline Tab */}
               {tab === 'timeline' && (
-                <StatusTimeline history={task.status_history ?? []} />
+                <StatusTimeline
+                  history={task.status_history ?? []}
+                  currentStatus={task.status}
+                  updatedAt={task.updated_at}
+                  completedAt={task.completed_at}
+                />
               )}
 
               {/* Comments tab removed — comments are only collected during rejections */}

@@ -642,7 +642,14 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
         )}
 
         {/* Timeline */}
-        {tab === 'timeline' && <StatusTimeline history={task.status_history ?? []} />}
+        {tab === 'timeline' && (
+          <StatusTimeline
+            history={task.status_history ?? []}
+            currentStatus={task.status}
+            updatedAt={task.updated_at}
+            completedAt={task.completed_at}
+          />
+        )}
 
         {/* Comments */}
         {tab === 'comments' && (

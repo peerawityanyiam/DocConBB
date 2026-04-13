@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import StatusBadge from './StatusBadge';
 import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
-import type { TaskStatus } from '@/lib/constants/status';
+import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
 import { buildPdfFromImages } from '@/lib/files/image-to-pdf';
+import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage } from '@/lib/ui/friendly-error';
 
 /* ── Border colors per role context ── */
@@ -33,10 +34,6 @@ function formatDateThai(iso: string) {
     day: '2-digit', month: '2-digit', year: 'numeric',
     timeZone: 'Asia/Bangkok',
   });
-}
-
-function daysAgo(iso: string): number {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
 /* ── Pipeline visualization (for DocCon tracking tab) ── */
@@ -173,7 +170,17 @@ interface DocRefCheckResult {
 
 export default function ActionCard({ task, activeRole, activeSubTab, userId, userRoles, onUpdated, onOpenHistory }: ActionCardProps) {
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
-  const age = daysAgo(task.created_at);
+  const currentStageStuck = getCurrentStageStuckInfo({
+    status: task.status,
+    statusHistory: task.status_history,
+    updatedAt: task.updated_at,
+    completedAt: task.completed_at,
+  });
+  const stageStuckDays = currentStageStuck?.days ?? 0;
+  const stageStuckLabel = currentStageStuck
+    ? STATUS_LABELS[currentStageStuck.stage as TaskStatus]
+    : '';
+  const isOwnedStaffCard = activeRole === 'STAFF' && task.officer_id === userId;
 
   // File selection state — just tracks what user selected, NOT auto-uploaded
   const [selectedWordFile, setSelectedWordFile] = useState<File | null>(null);
@@ -540,18 +547,15 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
             {activeRole === 'STAFF' && (
               <>
                 <span>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</span>
-                <span className={age > 7 ? 'text-red-600 font-medium' : ''}>
-                  👤 ค้างที่คุณ {age} วัน
-                </span>
               </>
             )}
             {activeRole === 'DOCCON' && (
               <>
                 <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
                 <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
-                {isPipelineView && age > 0 && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${age > 7 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                    ค้าง {age} วัน
+                {isPipelineView && currentStageStuck && (
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stageStuckDays > 7 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                    ค้าง {stageStuckDays} วัน
                   </span>
                 )}
               </>
@@ -576,6 +580,13 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
               </>
             )}
           </div>
+
+          {currentStageStuck && (
+            <div className="mb-3 text-xs text-gray-500">
+              ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-gray-700">{stageStuckLabel}</span> มา{' '}
+              <span className="font-semibold text-gray-700">{stageStuckDays}</span> วัน
+            </div>
+          )}
 
           {/* Latest comment (rejection reason) + who sent back */}
           {/* Rejected: show who sent back + comment */}

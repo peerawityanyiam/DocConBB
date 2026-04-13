@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
 import type { AppRole } from '@/lib/auth/guards';
-import type { TaskStatus } from '@/lib/constants/status';
+import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
+import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 
 const PIPELINE_STAGES: { key: string; label: string; icon: string }[] = [
   { key: 'ASSIGNED', label: 'เจ้าหน้าที่', icon: '1' },
@@ -208,6 +209,16 @@ export default function TaskCard({
   onChecklistUpdated,
 }: TaskCardProps) {
   const age = daysAgo(task.created_at);
+  const currentStageStuck = getCurrentStageStuckInfo({
+    status: task.status,
+    statusHistory: task.status_history,
+    updatedAt: task.updated_at,
+    completedAt: task.completed_at,
+  });
+  const stuckStageLabel = currentStageStuck
+    ? STATUS_LABELS[currentStageStuck.stage as TaskStatus]
+    : null;
+  const ageForBadge = currentStageStuck?.days ?? age;
   const isRejected = REJECTED_STATUSES.has(task.status);
   const actionHint = getActionHint(task, activeRole);
   const needsAction = actionHint?.color === '#00c2a8' || actionHint?.color === '#ef4444';
@@ -368,6 +379,12 @@ export default function TaskCard({
                 หมายเหตุ: {task.latest_comment}
               </div>
             )}
+            {currentStageStuck && stuckStageLabel && (
+              <p className="mt-2 text-[0.72rem] text-[#6b7f96]">
+                ⏱ ค้างที่ขั้น <span className="font-semibold text-[#374f6b]">{stuckStageLabel}</span> มา{' '}
+                <span className="font-semibold text-[#374f6b]">{currentStageStuck.days}</span> วัน
+              </p>
+            )}
           </>
         )}
       </div>
@@ -375,7 +392,7 @@ export default function TaskCard({
       {!isCompletedView && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-t" style={{ background: '#f8fafc', borderColor: '#e2e8f0', borderRadius: '0 0 12px 12px' }}>
           <span className="text-[0.7rem] text-[#6b7f96]">อัปเดต {formatDate(task.updated_at)}</span>
-          <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(age)}`}>⏱ {age} วัน</span>
+          <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${ageStyle(ageForBadge)}`}>⏱ {ageForBadge} วัน</span>
         </div>
       )}
     </div>
