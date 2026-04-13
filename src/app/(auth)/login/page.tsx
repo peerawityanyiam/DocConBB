@@ -73,7 +73,7 @@ function LoginContent() {
         <section className="px-5 py-5 sm:px-6 sm:py-6">
           <div className="mb-5 flex items-center gap-3">
             <img
-              src="/icons/icon-192-v2.png"
+              src="/icons/icon-192.png"
               alt="BB icon"
               className="h-12 w-12"
             />
