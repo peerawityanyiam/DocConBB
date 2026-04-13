@@ -72,22 +72,11 @@ function LoginContent() {
 
         <section className="px-5 py-5 sm:px-6 sm:py-6">
           <div className="mb-5 flex items-center gap-3">
-            <div className="relative h-12 w-12 overflow-hidden rounded-[14px] bg-gradient-to-br from-[#355eab] to-[#243f82] text-white shadow-lg ring-1 ring-[#1f376f]/35">
-              <span className="pointer-events-none absolute -left-3 -top-3 h-8 w-8 rounded-full bg-[#4a74cf]/70" />
-              <span className="pointer-events-none absolute bottom-[-7px] right-[-7px] h-8 w-8 rounded-full bg-[#2b4a93]/80" />
-
-              <span className="absolute left-1/2 top-[9px] h-4 w-8 -translate-x-1/2">
-                <span className="absolute left-1/2 top-0 h-[10px] w-7 -translate-x-1/2 rotate-45 bg-[#f5f8fd] shadow-[0_1px_2px_rgba(0,0,0,0.2)]" />
-                <span className="absolute left-1/2 top-[5px] h-[9px] w-7 -translate-x-1/2 rotate-45 bg-[#d99a2b]/95" />
-                <span className="absolute left-1/2 top-[9px] h-[9px] w-7 -translate-x-1/2 rotate-45 bg-[#d9dfeb]/90" />
-                <span className="absolute left-1/2 top-[13px] h-[8px] w-7 -translate-x-1/2 rotate-45 bg-[#afbad2]/70" />
-              </span>
-
-              <span className="absolute bottom-[3px] left-1/2 -translate-x-1/2 text-[0.58rem] font-extrabold leading-none tracking-tight">
-                <span className="text-[#f3f6fc]">B</span>
-                <span className="text-[#e4a32d]">B</span>
-              </span>
-            </div>
+            <img
+              src="/icons/icon-192.png"
+              alt="BB icon"
+              className="h-12 w-12 rounded-[14px] shadow-lg ring-1 ring-slate-900/10"
+            />
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#2f68ff]">App login</p>
               <p className="text-sm font-semibold text-slate-800">เข้าสู่ระบบ</p>
