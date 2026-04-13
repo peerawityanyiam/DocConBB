@@ -72,11 +72,13 @@ function LoginContent() {
 
         <section className="px-5 py-5 sm:px-6 sm:py-6">
           <div className="mb-5 flex items-center gap-3">
-            <img
-              src="/icons/icon-192.png"
-              alt="BB icon"
-              className="h-12 w-12"
-            />
+            <div className="h-12 w-12 overflow-hidden rounded-xl">
+              <img
+                src="/icons/icon-192.png"
+                alt="BB icon"
+                className="h-full w-full scale-110 object-cover"
+              />
+            </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#2f68ff]">App login</p>
               <p className="text-sm font-semibold text-slate-800">เข้าสู่ระบบ</p>
