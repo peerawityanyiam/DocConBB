@@ -1,8 +1,8 @@
-{
+﻿{
   "id": "/",
-  "name": "BB Document Control",
-  "short_name": "BBDC",
-  "description": "Tracking and document control dashboard for quality documents.",
+  "name": "BB document center",
+  "short_name": "BB document center",
+  "description": "Tracking and document center dashboard for quality documents.",
   "lang": "th",
   "start_url": "/",
   "scope": "/",
@@ -31,3 +31,5 @@
     }
   ]
 }
+
+

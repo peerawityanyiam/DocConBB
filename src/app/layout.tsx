@@ -13,7 +13,7 @@ const ibmPlexSansThai = IBM_Plex_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "ระบบเอกสารคุณภาพ - รพ.สงขลานครินทร์",
+  title: "BB document center - ระบบเอกสารคุณภาพ - รพ.สงขลานครินทร์",
   description: "ระบบติดตามและจัดการเอกสารคุณภาพ โรงพยาบาลสงขลานครินทร์",
   manifest: "/manifest.json",
   icons: {
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BBDC",
+    title: "BB document center",
   },
 };
 
@@ -54,3 +54,4 @@ export default function RootLayout({
     </html>
   );
 }
+

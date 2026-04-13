@@ -17,7 +17,7 @@ const cards = [
     href: '/tracking',
   },
   {
-    title: 'BB Document Control',
+    title: 'BB document center',
     icon: '📑',
     description: 'จัดการระบบเอกสารคุณภาพ',
     href: DOCUMENT_CONTROL_GAS_URL,
@@ -88,3 +88,4 @@ export default async function Home() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-export default function Loading() {
+﻿export default function Loading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0d1b2e]">
       <div className="flex flex-col items-center gap-5 text-center text-white">
@@ -7,7 +7,7 @@ export default function Loading() {
           <span className="text-2xl font-bold tracking-wide">BB</span>
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-cyan-100">BB Document Control</p>
+          <p className="text-sm font-semibold text-cyan-100">BB document center</p>
           <p className="text-xs text-cyan-100/80">Loading...</p>
         </div>
         <div className="h-1.5 w-44 overflow-hidden rounded-full bg-white/15">
@@ -17,3 +17,4 @@ export default function Loading() {
     </div>
   );
 }
+
