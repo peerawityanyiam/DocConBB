@@ -73,9 +73,9 @@ function LoginContent() {
         <section className="px-5 py-5 sm:px-6 sm:py-6">
           <div className="mb-5 flex items-center gap-3">
             <img
-              src="/icons/icon-192.png"
+              src="/icons/icon-192-v2.png"
               alt="BB icon"
-              className="h-16 w-16 md:h-24 md:w-24"
+              className="h-12 w-12"
             />
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#2f68ff]">App login</p>
