@@ -75,7 +75,7 @@ function LoginContent() {
             <img
               src="/icons/icon-192.png"
               alt="BB icon"
-              className="h-12 w-12 md:h-16 md:w-16"
+              className="h-16 w-16 md:h-24 md:w-24"
             />
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#2f68ff]">App login</p>
