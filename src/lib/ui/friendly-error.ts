@@ -52,6 +52,7 @@ export function toFriendlyErrorMessage(
   if (
     normalized.includes('50mb') ||
     normalized.includes('4mb') ||
+    normalized.includes('8mb') ||
     normalized.includes('413') ||
     normalized.includes('too large') ||
     normalized.includes('payload too large')
@@ -88,6 +89,7 @@ export function toUploadFailureMessage(
   if (
     normalized.includes('50mb') ||
     normalized.includes('4mb') ||
+    normalized.includes('8mb') ||
     normalized.includes('413') ||
     normalized.includes('too large') ||
     normalized.includes('payload too large') ||

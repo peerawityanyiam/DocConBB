@@ -7,6 +7,13 @@ import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } 
 
 const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
 
+function toPositiveInt(raw: FormDataEntryValue | null): number | null {
+  if (typeof raw !== 'string') return null;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 // POST /api/tasks/[taskId]/files — อัปโหลดไฟล์ (docx/pdf) เข้า task folder
 export async function POST(
   request: NextRequest,
@@ -19,8 +26,21 @@ export async function POST(
     const { taskId } = await params;
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
+    const uploadBatchIdRaw = formData.get('upload_batch_id');
+    const uploadBatchLabelRaw = formData.get('upload_batch_label');
+    const uploadBatchIndex = toPositiveInt(formData.get('upload_batch_index'));
+    const uploadBatchTotal = toPositiveInt(formData.get('upload_batch_total'));
 
     if (!file) return NextResponse.json({ error: 'ไม่พบไฟล์' }, { status: 400 });
+    const uploadBatchId = typeof uploadBatchIdRaw === 'string' ? uploadBatchIdRaw.trim() : '';
+    const uploadBatchLabel = typeof uploadBatchLabelRaw === 'string' ? uploadBatchLabelRaw.trim() : '';
+    const hasPdfBatchMeta = Boolean(
+      uploadBatchId &&
+      uploadBatchTotal &&
+      uploadBatchTotal > 1 &&
+      uploadBatchIndex &&
+      uploadBatchIndex <= uploadBatchTotal,
+    );
 
     // ตรวจนามสกุล
     const ext = file.name.toLowerCase().split('.').pop();
@@ -196,8 +216,19 @@ export async function POST(
       // PDF → ไฟล์อ้างอิง (ref)
       // Keep older PDF files for cases that require multiple reference parts.
       // Forward/approve actions will clear all reference PDFs later in status route.
-      updates.ref_file_id = driveFileId;
-      updates.ref_file_name = driveFileName;
+      if (hasPdfBatchMeta) {
+        const summaryBaseName = (uploadBatchLabel || driveFileName).replace(/-part-\d+\.pdf$/i, '.pdf');
+        const shouldKeepExistingRefId =
+          uploadBatchIndex! > 1 &&
+          typeof task.ref_file_id === 'string' &&
+          task.ref_file_id.length > 0;
+
+        updates.ref_file_id = shouldKeepExistingRefId ? task.ref_file_id : driveFileId;
+        updates.ref_file_name = `${summaryBaseName} + อีก ${uploadBatchTotal! - 1} ไฟล์`;
+      } else {
+        updates.ref_file_id = driveFileId;
+        updates.ref_file_name = driveFileName;
+      }
     } else {
       // DOCX → ไฟล์หลัก — replace old DOCX only, keep ref PDF intact
       const oldDocxId = task.drive_file_id ?? latestOldDocxFromHistory;
@@ -216,6 +247,9 @@ export async function POST(
       uploadedByName: dbUser.display_name,
       driveFileId,
       isPdf,
+      uploadBatchId: hasPdfBatchMeta ? uploadBatchId : undefined,
+      uploadBatchIndex: hasPdfBatchMeta ? uploadBatchIndex : undefined,
+      uploadBatchTotal: hasPdfBatchMeta ? uploadBatchTotal : undefined,
     }];
     updates.file_history = fileHistory;
 

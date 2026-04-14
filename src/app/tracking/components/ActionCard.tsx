@@ -193,6 +193,13 @@ interface DocRefCheckResult {
   date?: string;
 }
 
+interface UploadBatchMeta {
+  id: string;
+  index: number;
+  total: number;
+  label: string;
+}
+
 export default function ActionCard({ task, activeRole, activeSubTab, userId, userRoles, onUpdated, onOpenHistory }: ActionCardProps) {
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
   const currentStageStuck = getCurrentStageStuckInfo({
@@ -213,6 +220,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const [selectedSupplementFiles, setSelectedSupplementFiles] = useState<File[]>([]);
   const [selectedImageCount, setSelectedImageCount] = useState<number | null>(null);
   const [selectedPdfPartCount, setSelectedPdfPartCount] = useState<number | null>(null);
+  const [selectedPdfBatchId, setSelectedPdfBatchId] = useState<string | null>(null);
+  const [selectedPdfBatchLabel, setSelectedPdfBatchLabel] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -262,12 +271,14 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setSelectedSupplementFiles([]);
     setSelectedImageCount(null);
     setSelectedPdfPartCount(null);
+    setSelectedPdfBatchId(null);
+    setSelectedPdfBatchLabel(null);
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
   /* ── uploadFileAsync: returns Promise (no callback) ── */
-  const uploadFileOnceAsync = useCallback((file: File): Promise<void> => {
+  const uploadFileOnceAsync = useCallback((file: File, batchMeta?: UploadBatchMeta): Promise<void> => {
     return new Promise((resolve, reject) => {
       const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
       if (!['.docx', '.pdf'].includes(ext)) {
@@ -281,6 +292,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       setUploadProgress(0);
       const formData = new FormData();
       formData.append('file', file);
+      if (batchMeta) {
+        formData.append('upload_batch_id', batchMeta.id);
+        formData.append('upload_batch_index', String(batchMeta.index));
+        formData.append('upload_batch_total', String(batchMeta.total));
+        formData.append('upload_batch_label', batchMeta.label);
+      }
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/tasks/${task.id}/files`);
       xhr.upload.addEventListener('progress', (e) => {
@@ -311,13 +328,13 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     });
   }, [task.id]);
 
-  const uploadFileAsync = useCallback(async (file: File): Promise<void> => {
+  const uploadFileAsync = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<void> => {
     let attempt = 0;
     let lastError: unknown = null;
     while (attempt <= MAX_UPLOAD_RETRIES) {
       try {
         setUploadProgress(0);
-        await uploadFileOnceAsync(file);
+        await uploadFileOnceAsync(file, batchMeta);
         return;
       } catch (err) {
         lastError = err;
@@ -356,12 +373,36 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setActionError('');
     setUploadError('');
     const hasSelectedUpload = !!selectedWordFile || selectedSupplementFiles.length > 0;
+    const hasImageBatchMeta = Boolean(
+      selectedPdfBatchId &&
+      selectedPdfBatchLabel &&
+      selectedPdfPartCount &&
+      selectedPdfPartCount > 1 &&
+      selectedWordFile?.name.toLowerCase().endsWith('.pdf'),
+    );
     let uploadFinished = !hasSelectedUpload;
     try {
       if (selectedWordFile) {
-        await uploadFileAsync(selectedWordFile);
-        for (const extraFile of selectedSupplementFiles) {
-          await uploadFileAsync(extraFile);
+        const firstBatchMeta = hasImageBatchMeta
+          ? {
+              id: selectedPdfBatchId!,
+              index: 1,
+              total: selectedPdfPartCount!,
+              label: selectedPdfBatchLabel!,
+            }
+          : undefined;
+        await uploadFileAsync(selectedWordFile, firstBatchMeta);
+        for (let index = 0; index < selectedSupplementFiles.length; index += 1) {
+          const extraFile = selectedSupplementFiles[index];
+          const batchMeta = hasImageBatchMeta
+            ? {
+                id: selectedPdfBatchId!,
+                index: index + 2,
+                total: selectedPdfPartCount!,
+                label: selectedPdfBatchLabel!,
+              }
+            : undefined;
+          await uploadFileAsync(extraFile, batchMeta);
         }
         uploadFinished = true;
         clearSelectedUploadFiles();
@@ -452,6 +493,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setSelectedSupplementFiles([]);
     setSelectedImageCount(null);
     setSelectedPdfPartCount(null);
+    setSelectedPdfBatchId(null);
+    setSelectedPdfBatchLabel(null);
     setUploadError('');
     setActionError('');
   }
@@ -463,6 +506,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
     setUploadError('');
     setActionError('');
+    setSelectedPdfBatchId(null);
+    setSelectedPdfBatchLabel(null);
     setIsConvertingImages(true);
     try {
       const nonImageFile = images.find((file) => !file.type.startsWith('image/'));
@@ -482,6 +527,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       setSelectedSupplementFiles(pdfFiles.slice(1));
       setSelectedImageCount(images.length);
       setSelectedPdfPartCount(pdfFiles.length);
+      setSelectedPdfBatchId(`imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+      setSelectedPdfBatchLabel(pdfFiles[0].name.replace(/-part-\d+\.pdf$/i, '.pdf'));
       if (wordInputRef.current) wordInputRef.current.value = '';
     } catch (err) {
       setUploadError(toUploadFailureMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
@@ -570,6 +617,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         : 'ระบบจะส่งไฟล์ PDF ที่รวมจากรูปภาพเมื่อกดปุ่มดำเนินการ')
       : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
     : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
+  const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
   const renderAttachmentSummary = (hint: string) => (
     <div className={`mt-2 rounded-md border px-2.5 py-2 text-[0.7rem] ${selectedWordFile ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>
@@ -887,7 +935,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {renderAttachmentSummary(
                   docconSentBackFromBoss
                     ? 'กรณีส่งกลับจากหัวหน้างาน ต้องแนบ Word (.docx)'
-                    : 'รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)'
+                    : attachmentHintWithLimit
                 )}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
@@ -968,7 +1016,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)')}
+                {renderAttachmentSummary(attachmentHintWithLimit)}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
@@ -1036,7 +1084,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)')}
+                {renderAttachmentSummary(attachmentHintWithLimit)}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
@@ -1112,7 +1160,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)')}
+                {renderAttachmentSummary(attachmentHintWithLimit)}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}

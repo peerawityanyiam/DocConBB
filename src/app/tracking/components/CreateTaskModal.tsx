@@ -24,6 +24,13 @@ const MAX_UPLOAD_RETRIES = 2;
 const MAX_ROLLBACK_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 900;
 
+interface UploadBatchMeta {
+  id: string;
+  index: number;
+  total: number;
+  label: string;
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -53,6 +60,8 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [pdfImageCount, setPdfImageCount] = useState<number | null>(null);
   const [pdfPartCount, setPdfPartCount] = useState<number | null>(null);
+  const [pdfBatchId, setPdfBatchId] = useState<string | null>(null);
+  const [pdfBatchLabel, setPdfBatchLabel] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const wordInputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +84,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   function reset() {
     setTitle(''); setDetail(''); setOfficerId(''); setReviewerId(''); setError('');
-    setWordFile(null); setPdfFiles([]); setPdfImageCount(null); setPdfPartCount(null); setUploadProgress(null); setIsConvertingImages(false);
+    setWordFile(null); setPdfFiles([]); setPdfImageCount(null); setPdfPartCount(null); setPdfBatchId(null); setPdfBatchLabel(null); setUploadProgress(null); setIsConvertingImages(false);
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (pdfInputRef.current) pdfInputRef.current.value = '';
     if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
@@ -98,6 +107,8 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     setPdfFiles([selected]);
     setPdfImageCount(null);
     setPdfPartCount(1);
+    setPdfBatchId(null);
+    setPdfBatchLabel(null);
   }
 
   async function handleImageToPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -106,6 +117,8 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     const sourceTotalBytes = selectedImages.reduce((sum, file) => sum + file.size, 0);
 
     setError('');
+    setPdfBatchId(null);
+    setPdfBatchLabel(null);
     setIsConvertingImages(true);
     try {
       const nonImageFile = selectedImages.find((file) => !file.type.startsWith('image/'));
@@ -124,6 +137,8 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       setPdfFiles(generatedPdfFiles);
       setPdfImageCount(selectedImages.length);
       setPdfPartCount(generatedPdfFiles.length);
+      setPdfBatchId(`imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+      setPdfBatchLabel(generatedPdfFiles[0].name.replace(/-part-\d+\.pdf$/i, '.pdf'));
       if (pdfInputRef.current) pdfInputRef.current.value = '';
     } catch (err) {
       setError(toUploadFailureMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
@@ -133,7 +148,11 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     }
   }
 
-  function uploadFileOnceWithProgress(taskId: string, fileToUpload: File): Promise<void> {
+  function uploadFileOnceWithProgress(
+    taskId: string,
+    fileToUpload: File,
+    batchMeta?: UploadBatchMeta,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/tasks/${taskId}/files`);
@@ -162,17 +181,27 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
       const formData = new FormData();
       formData.append('file', fileToUpload);
+      if (batchMeta) {
+        formData.append('upload_batch_id', batchMeta.id);
+        formData.append('upload_batch_index', String(batchMeta.index));
+        formData.append('upload_batch_total', String(batchMeta.total));
+        formData.append('upload_batch_label', batchMeta.label);
+      }
       xhr.send(formData);
     });
   }
 
-  async function uploadFileWithProgress(taskId: string, fileToUpload: File): Promise<void> {
+  async function uploadFileWithProgress(
+    taskId: string,
+    fileToUpload: File,
+    batchMeta?: UploadBatchMeta,
+  ): Promise<void> {
     let attempt = 0;
     let lastError: unknown = null;
     while (attempt <= MAX_UPLOAD_RETRIES) {
       try {
         setUploadProgress(0);
-        await uploadFileOnceWithProgress(taskId, fileToUpload);
+        await uploadFileOnceWithProgress(taskId, fileToUpload, batchMeta);
         return;
       } catch (err) {
         lastError = err;
@@ -229,9 +258,19 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         setUploadProgress(0);
         await uploadFileWithProgress(createdTaskId, wordFile);
       }
-      for (const file of pdfFiles) {
+      const hasImageBatchMeta = Boolean(pdfBatchId && pdfBatchLabel && pdfPartCount && pdfPartCount > 1);
+      for (let index = 0; index < pdfFiles.length; index += 1) {
+        const file = pdfFiles[index];
+        const batchMeta = hasImageBatchMeta
+          ? {
+              id: pdfBatchId!,
+              index: index + 1,
+              total: pdfPartCount!,
+              label: pdfBatchLabel!,
+            }
+          : undefined;
         setUploadProgress(0);
-        await uploadFileWithProgress(createdTaskId, file);
+        await uploadFileWithProgress(createdTaskId, file, batchMeta);
       }
 
       reset();
@@ -423,6 +462,8 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                       setPdfFiles([]);
                       setPdfImageCount(null);
                       setPdfPartCount(null);
+                      setPdfBatchId(null);
+                      setPdfBatchLabel(null);
                       if (pdfInputRef.current) pdfInputRef.current.value = '';
                       if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
                     }}

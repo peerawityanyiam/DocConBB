@@ -13,10 +13,11 @@ interface ConversionProfile {
 }
 
 const CONVERSION_PROFILES: ConversionProfile[] = [
-  { maxEdge: 3000, quality: 0.9 },
-  { maxEdge: 2600, quality: 0.86 },
-  { maxEdge: 2200, quality: 0.82 },
-  { maxEdge: 1800, quality: 0.78 },
+  { maxEdge: 2400, quality: 0.82 },
+  { maxEdge: 2000, quality: 0.76 },
+  { maxEdge: 1600, quality: 0.7 },
+  { maxEdge: 1280, quality: 0.64 },
+  { maxEdge: 1024, quality: 0.58 },
 ];
 
 interface PdfImageSource {
