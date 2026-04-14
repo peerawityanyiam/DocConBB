@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { buildPdfFromImages } from '@/lib/files/image-to-pdf';
-import { toFriendlyErrorMessage } from '@/lib/ui/friendly-error';
+import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
 interface UserOption {
   id: string;
@@ -77,6 +77,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   async function handleImageToPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedImages = Array.from(e.target.files ?? []);
     if (!selectedImages.length) return;
+    const sourceTotalBytes = selectedImages.reduce((sum, file) => sum + file.size, 0);
 
     setError('');
     setIsConvertingImages(true);
@@ -84,6 +85,9 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       const nonImageFile = selectedImages.find((file) => !file.type.startsWith('image/'));
       if (nonImageFile) {
         throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
+      }
+      if (sourceTotalBytes > MAX_FILE_SIZE * 3) {
+        throw new Error('รูปที่เลือกมีขนาดรวมสูงมาก กรุณาแบ่งอัปโหลดเป็นหลายรอบ');
       }
 
       const mergedPdf = await buildPdfFromImages(selectedImages);
@@ -95,7 +99,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       setPdfImageCount(selectedImages.length);
       if (pdfInputRef.current) pdfInputRef.current.value = '';
     } catch (err) {
-      setError(toFriendlyErrorMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
+      setError(toUploadFailureMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
     } finally {
       setIsConvertingImages(false);
       e.target.value = '';
@@ -118,8 +122,8 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
           resolve();
         } else {
           try {
-            const data = JSON.parse(xhr.responseText);
-            reject(new Error(toFriendlyErrorMessage(data.error, 'อัปโหลดไฟล์ไม่สำเร็จ')));
+            const data = JSON.parse(xhr.responseText) as { error?: string };
+            reject(new Error(data.error ?? `HTTP_${xhr.status}`));
           } catch {
             reject(new Error('อัปโหลดไฟล์ไม่สำเร็จ'));
           }
@@ -134,6 +138,15 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     });
   }
 
+  async function rollbackCreatedTask(taskId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -143,6 +156,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
     setLoading(true);
     setUploadProgress(null);
+    let createdTaskId: string | null = null;
     try {
       // 1) Create the task
       const res = await fetch('/api/tasks', {
@@ -151,22 +165,33 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         body: JSON.stringify({ title: title.trim(), detail: detail.trim(), officer_id: officerId, reviewer_id: reviewerId }),
       });
       const data = await res.json();
+      createdTaskId = data.id ?? null;
+      if (!createdTaskId) throw new Error('MISSING_TASK_ID');
       if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
 
       // 2) Upload files if selected
       if (wordFile) {
         setUploadProgress(0);
-        await uploadFileWithProgress(data.id, wordFile);
+        await uploadFileWithProgress(createdTaskId, wordFile);
       }
       if (pdfFile) {
         setUploadProgress(0);
-        await uploadFileWithProgress(data.id, pdfFile);
+        await uploadFileWithProgress(createdTaskId, pdfFile);
       }
 
       reset();
       onCreated();
       onClose();
     } catch (err) {
+      if (createdTaskId) {
+        const rolledBack = await rollbackCreatedTask(createdTaskId);
+        if (rolledBack) {
+          setError(toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ ระบบลบงานที่เพิ่งสร้างอัตโนมัติแล้ว'));
+          return;
+        }
+        setError(toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ และไม่สามารถลบงานที่สร้างไว้ได้ กรุณาลบงานด้วยตนเอง'));
+        return;
+      }
       setError(toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'));
     } finally {
       setLoading(false);
@@ -354,7 +379,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
           )}
 
           {error && (
-            <div className="bg-[#fee2e2] border border-[#fecaca] rounded-lg px-3 py-2 text-sm text-[#991b1b]">
+            <div className="bg-[#fee2e2] border border-[#fecaca] rounded-lg px-3 py-2 text-sm text-[#991b1b] whitespace-pre-line">
               {error}
             </div>
           )}

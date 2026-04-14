@@ -1,6 +1,8 @@
 import { PDFDocument } from 'pdf-lib';
 
 const FALLBACK_PDF_NAME = 'image-attachment.pdf';
+const MAX_IMAGE_EDGE = 1800;
+const JPEG_QUALITY = 0.82;
 
 function toPdfName(baseName: string) {
   const clean = baseName
@@ -13,29 +15,48 @@ function toPdfName(baseName: string) {
   return `${name}.pdf`;
 }
 
-async function rasterizeToPngBytes(file: File): Promise<Uint8Array> {
+async function rasterizeToJpeg(file: File): Promise<{
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+}> {
   const imageBitmap = await createImageBitmap(file);
+  const longestEdge = Math.max(imageBitmap.width, imageBitmap.height);
+  const scale = longestEdge > MAX_IMAGE_EDGE ? MAX_IMAGE_EDGE / longestEdge : 1;
+  const targetWidth = Math.max(1, Math.round(imageBitmap.width * scale));
+  const targetHeight = Math.max(1, Math.round(imageBitmap.height * scale));
+
   const canvas = document.createElement('canvas');
-  canvas.width = imageBitmap.width;
-  canvas.height = imageBitmap.height;
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
 
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('ไม่สามารถประมวลผลรูปภาพได้');
+  if (!ctx) throw new Error('Unable to process image');
 
-  ctx.drawImage(imageBitmap, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, targetWidth, targetHeight);
+  ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
   imageBitmap.close();
 
   const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((result) => {
-      if (result) {
-        resolve(result);
-        return;
-      }
-      reject(new Error('ไม่สามารถแปลงรูปเป็น PNG ได้'));
-    }, 'image/png');
+    canvas.toBlob(
+      (result) => {
+        if (result) {
+          resolve(result);
+          return;
+        }
+        reject(new Error('Unable to convert image to JPEG'));
+      },
+      'image/jpeg',
+      JPEG_QUALITY,
+    );
   });
 
-  return new Uint8Array(await blob.arrayBuffer());
+  return {
+    bytes: new Uint8Array(await blob.arrayBuffer()),
+    width: targetWidth,
+    height: targetHeight,
+  };
 }
 
 export async function buildPdfFromImages(
@@ -43,35 +64,24 @@ export async function buildPdfFromImages(
   outputName?: string,
 ): Promise<File> {
   if (!images.length) {
-    throw new Error('กรุณาเลือกรูปภาพอย่างน้อย 1 รูป');
+    throw new Error('Please select at least one image');
   }
 
   const pdf = await PDFDocument.create();
 
   for (const image of images) {
     if (!image.type.startsWith('image/')) {
-      throw new Error(`ไฟล์ ${image.name} ไม่ใช่รูปภาพ`);
+      throw new Error(`File ${image.name} is not an image`);
     }
 
-    const rawBytes = new Uint8Array(await image.arrayBuffer());
-    let embedded;
-    const mime = image.type.toLowerCase();
-
-    if (mime === 'image/jpeg' || mime === 'image/jpg') {
-      embedded = await pdf.embedJpg(rawBytes);
-    } else if (mime === 'image/png') {
-      embedded = await pdf.embedPng(rawBytes);
-    } else {
-      const pngBytes = await rasterizeToPngBytes(image);
-      embedded = await pdf.embedPng(pngBytes);
-    }
-
-    const page = pdf.addPage([embedded.width, embedded.height]);
+    const { bytes, width, height } = await rasterizeToJpeg(image);
+    const embedded = await pdf.embedJpg(bytes);
+    const page = pdf.addPage([width, height]);
     page.drawImage(embedded, {
       x: 0,
       y: 0,
-      width: embedded.width,
-      height: embedded.height,
+      width,
+      height,
     });
   }
 

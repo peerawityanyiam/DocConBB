@@ -7,7 +7,7 @@ import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
 import { buildPdfFromImages } from '@/lib/files/image-to-pdf';
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
-import { toFriendlyErrorMessage } from '@/lib/ui/friendly-error';
+import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
 /* ── Border colors per role context ── */
 const ROLE_BORDER_COLOR: Record<string, string> = {
@@ -260,10 +260,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           resolve();
         } else {
           try {
-            const d = JSON.parse(xhr.responseText);
-            reject(new Error(toFriendlyErrorMessage(d.error, 'อัปโหลดไฟล์ไม่สำเร็จ')));
+            const d = JSON.parse(xhr.responseText) as { error?: string };
+            reject(new Error(d.error ?? `HTTP_${xhr.status}`));
+          } catch {
+            reject(new Error('อัปโหลดไม่สำเร็จ'));
           }
-          catch { reject(new Error('อัปโหลดไม่สำเร็จ')); }
         }
       });
       xhr.addEventListener('error', () => {
@@ -310,15 +311,16 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       await callStatusApi(actionKey, comment);
       onUpdated();
     } catch (err) {
-      const msg = toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+      const uploadMsg = toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ');
+      const actionMsg = toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่');
       if (!fileUploaded && selectedWordFile) {
         // upload failed — clear selection so user can pick again
         setSelectedWordFile(null);
         setSelectedImageCount(null);
         if (wordInputRef.current) wordInputRef.current.value = '';
-        setUploadError(msg);
+        setUploadError(uploadMsg);
       } else {
-        setActionError(msg);
+        setActionError(actionMsg);
       }
     } finally {
       setActionLoading(false);
@@ -402,6 +404,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   async function onImageFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const images = Array.from(e.target.files ?? []);
     if (!images.length) return;
+    const sourceTotalBytes = images.reduce((sum, file) => sum + file.size, 0);
 
     setUploadError('');
     setActionError('');
@@ -410,6 +413,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       const nonImageFile = images.find((file) => !file.type.startsWith('image/'));
       if (nonImageFile) {
         throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
+      }
+      if (sourceTotalBytes > MAX_UPLOAD_FILE_SIZE * 3) {
+        throw new Error('รูปที่เลือกมีขนาดรวมสูงมาก กรุณาแบ่งอัปโหลดเป็นหลายรอบ');
       }
 
       const pdfFromImages = await buildPdfFromImages(images);
@@ -421,7 +427,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       setSelectedImageCount(images.length);
       if (wordInputRef.current) wordInputRef.current.value = '';
     } catch (err) {
-      setUploadError(toFriendlyErrorMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
+      setUploadError(toUploadFailureMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
     } finally {
       setIsConvertingImages(false);
       e.target.value = '';
@@ -689,8 +695,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 </div>
               )}
 
-              {uploadError && <p className="text-xs text-red-600 px-1">⚠️ {uploadError}</p>}
-              {actionError && <p className="text-xs text-red-600 px-1">⚠️ {actionError}</p>}
+              {uploadError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {uploadError}</p>}
+              {actionError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {actionError}</p>}
 
               <button
                 onClick={handleStaffSubmit}
@@ -819,7 +825,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
               {/* Action buttons: sent-back from Boss → only forward, no reject */}
@@ -899,7 +905,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
               <div className="flex flex-col sm:flex-row gap-2">
@@ -967,7 +973,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
               <button
@@ -1043,7 +1049,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600">⚠️ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
               <button
