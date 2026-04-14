@@ -21,7 +21,7 @@ export async function POST(
 ) {
   try {
     const user = await getAuthUser('tracking');
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบก่อนใช้งาน' }, { status: 401 });
 
     const { taskId } = await params;
     const formData = await request.formData();
@@ -394,7 +394,7 @@ export async function DELETE(
   } catch (err) {
     if (err instanceof AuthError) return handleAuthError(err);
     console.error('[FILE_UPLOAD_ROLLBACK_ERROR]', err);
-    return NextResponse.json({ error: 'rollback_failed' }, { status: 500 });
+    return NextResponse.json({ error: 'ไม่สามารถล้างไฟล์ที่อัปโหลดค้างได้' }, { status: 500 });
   }
 }
 
