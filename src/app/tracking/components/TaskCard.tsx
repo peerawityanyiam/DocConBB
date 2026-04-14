@@ -103,6 +103,9 @@ export interface Task {
     uploadedBy: string;
     uploadedByName: string;
     isPdf: boolean;
+    uploadBatchId?: string;
+    uploadBatchIndex?: number;
+    uploadBatchTotal?: number;
   }>;
 }
 

@@ -570,29 +570,45 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   /* ── Compute file links ── */
   const hasWordFile = !!task.drive_file_id;
   const wordFileUrl = hasWordFile ? `https://drive.google.com/file/d/${task.drive_file_id}/view` : null;
-  const hasRefFile = !!task.ref_file_id;
-  const refFileUrl = hasRefFile ? `https://drive.google.com/file/d/${task.ref_file_id}/view` : null;
-  const displayRefFileName = (() => {
-    const raw = (task.ref_file_name ?? '').trim();
-    if (!raw) return raw;
-    if (!/-part-\d+\.pdf$/i.test(raw)) return raw;
-
-    const normalizedBase = raw.replace(/-part-\d+\.pdf$/i, '.pdf');
-    const basePrefix = normalizedBase.replace(/\.pdf$/i, '');
-    const escapedPrefix = basePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const partPattern = new RegExp(`^${escapedPrefix}-part-\\d+\\.pdf$`, 'i');
-    const batchMatches = (task.file_history ?? []).filter((entry) => (
+  const currentRefFiles = (() => {
+    const history = (task.file_history ?? []).filter((entry) => (
       entry.isPdf &&
-      typeof entry.fileName === 'string' &&
-      partPattern.test(entry.fileName)
+      typeof entry.driveFileId === 'string' &&
+      entry.driveFileId.length > 0
     ));
-
-    if (batchMatches.length > 1) {
-      return `${normalizedBase} + อีก ${batchMatches.length - 1} ไฟล์`;
+    if (history.length === 0) {
+      if (task.ref_file_id) {
+        return [{
+          driveFileId: task.ref_file_id,
+          fileName: task.ref_file_name || 'document.pdf',
+          uploadBatchIndex: 1,
+        }];
+      }
+      return [] as Array<{ driveFileId: string; fileName: string; uploadBatchIndex?: number }>;
     }
 
-    return normalizedBase;
+    if (task.ref_file_id) {
+      const refEntry = history.find((entry) => entry.driveFileId === task.ref_file_id);
+      if (refEntry?.uploadBatchId) {
+        const sameBatch = history
+          .filter((entry) => entry.uploadBatchId === refEntry.uploadBatchId)
+          .sort((a, b) => (a.uploadBatchIndex ?? 9999) - (b.uploadBatchIndex ?? 9999));
+        if (sameBatch.length > 0) return sameBatch;
+      }
+      if (refEntry) return [refEntry];
+    }
+
+    const latestBatchEntry = [...history].reverse().find((entry) => entry.uploadBatchId);
+    if (latestBatchEntry?.uploadBatchId) {
+      const sameBatch = history
+        .filter((entry) => entry.uploadBatchId === latestBatchEntry.uploadBatchId)
+        .sort((a, b) => (a.uploadBatchIndex ?? 9999) - (b.uploadBatchIndex ?? 9999));
+      if (sameBatch.length > 0) return sameBatch;
+    }
+
+    return [history[history.length - 1]];
   })();
+  const hasRefFile = currentRefFiles.length > 0;
 
   /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
@@ -784,15 +800,22 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 </a>
               )}
               {hasRefFile && (
-                <a
-                  href={refFileUrl!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
-                >
-                  <span>📋</span>
-                  <span className="min-w-0 break-all">PDF: <span className="font-medium">{displayRefFileName || task.ref_file_name || 'document.pdf'}</span></span>
-                </a>
+                <div className="space-y-1.5">
+                  {currentRefFiles.map((file, index) => (
+                    <a
+                      key={`${file.driveFileId}-${index}`}
+                      href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                    >
+                      <span>📋</span>
+                      <span className="min-w-0 break-all">
+                        PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
+                      </span>
+                    </a>
+                  ))}
+                </div>
               )}
             </div>
           )}
