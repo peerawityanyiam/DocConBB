@@ -5,11 +5,10 @@ import StatusBadge from './StatusBadge';
 import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
-import { buildPdfFilesFromImages } from '@/lib/files/image-to-pdf';
+import { buildPdfFilesFromImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
   MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
-  TARGET_COMPRESSED_IMAGE_MAX_LABEL,
 } from '@/lib/files/upload-limits';
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
@@ -204,6 +203,12 @@ interface UploadBatchMeta {
   label: string;
 }
 
+interface ImageQueueItem {
+  name: string;
+  status: 'pending' | 'uploading' | 'done';
+  outputBytes?: number;
+}
+
 export default function ActionCard({ task, activeRole, activeSubTab, userId, userRoles, onUpdated, onOpenHistory }: ActionCardProps) {
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
   const currentStageStuck = getCurrentStageStuckInfo({
@@ -221,11 +226,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
   // File selection state — just tracks what user selected, NOT auto-uploaded
   const [selectedWordFile, setSelectedWordFile] = useState<File | null>(null);
-  const [selectedSupplementFiles, setSelectedSupplementFiles] = useState<File[]>([]);
+  const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
+  const [imageQueue, setImageQueue] = useState<ImageQueueItem[]>([]);
   const [selectedImageCount, setSelectedImageCount] = useState<number | null>(null);
-  const [selectedPdfPartCount, setSelectedPdfPartCount] = useState<number | null>(null);
-  const [selectedPdfBatchId, setSelectedPdfBatchId] = useState<string | null>(null);
-  const [selectedPdfBatchLabel, setSelectedPdfBatchLabel] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -272,11 +275,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
   function clearSelectedUploadFiles() {
     setSelectedWordFile(null);
-    setSelectedSupplementFiles([]);
+    setSelectedImageFiles([]);
+    setImageQueue([]);
     setSelectedImageCount(null);
-    setSelectedPdfPartCount(null);
-    setSelectedPdfBatchId(null);
-    setSelectedPdfBatchLabel(null);
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
@@ -376,41 +377,34 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setActionLoading(true);
     setActionError('');
     setUploadError('');
-    const hasSelectedUpload = !!selectedWordFile || selectedSupplementFiles.length > 0;
-    const hasImageBatchMeta = Boolean(
-      selectedPdfBatchId &&
-      selectedPdfBatchLabel &&
-      selectedPdfPartCount &&
-      selectedPdfPartCount > 1 &&
-      selectedWordFile?.name.toLowerCase().endsWith('.pdf'),
-    );
+    const hasSelectedUpload = !!selectedWordFile || selectedImageFiles.length > 0;
     let uploadFinished = !hasSelectedUpload;
     try {
       if (selectedWordFile) {
-        const firstBatchMeta = hasImageBatchMeta
-          ? {
-              id: selectedPdfBatchId!,
-              index: 1,
-              total: selectedPdfPartCount!,
-              label: selectedPdfBatchLabel!,
-            }
-          : undefined;
-        await uploadFileAsync(selectedWordFile, firstBatchMeta);
-        for (let index = 0; index < selectedSupplementFiles.length; index += 1) {
-          const extraFile = selectedSupplementFiles[index];
-          const batchMeta = hasImageBatchMeta
+        await uploadFileAsync(selectedWordFile);
+        uploadFinished = true;
+      }
+      if (selectedImageFiles.length > 0) {
+        setIsConvertingImages(true);
+        const generatedPdfFiles = await buildPdfFilesFromImages(selectedImageFiles);
+        const hasImageBatchMeta = generatedPdfFiles.length > 1;
+        const pdfBatchId = hasImageBatchMeta ? `imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : '';
+        const pdfBatchLabel = generatedPdfFiles[0].name.replace(/-part-\d+\.pdf$/i, '.pdf');
+        for (let index = 0; index < generatedPdfFiles.length; index += 1) {
+          const file = generatedPdfFiles[index];
+          const batchMeta: UploadBatchMeta | undefined = hasImageBatchMeta
             ? {
-                id: selectedPdfBatchId!,
-                index: index + 2,
-                total: selectedPdfPartCount!,
-                label: selectedPdfBatchLabel!,
+                id: pdfBatchId,
+                index: index + 1,
+                total: generatedPdfFiles.length,
+                label: pdfBatchLabel,
               }
             : undefined;
-          await uploadFileAsync(extraFile, batchMeta);
+          await uploadFileAsync(file, batchMeta);
         }
         uploadFinished = true;
-        clearSelectedUploadFiles();
       }
+      clearSelectedUploadFiles();
       await callStatusApi(actionKey, comment);
       onUpdated();
     } catch (err) {
@@ -424,6 +418,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         setActionError(actionMsg);
       }
     } finally {
+      setIsConvertingImages(false);
       setActionLoading(false);
       setUploadProgress(null);
     }
@@ -494,11 +489,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     }
 
     setSelectedWordFile(file);
-    setSelectedSupplementFiles([]);
+    setSelectedImageFiles([]);
+    setImageQueue([]);
     setSelectedImageCount(null);
-    setSelectedPdfPartCount(null);
-    setSelectedPdfBatchId(null);
-    setSelectedPdfBatchLabel(null);
     setUploadError('');
     setActionError('');
   }
@@ -510,8 +503,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
     setUploadError('');
     setActionError('');
-    setSelectedPdfBatchId(null);
-    setSelectedPdfBatchLabel(null);
+    setSelectedWordFile(null);
+    if (wordInputRef.current) wordInputRef.current.value = '';
+    setImageQueue(images.map((image) => ({ name: image.name, status: 'pending' })));
     setIsConvertingImages(true);
     try {
       const nonImageFile = images.find((file) => !file.type.startsWith('image/'));
@@ -522,20 +516,26 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         throw new Error('รูปที่เลือกมีขนาดรวมสูงเกิน 300MB กรุณาแบ่งอัปโหลดเป็นหลายรอบ');
       }
 
-      const pdfFiles = await buildPdfFilesFromImages(images);
-      if (!pdfFiles.length) {
-        throw new Error('ไม่พบไฟล์ PDF ที่สร้างจากรูป');
-      }
-
-      setSelectedWordFile(pdfFiles[0]);
-      setSelectedSupplementFiles(pdfFiles.slice(1));
+      const preparedImages = await prepareImagesForPdf(images, (progress) => {
+        setImageQueue((prev) => prev.map((item, index) => {
+          if (index !== progress.index) return item;
+          if (progress.status === 'processing') {
+            return { ...item, status: 'uploading' };
+          }
+          return {
+            ...item,
+            status: 'done',
+            outputBytes: progress.outputBytes,
+          };
+        }));
+      });
+      setSelectedImageFiles(preparedImages);
       setSelectedImageCount(images.length);
-      setSelectedPdfPartCount(pdfFiles.length);
-      setSelectedPdfBatchId(`imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
-      setSelectedPdfBatchLabel(pdfFiles[0].name.replace(/-part-\d+\.pdf$/i, '.pdf'));
-      if (wordInputRef.current) wordInputRef.current.value = '';
     } catch (err) {
-      setUploadError(toUploadFailureMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
+      setSelectedImageFiles([]);
+      setSelectedImageCount(null);
+      setImageQueue([]);
+      setUploadError(toUploadFailureMessage(err, 'ไม่สามารถเตรียมรูปเพื่อส่งได้'));
     } finally {
       setIsConvertingImages(false);
       e.target.value = '';
@@ -548,16 +548,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
   const hasDocxSelected = !!selectedWordFile && selectedWordFile.name.toLowerCase().endsWith('.docx');
   const selectedFileDisplayName = selectedWordFile
-    ? (selectedPdfPartCount && selectedPdfPartCount > 1
-      ? `${selectedWordFile.name} + อีก ${selectedPdfPartCount - 1} ไฟล์`
-      : (selectedImageCount && selectedWordFile.name.toLowerCase().endsWith('.pdf')
-        ? `${selectedWordFile.name} (${selectedImageCount} รูป)`
-        : selectedWordFile.name))
-    : '';
+    ? selectedWordFile.name
+    : (selectedImageCount ? `ภาพ ${selectedImageCount} รูป` : '');
   const imagePickerStatusText = isConvertingImages
-    ? 'กำลังรวมภาพเป็น PDF...'
+    ? 'กำลังอัปโหลดรูป...'
     : (selectedImageCount
-      ? `เลือกรูปแล้ว ${selectedImageCount} รูป${selectedPdfPartCount && selectedPdfPartCount > 1 ? ` (แยกเป็น ${selectedPdfPartCount} ไฟล์ PDF)` : ''}`
+      ? `เลือกรูปแล้ว ${selectedImageCount} รูป`
       : 'ยังไม่ได้เลือกไฟล์...');
   const requiresRejectReason = [
     'doccon_reject',
@@ -619,7 +615,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
   const isBlocked = actionLoading || uploadProgress !== null || isConvertingImages;
   const busyReason = isConvertingImages
-    ? 'กำลังรวมภาพเป็น PDF กรุณารอสักครู่'
+    ? 'กำลังอัปโหลดรูป กรุณารอให้ครบก่อน'
     : (actionLoading || uploadProgress !== null ? 'ระบบกำลังอัปโหลดหรือบันทึกข้อมูล กรุณารอสักครู่' : '');
   const staffSubmitDisabledReason = isBlocked
     ? busyReason
@@ -632,22 +628,31 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       ? busyReason
       : ((!docRef.trim() && !task.doc_ref) ? 'ต้องระบุรหัสเอกสารก่อนกดผ่านรูปแบบ' : ''));
   const genericApproveDisabledReason = isBlocked ? busyReason : '';
-  const attachmentSummaryLabel = selectedWordFile
+  const attachmentSummaryLabel = selectedWordFile || selectedImageFiles.length > 0
     ? `ไฟล์ที่พร้อมส่ง: ${selectedFileDisplayName}`
     : 'ยังไม่ได้เลือกไฟล์แนบ';
-  const attachmentSummaryHint = selectedWordFile
+  const attachmentSummaryHint = selectedWordFile || selectedImageFiles.length > 0
     ? (selectedImageCount
-      ? (selectedPdfPartCount && selectedPdfPartCount > 1
-        ? `ระบบจะส่งไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยบีบภาพให้เหมาะสม (เป้าต่อรูป ${TARGET_COMPRESSED_IMAGE_MAX_LABEL})`
-        : 'ระบบจะส่งไฟล์ PDF ที่รวมจากรูปภาพเมื่อกดปุ่มดำเนินการ')
+      ? 'ระบบจะรวมรูปที่อัปโหลดครบเป็น PDF ตอนกดปุ่มดำเนินการ'
       : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
     : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
   const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
   const renderAttachmentSummary = (hint: string) => (
-    <div className={`mt-2 rounded-md border px-2.5 py-2 text-[0.7rem] ${selectedWordFile ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+    <div className={`mt-2 rounded-md border px-2.5 py-2 text-[0.7rem] ${(selectedWordFile || selectedImageFiles.length > 0) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>
-      <p className="mt-0.5 text-[0.65rem] opacity-90">{selectedWordFile ? attachmentSummaryHint : hint}</p>
+      <p className="mt-0.5 text-[0.65rem] opacity-90">{(selectedWordFile || selectedImageFiles.length > 0) ? attachmentSummaryHint : hint}</p>
     </div>
+  );
+  const renderImageQueue = () => (
+    imageQueue.length > 0 ? (
+      <div className="mt-2 space-y-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 max-h-32 overflow-y-auto">
+        {imageQueue.map((item, index) => (
+          <p key={`${item.name}-${index}`} className="text-[0.68rem] text-amber-800 break-all">
+            {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังอัปโหลด' : item.status === 'done' ? 'อัปโหลดแล้ว' : 'รออัปโหลด'}: ${item.name}`}
+          </p>
+        ))}
+      </div>
+    ) : null
   );
 
   return (
@@ -816,11 +821,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                     <p className="text-xs text-green-700 flex items-center gap-1">
                       ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
                     </p>
-                    {selectedSupplementFiles.length > 0 && (
-                      <p className="text-[0.68rem] text-emerald-700">
-                        ระบบจะอัปโหลดไฟล์เสริมให้อีก {selectedSupplementFiles.length} ไฟล์แบบอัตโนมัติ
-                      </p>
-                    )}
                   </div>
                 )}
                 {renderAttachmentSummary('ขั้นตอนนี้ต้องแนบไฟล์ Word (.docx)')}
@@ -954,9 +954,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                     </div>
                   </>
                 )}
-                {selectedWordFile && (
+                {(selectedWordFile || selectedImageFiles.length > 0) && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
+                {renderImageQueue()}
                 {renderAttachmentSummary(
                   docconSentBackFromBoss
                     ? 'กรณีส่งกลับจากหัวหน้างาน ต้องแนบ Word (.docx)'
@@ -1038,9 +1039,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
-                {selectedWordFile && (
+                {(selectedWordFile || selectedImageFiles.length > 0) && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
+                {renderImageQueue()}
                 {renderAttachmentSummary(attachmentHintWithLimit)}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
@@ -1106,9 +1108,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
-                {selectedWordFile && (
+                {(selectedWordFile || selectedImageFiles.length > 0) && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
+                {renderImageQueue()}
                 {renderAttachmentSummary(attachmentHintWithLimit)}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
@@ -1182,9 +1185,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
-                {selectedWordFile && (
+                {(selectedWordFile || selectedImageFiles.length > 0) && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
+                {renderImageQueue()}
                 {renderAttachmentSummary(attachmentHintWithLimit)}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>

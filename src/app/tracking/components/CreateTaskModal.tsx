@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { buildPdfFilesFromImages } from '@/lib/files/image-to-pdf';
+import { buildPdfFilesFromImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
   MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
-  TARGET_COMPRESSED_IMAGE_MAX_LABEL,
 } from '@/lib/files/upload-limits';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
@@ -35,6 +34,12 @@ interface UploadBatchMeta {
   label: string;
 }
 
+interface ImageQueueItem {
+  name: string;
+  status: 'pending' | 'uploading' | 'done';
+  outputBytes?: number;
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -61,11 +66,10 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [wordFile, setWordFile] = useState<File | null>(null);
-  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [preparedImageFiles, setPreparedImageFiles] = useState<File[]>([]);
+  const [imageQueue, setImageQueue] = useState<ImageQueueItem[]>([]);
   const [pdfImageCount, setPdfImageCount] = useState<number | null>(null);
-  const [pdfPartCount, setPdfPartCount] = useState<number | null>(null);
-  const [pdfBatchId, setPdfBatchId] = useState<string | null>(null);
-  const [pdfBatchLabel, setPdfBatchLabel] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const wordInputRef = useRef<HTMLInputElement>(null);
@@ -88,7 +92,13 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   function reset() {
     setTitle(''); setDetail(''); setOfficerId(''); setReviewerId(''); setError('');
-    setWordFile(null); setPdfFiles([]); setPdfImageCount(null); setPdfPartCount(null); setPdfBatchId(null); setPdfBatchLabel(null); setUploadProgress(null); setIsConvertingImages(false);
+    setWordFile(null);
+    setPdfFile(null);
+    setPreparedImageFiles([]);
+    setImageQueue([]);
+    setPdfImageCount(null);
+    setUploadProgress(null);
+    setIsConvertingImages(false);
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (pdfInputRef.current) pdfInputRef.current.value = '';
     if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
@@ -108,11 +118,11 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('รองรับเฉพาะ .pdf'); return; }
     if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
     setError('');
-    setPdfFiles([selected]);
+    setPdfFile(selected);
+    setPreparedImageFiles([]);
+    setImageQueue([]);
     setPdfImageCount(null);
-    setPdfPartCount(1);
-    setPdfBatchId(null);
-    setPdfBatchLabel(null);
+    if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
   }
 
   async function handleImageToPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -121,8 +131,12 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     const sourceTotalBytes = selectedImages.reduce((sum, file) => sum + file.size, 0);
 
     setError('');
-    setPdfBatchId(null);
-    setPdfBatchLabel(null);
+    setPdfFile(null);
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
+    setImageQueue(selectedImages.map((image) => ({
+      name: image.name,
+      status: 'pending',
+    })));
     setIsConvertingImages(true);
     try {
       const nonImageFile = selectedImages.find((file) => !file.type.startsWith('image/'));
@@ -133,19 +147,27 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         throw new Error('รูปที่เลือกมีขนาดรวมสูงเกิน 300MB กรุณาแบ่งอัปโหลดเป็นหลายรอบ');
       }
 
-      const generatedPdfFiles = await buildPdfFilesFromImages(selectedImages);
-      if (!generatedPdfFiles.length) {
-        throw new Error('ไม่พบไฟล์ PDF ที่สร้างจากรูป');
-      }
+      const preparedFiles = await prepareImagesForPdf(selectedImages, (progress) => {
+        setImageQueue((prev) => prev.map((item, index) => {
+          if (index !== progress.index) return item;
+          if (progress.status === 'processing') {
+            return { ...item, status: 'uploading' };
+          }
+          return {
+            ...item,
+            status: 'done',
+            outputBytes: progress.outputBytes,
+          };
+        }));
+      });
 
-      setPdfFiles(generatedPdfFiles);
+      setPreparedImageFiles(preparedFiles);
       setPdfImageCount(selectedImages.length);
-      setPdfPartCount(generatedPdfFiles.length);
-      setPdfBatchId(`imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
-      setPdfBatchLabel(generatedPdfFiles[0].name.replace(/-part-\d+\.pdf$/i, '.pdf'));
-      if (pdfInputRef.current) pdfInputRef.current.value = '';
     } catch (err) {
-      setError(toUploadFailureMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
+      setPreparedImageFiles([]);
+      setPdfImageCount(null);
+      setImageQueue([]);
+      setError(toUploadFailureMessage(err, 'ไม่สามารถเตรียมรูปเพื่อส่งได้'));
     } finally {
       setIsConvertingImages(false);
       e.target.value = '';
@@ -262,19 +284,29 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         setUploadProgress(0);
         await uploadFileWithProgress(createdTaskId, wordFile);
       }
-      const hasImageBatchMeta = Boolean(pdfBatchId && pdfBatchLabel && pdfPartCount && pdfPartCount > 1);
-      for (let index = 0; index < pdfFiles.length; index += 1) {
-        const file = pdfFiles[index];
-        const batchMeta = hasImageBatchMeta
-          ? {
-              id: pdfBatchId!,
-              index: index + 1,
-              total: pdfPartCount!,
-              label: pdfBatchLabel!,
-            }
-          : undefined;
+      if (pdfFile) {
         setUploadProgress(0);
-        await uploadFileWithProgress(createdTaskId, file, batchMeta);
+        await uploadFileWithProgress(createdTaskId, pdfFile);
+      }
+      if (preparedImageFiles.length > 0) {
+        setIsConvertingImages(true);
+        const generatedPdfFiles = await buildPdfFilesFromImages(preparedImageFiles);
+        const hasImageBatchMeta = generatedPdfFiles.length > 1;
+        const pdfBatchId = hasImageBatchMeta ? `imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : '';
+        const pdfBatchLabel = generatedPdfFiles[0].name.replace(/-part-\d+\.pdf$/i, '.pdf');
+        for (let index = 0; index < generatedPdfFiles.length; index += 1) {
+          const file = generatedPdfFiles[index];
+          const batchMeta = hasImageBatchMeta
+            ? {
+                id: pdfBatchId,
+                index: index + 1,
+                total: generatedPdfFiles.length,
+                label: pdfBatchLabel,
+              }
+            : undefined;
+          setUploadProgress(0);
+          await uploadFileWithProgress(createdTaskId, file, batchMeta);
+        }
       }
 
       reset();
@@ -292,6 +324,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       }
       setError(toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'));
     } finally {
+      setIsConvertingImages(false);
       setLoading(false);
       setUploadProgress(null);
     }
@@ -301,33 +334,27 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   const isUploading = uploadProgress !== null || isConvertingImages;
   const progressValue = uploadProgress ?? 0;
-  const uploadStatusLabel = isConvertingImages ? 'กำลังรวมภาพเป็น PDF...' : 'กำลังอัปโหลดไฟล์...';
-  const pdfDisplayName = pdfFiles.length > 0
-    ? (pdfFiles.length === 1
-      ? (pdfImageCount
-        ? `${pdfFiles[0].name} (${pdfImageCount} รูป)`
-        : pdfFiles[0].name)
-      : `${pdfFiles[0].name} + อีก ${pdfFiles.length - 1} ไฟล์`)
-    : '';
+  const uploadStatusLabel = isConvertingImages ? 'กำลังเตรียมรูป / รวม PDF...' : 'กำลังอัปโหลดไฟล์...';
   const imagePickerStatusText = isConvertingImages
-    ? 'กำลังรวมภาพเป็น PDF...'
+    ? 'กำลังอัปโหลดรูป...'
     : (pdfImageCount
-      ? `เลือกรูปแล้ว ${pdfImageCount} รูป${pdfPartCount && pdfPartCount > 1 ? ` (แยกเป็น ${pdfPartCount} ไฟล์ PDF)` : ''}`
+      ? `เลือกรูปแล้ว ${pdfImageCount} รูป`
       : 'ยังไม่ได้เลือกไฟล์...');
   const attachmentQueue = [
     wordFile ? `Word: ${wordFile.name}` : null,
-    pdfFiles.length > 0 ? `PDF: ${pdfDisplayName}` : null,
+    pdfFile ? `PDF: ${pdfFile.name}` : null,
+    preparedImageFiles.length > 0 ? `ภาพ: ${preparedImageFiles.length} รูป (รวมเป็น PDF ตอนกดสร้างงาน)` : null,
   ].filter((item): item is string => item !== null);
   const attachmentSummaryLabel = attachmentQueue.length > 0
     ? attachmentQueue.join(' | ')
     : 'ยังไม่ได้เลือกไฟล์แนบ';
   const attachmentSummaryHint = attachmentQueue.length > 0
-    ? (pdfFiles.length > 1
-      ? `ระบบจะแนบไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยบีบภาพให้เหมาะสม (เป้าต่อรูป ${TARGET_COMPRESSED_IMAGE_MAX_LABEL})`
+    ? (preparedImageFiles.length > 0
+      ? 'ระบบจะรวมภาพที่อัปโหลดครบแล้วเป็น PDF ตอนกดสร้างงาน'
       : 'ระบบจะอัปโหลดไฟล์เหล่านี้ทันทีหลังสร้างงาน')
     : `เลือกไฟล์ Word / PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}) หรือใช้ปุ่มแนบภาพเพื่อรวมเป็น PDF`;
   const submitDisabledReason = isConvertingImages
-    ? 'กรุณารอระบบรวมภาพเป็น PDF ให้เสร็จก่อน'
+    ? 'กรุณารอระบบอัปโหลดรูปให้ครบก่อน'
     : (loading ? 'ระบบกำลังสร้างงานและอัปโหลดไฟล์ กรุณารอสักครู่' : '');
 
   return (
@@ -457,17 +484,16 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 </button>
                 <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
               </div>
-              {pdfFiles.length > 0 && (
+              {pdfFile && (
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
-                  <span>✅ {pdfDisplayName}</span>
+                  <span>✅ {pdfFile.name}</span>
                   <button
                     type="button"
                     onClick={() => {
-                      setPdfFiles([]);
+                      setPdfFile(null);
+                      setPreparedImageFiles([]);
+                      setImageQueue([]);
                       setPdfImageCount(null);
-                      setPdfPartCount(null);
-                      setPdfBatchId(null);
-                      setPdfBatchLabel(null);
                       if (pdfInputRef.current) pdfInputRef.current.value = '';
                       if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
                     }}
@@ -475,6 +501,15 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                   >
                     ✕
                   </button>
+                </div>
+              )}
+              {imageQueue.length > 0 && (
+                <div className="mt-2 space-y-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-2 max-h-32 overflow-y-auto">
+                  {imageQueue.map((item, index) => (
+                    <p key={`${item.name}-${index}`} className="text-[0.7rem] text-amber-800 break-all">
+                      {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังอัปโหลด' : item.status === 'done' ? 'อัปโหลดแล้ว' : 'รออัปโหลด'}: ${item.name}`}
+                    </p>
+                  ))}
                 </div>
               )}
             </div>

@@ -1,11 +1,12 @@
 import { PDFDocument } from 'pdf-lib';
-import { DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES, TARGET_COMPRESSED_IMAGE_MAX_BYTES } from './upload-limits';
+import { DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES } from './upload-limits';
 
 const FALLBACK_PDF_BASENAME = 'image-attachment';
 const DEFAULT_MAX_PDF_PART_BYTES = DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES;
 const MIN_PART_SIZE_BYTES = 512 * 1024;
 const PDF_BASE_OVERHEAD_BYTES = 96 * 1024;
 const PDF_IMAGE_ESTIMATE_MULTIPLIER = 1.08;
+const PREPARED_IMAGE_SOFT_TARGET_BYTES = Math.floor(2.8 * 1024 * 1024);
 
 interface ConversionProfile {
   maxEdge: number;
@@ -18,6 +19,9 @@ const CONVERSION_PROFILES: ConversionProfile[] = [
   { maxEdge: 1600, quality: 0.7 },
   { maxEdge: 1280, quality: 0.64 },
   { maxEdge: 1024, quality: 0.58 },
+  { maxEdge: 768, quality: 0.52 },
+  { maxEdge: 640, quality: 0.5 },
+  { maxEdge: 512, quality: 0.48 },
 ];
 
 interface PdfImageSource {
@@ -25,6 +29,14 @@ interface PdfImageSource {
   bytes: Uint8Array;
   width: number;
   height: number;
+}
+
+export interface PreparedImageProgress {
+  index: number;
+  total: number;
+  name: string;
+  status: 'processing' | 'done';
+  outputBytes?: number;
 }
 
 function toPdfBaseName(baseName: string): string {
@@ -124,12 +136,11 @@ function estimateSourcePdfContribution(source: PdfImageSource): number {
 async function buildAdaptiveImageSource(image: File, maxPartSizeBytes: number): Promise<PdfImageSource> {
   let lastRenderedSize = 0;
   let lastSourceSize = 0;
+  let fallbackSource: PdfImageSource | null = null;
   for (const profile of CONVERSION_PROFILES) {
     const source = await readImageSource(image, profile);
+    fallbackSource = source;
     lastSourceSize = source.bytes.byteLength;
-    if (source.bytes.byteLength > TARGET_COMPRESSED_IMAGE_MAX_BYTES) {
-      continue;
-    }
     const singlePagePdf = await renderPdfBytes([source]);
     lastRenderedSize = singlePagePdf.byteLength;
     if (singlePagePdf.byteLength <= maxPartSizeBytes) {
@@ -137,9 +148,66 @@ async function buildAdaptiveImageSource(image: File, maxPartSizeBytes: number): 
     }
   }
 
+  if (fallbackSource) {
+    return fallbackSource;
+  }
+
   throw new Error(
     `รูป ${image.name} ยังใหญ่เกินขีดจำกัดหลังบีบอัด (รูป ${Math.ceil(lastSourceSize / 1024 / 1024)}MB / PDF ${Math.ceil(lastRenderedSize / 1024 / 1024)}MB) กรุณาลดขนาดรูปก่อน`,
   );
+}
+
+export async function prepareImagesForPdf(
+  images: File[],
+  onProgress?: (progress: PreparedImageProgress) => void,
+): Promise<File[]> {
+  if (!images.length) {
+    throw new Error('กรุณาเลือกรูปอย่างน้อย 1 รูป');
+  }
+
+  const prepared: File[] = [];
+  for (let index = 0; index < images.length; index += 1) {
+    const image = images[index];
+    if (!image.type.startsWith('image/')) {
+      throw new Error(`ไฟล์ ${image.name} ไม่ใช่รูปภาพ`);
+    }
+
+    onProgress?.({
+      index,
+      total: images.length,
+      name: image.name,
+      status: 'processing',
+    });
+
+    let selectedSource: PdfImageSource | null = null;
+    for (const profile of CONVERSION_PROFILES) {
+      const source = await readImageSource(image, profile);
+      selectedSource = source;
+      if (source.bytes.byteLength <= PREPARED_IMAGE_SOFT_TARGET_BYTES) {
+        break;
+      }
+    }
+
+    if (!selectedSource) {
+      throw new Error(`ไม่สามารถเตรียมรูป ${image.name} ได้`);
+    }
+
+    const preparedName = image.name.replace(/\.[^/.]+$/, '.jpg');
+    prepared.push(new File([Uint8Array.from(selectedSource.bytes)], preparedName, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    }));
+
+    onProgress?.({
+      index,
+      total: images.length,
+      name: image.name,
+      status: 'done',
+      outputBytes: selectedSource.bytes.byteLength,
+    });
+  }
+
+  return prepared;
 }
 
 function buildInitialGroups(sources: PdfImageSource[], maxPartSizeBytes: number): PdfImageSource[][] {
