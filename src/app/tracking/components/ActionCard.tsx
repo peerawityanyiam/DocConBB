@@ -571,42 +571,35 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const hasWordFile = !!task.drive_file_id;
   const wordFileUrl = hasWordFile ? `https://drive.google.com/file/d/${task.drive_file_id}/view` : null;
   const currentRefFiles = (() => {
+    // IMPORTANT:
+    // Show ref PDFs on card only when the task currently has ref_file_id.
+    // Old PDFs remain in file_history for audit/history tab, but must not appear as "current".
+    if (!task.ref_file_id) {
+      return [] as Array<{ driveFileId: string; fileName: string; uploadBatchIndex?: number }>;
+    }
+
     const history = (task.file_history ?? []).filter((entry) => (
       entry.isPdf &&
       typeof entry.driveFileId === 'string' &&
       entry.driveFileId.length > 0
     ));
-    if (history.length === 0) {
-      if (task.ref_file_id) {
-        return [{
-          driveFileId: task.ref_file_id,
-          fileName: task.ref_file_name || 'document.pdf',
-          uploadBatchIndex: 1,
-        }];
-      }
-      return [] as Array<{ driveFileId: string; fileName: string; uploadBatchIndex?: number }>;
-    }
 
-    if (task.ref_file_id) {
-      const refEntry = history.find((entry) => entry.driveFileId === task.ref_file_id);
-      if (refEntry?.uploadBatchId) {
-        const sameBatch = history
-          .filter((entry) => entry.uploadBatchId === refEntry.uploadBatchId)
-          .sort((a, b) => (a.uploadBatchIndex ?? 9999) - (b.uploadBatchIndex ?? 9999));
-        if (sameBatch.length > 0) return sameBatch;
-      }
-      if (refEntry) return [refEntry];
-    }
-
-    const latestBatchEntry = [...history].reverse().find((entry) => entry.uploadBatchId);
-    if (latestBatchEntry?.uploadBatchId) {
+    const refEntry = history.find((entry) => entry.driveFileId === task.ref_file_id);
+    if (refEntry?.uploadBatchId) {
       const sameBatch = history
-        .filter((entry) => entry.uploadBatchId === latestBatchEntry.uploadBatchId)
+        .filter((entry) => entry.uploadBatchId === refEntry.uploadBatchId)
         .sort((a, b) => (a.uploadBatchIndex ?? 9999) - (b.uploadBatchIndex ?? 9999));
       if (sameBatch.length > 0) return sameBatch;
     }
 
-    return [history[history.length - 1]];
+    if (refEntry) return [refEntry];
+
+    // Fallback for legacy data: keep card renderable even if history missed this id.
+    return [{
+      driveFileId: task.ref_file_id,
+      fileName: task.ref_file_name || 'document.pdf',
+      uploadBatchIndex: 1,
+    }];
   })();
   const hasRefFile = currentRefFiles.length > 0;
 
