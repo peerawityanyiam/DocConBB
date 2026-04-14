@@ -190,14 +190,11 @@ export async function POST(
 
     const existingHistory = (task.file_history as Array<{ driveFileId?: string; isPdf?: boolean }> | null) ?? [];
     const latestOldDocxFromHistory = [...existingHistory].reverse().find(f => !f.isPdf && f.driveFileId)?.driveFileId;
-    const latestOldPdfFromHistory = [...existingHistory].reverse().find(f => f.isPdf && f.driveFileId)?.driveFileId;
 
     if (isPdf) {
-      // PDF → ไฟล์อ้างอิง (ref) — replace old PDF only
-      const oldPdfId = task.ref_file_id ?? latestOldPdfFromHistory;
-      if (oldPdfId && oldPdfId !== driveFileId) {
-        await removeOldFile(oldPdfId, 'PDF');
-      }
+      // PDF → ไฟล์อ้างอิง (ref)
+      // Keep older PDF files for cases that require multiple reference parts.
+      // Forward/approve actions will clear all reference PDFs later in status route.
       updates.ref_file_id = driveFileId;
       updates.ref_file_name = driveFileName;
     } else {

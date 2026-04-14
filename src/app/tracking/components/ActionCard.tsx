@@ -5,7 +5,7 @@ import StatusBadge from './StatusBadge';
 import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
-import { buildPdfFromImages } from '@/lib/files/image-to-pdf';
+import { buildPdfFilesFromImages } from '@/lib/files/image-to-pdf';
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
@@ -67,6 +67,7 @@ const REJECTED_STATUSES = new Set<TaskStatus>([
   'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED',
 ]);
 const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_IMAGE_SOURCE_TOTAL_SIZE = 300 * 1024 * 1024;
 
 function getFileExtension(name: string): string {
   const index = name.lastIndexOf('.');
@@ -189,7 +190,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
   // File selection state — just tracks what user selected, NOT auto-uploaded
   const [selectedWordFile, setSelectedWordFile] = useState<File | null>(null);
+  const [selectedSupplementFiles, setSelectedSupplementFiles] = useState<File[]>([]);
   const [selectedImageCount, setSelectedImageCount] = useState<number | null>(null);
+  const [selectedPdfPartCount, setSelectedPdfPartCount] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -233,6 +236,15 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setDocRef(initial);
     setIsDocRefEditing(!initial.trim());
   }, [task.id, task.doc_ref]);
+
+  function clearSelectedUploadFiles() {
+    setSelectedWordFile(null);
+    setSelectedSupplementFiles([]);
+    setSelectedImageCount(null);
+    setSelectedPdfPartCount(null);
+    if (wordInputRef.current) wordInputRef.current.value = '';
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  }
 
   /* ── uploadFileAsync: returns Promise (no callback) ── */
   const uploadFileAsync = useCallback((file: File): Promise<void> => {
@@ -299,25 +311,25 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setActionLoading(true);
     setActionError('');
     setUploadError('');
-    let fileUploaded = false;
+    const hasSelectedUpload = !!selectedWordFile || selectedSupplementFiles.length > 0;
+    let uploadFinished = !hasSelectedUpload;
     try {
       if (selectedWordFile) {
         await uploadFileAsync(selectedWordFile);
-        fileUploaded = true;
-        setSelectedWordFile(null);
-        setSelectedImageCount(null);
-        if (wordInputRef.current) wordInputRef.current.value = '';
+        for (const extraFile of selectedSupplementFiles) {
+          await uploadFileAsync(extraFile);
+        }
+        uploadFinished = true;
+        clearSelectedUploadFiles();
       }
       await callStatusApi(actionKey, comment);
       onUpdated();
     } catch (err) {
       const uploadMsg = toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ');
       const actionMsg = toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่');
-      if (!fileUploaded && selectedWordFile) {
+      if (!uploadFinished && hasSelectedUpload) {
         // upload failed — clear selection so user can pick again
-        setSelectedWordFile(null);
-        setSelectedImageCount(null);
-        if (wordInputRef.current) wordInputRef.current.value = '';
+        clearSelectedUploadFiles();
         setUploadError(uploadMsg);
       } else {
         setActionError(actionMsg);
@@ -368,8 +380,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   function onWordFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     if (!file) {
-      setSelectedWordFile(null);
-      setSelectedImageCount(null);
+      clearSelectedUploadFiles();
       setUploadError('');
       setActionError('');
       return;
@@ -379,8 +390,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     const allowedExtensions = docconSentBackFromBoss ? ['docx'] : ['docx', 'pdf'];
     if (!allowedExtensions.includes(fileExt)) {
       e.target.value = '';
-      setSelectedWordFile(null);
-      setSelectedImageCount(null);
+      clearSelectedUploadFiles();
       setUploadError(docconSentBackFromBoss
         ? 'งานที่ส่งกลับจากหัวหน้างาน ต้องแนบไฟล์ Word (.docx) เท่านั้น'
         : 'รองรับเฉพาะไฟล์ Word (.docx) หรือ PDF (.pdf)');
@@ -389,14 +399,15 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
     if (file.size > MAX_UPLOAD_FILE_SIZE) {
       e.target.value = '';
-      setSelectedWordFile(null);
-      setSelectedImageCount(null);
+      clearSelectedUploadFiles();
       setUploadError('ไฟล์มีขนาดใหญ่เกิน 50MB กรุณาเลือกไฟล์ใหม่');
       return;
     }
 
     setSelectedWordFile(file);
+    setSelectedSupplementFiles([]);
     setSelectedImageCount(null);
+    setSelectedPdfPartCount(null);
     setUploadError('');
     setActionError('');
   }
@@ -414,17 +425,19 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       if (nonImageFile) {
         throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
       }
-      if (sourceTotalBytes > MAX_UPLOAD_FILE_SIZE * 3) {
-        throw new Error('รูปที่เลือกมีขนาดรวมสูงมาก กรุณาแบ่งอัปโหลดเป็นหลายรอบ');
+      if (sourceTotalBytes > MAX_IMAGE_SOURCE_TOTAL_SIZE) {
+        throw new Error('รูปที่เลือกมีขนาดรวมสูงเกิน 300MB กรุณาแบ่งอัปโหลดเป็นหลายรอบ');
       }
 
-      const pdfFromImages = await buildPdfFromImages(images);
-      if (pdfFromImages.size > MAX_UPLOAD_FILE_SIZE) {
-        throw new Error('ไฟล์ PDF ที่รวมจากรูปมีขนาดเกิน 50MB');
+      const pdfFiles = await buildPdfFilesFromImages(images);
+      if (!pdfFiles.length) {
+        throw new Error('ไม่พบไฟล์ PDF ที่สร้างจากรูป');
       }
 
-      setSelectedWordFile(pdfFromImages);
+      setSelectedWordFile(pdfFiles[0]);
+      setSelectedSupplementFiles(pdfFiles.slice(1));
       setSelectedImageCount(images.length);
+      setSelectedPdfPartCount(pdfFiles.length);
       if (wordInputRef.current) wordInputRef.current.value = '';
     } catch (err) {
       setUploadError(toUploadFailureMessage(err, 'ไม่สามารถรวมรูปเป็น PDF ได้'));
@@ -440,13 +453,17 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
 
   const hasDocxSelected = !!selectedWordFile && selectedWordFile.name.toLowerCase().endsWith('.docx');
   const selectedFileDisplayName = selectedWordFile
-    ? (selectedImageCount && selectedWordFile.name.toLowerCase().endsWith('.pdf')
-      ? `${selectedWordFile.name} (${selectedImageCount} รูป)`
-      : selectedWordFile.name)
+    ? (selectedPdfPartCount && selectedPdfPartCount > 1
+      ? `${selectedWordFile.name} + อีก ${selectedPdfPartCount - 1} ไฟล์`
+      : (selectedImageCount && selectedWordFile.name.toLowerCase().endsWith('.pdf')
+        ? `${selectedWordFile.name} (${selectedImageCount} รูป)`
+        : selectedWordFile.name))
     : '';
   const imagePickerStatusText = isConvertingImages
     ? 'กำลังรวมภาพเป็น PDF...'
-    : (selectedImageCount ? `เลือกรูปแล้ว ${selectedImageCount} รูป` : 'ยังไม่ได้เลือกไฟล์...');
+    : (selectedImageCount
+      ? `เลือกรูปแล้ว ${selectedImageCount} รูป${selectedPdfPartCount && selectedPdfPartCount > 1 ? ` (แยกเป็น ${selectedPdfPartCount} ไฟล์ PDF)` : ''}`
+      : 'ยังไม่ได้เลือกไฟล์...');
   const requiresRejectReason = [
     'doccon_reject',
     'reviewer_reject',
@@ -504,7 +521,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     : 'ยังไม่ได้เลือกไฟล์แนบ';
   const attachmentSummaryHint = selectedWordFile
     ? (selectedImageCount
-      ? 'ระบบจะส่งไฟล์ PDF ที่รวมจากรูปภาพเมื่อกดปุ่มดำเนินการ'
+      ? (selectedPdfPartCount && selectedPdfPartCount > 1
+        ? 'ระบบจะส่งไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยยังคงความคมชัดของภาพ'
+        : 'ระบบจะส่งไฟล์ PDF ที่รวมจากรูปภาพเมื่อกดปุ่มดำเนินการ')
       : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
     : 'เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ"';
   const renderAttachmentSummary = (hint: string) => (
@@ -676,9 +695,16 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
                 {selectedWordFile && (
-                  <p className="text-xs text-green-700 mt-1.5 flex items-center gap-1">
-                    ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
-                  </p>
+                  <div className="mt-1.5 space-y-0.5">
+                    <p className="text-xs text-green-700 flex items-center gap-1">
+                      ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
+                    </p>
+                    {selectedSupplementFiles.length > 0 && (
+                      <p className="text-[0.68rem] text-emerald-700">
+                        ระบบจะอัปโหลดไฟล์เสริมให้อีก {selectedSupplementFiles.length} ไฟล์แบบอัตโนมัติ
+                      </p>
+                    )}
+                  </div>
                 )}
                 {renderAttachmentSummary('ขั้นตอนนี้ต้องแนบไฟล์ Word (.docx)')}
               </div>

@@ -80,6 +80,7 @@ export async function PATCH(
       uploadedAt?: string;
       uploadedBy?: string;
       isPdf?: boolean;
+      driveFileId?: string;
     }> | null) ?? [];
     const removeFileFromDrive = async (fileId: string) => {
       try {
@@ -107,12 +108,6 @@ export async function PATCH(
         if (task.status === 'SUPER_BOSS_REJECTED') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (task.status === 'BOSS_REJECTED') newStatus = 'WAITING_BOSS_APPROVAL';
         else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
-        // เมื่อส่งงานใหม่ ลบ PDF อ้างอิงที่เคยแนบมา (PDF ใช้ประกอบตีกลับเท่านั้น)
-        if (task.ref_file_id) {
-          await removeFileFromDrive(task.ref_file_id);
-          updates.ref_file_id = null;
-          updates.ref_file_name = null;
-        }
         break;
       }
       case 'doccon_approve': {
@@ -257,10 +252,23 @@ export async function PATCH(
       'boss_approve',
       'super_boss_approve',
     ]);
-    if (clearRefPdfOnForward.has(action) && task.ref_file_id && updates.ref_file_id === undefined) {
-      await removeFileFromDrive(task.ref_file_id);
-      updates.ref_file_id = null;
-      updates.ref_file_name = null;
+    if (clearRefPdfOnForward.has(action) && updates.ref_file_id === undefined) {
+      const refPdfIds = new Set<string>();
+      if (typeof task.ref_file_id === 'string' && task.ref_file_id) {
+        refPdfIds.add(task.ref_file_id);
+      }
+      for (const file of fileHistory) {
+        if (file?.isPdf && typeof file.driveFileId === 'string' && file.driveFileId) {
+          refPdfIds.add(file.driveFileId);
+        }
+      }
+      for (const refPdfId of refPdfIds) {
+        await removeFileFromDrive(refPdfId);
+      }
+      if (refPdfIds.size > 0 || task.ref_file_id) {
+        updates.ref_file_id = null;
+        updates.ref_file_name = null;
+      }
     }
 
     // ─── อัปเดต ─────────────────────────────────────────────────────────
