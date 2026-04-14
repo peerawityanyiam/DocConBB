@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 
 const FALLBACK_PDF_BASENAME = 'image-attachment';
-const DEFAULT_MAX_PDF_PART_BYTES = (50 * 1024 * 1024) - (256 * 1024); // keep margin under 50MB
+const DEFAULT_MAX_PDF_PART_BYTES = 18 * 1024 * 1024; // smaller parts improve real-world upload success
 
 type EmbedFormat = 'jpg' | 'png';
 

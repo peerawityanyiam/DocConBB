@@ -19,6 +19,25 @@ interface CreateTaskModalProps {
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_IMAGE_SOURCE_TOTAL_SIZE = 300 * 1024 * 1024; // 300MB
+const MAX_UPLOAD_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 900;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableUploadError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes('http_5') ||
+    message.includes('http_429') ||
+    message.includes('timeout') ||
+    message.includes('network') ||
+    message.includes('failed to fetch') ||
+    message.includes('connection') ||
+    message.includes('econn')
+  );
+}
 
 export default function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
@@ -112,7 +131,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     }
   }
 
-  function uploadFileWithProgress(taskId: string, fileToUpload: File): Promise<void> {
+  function uploadFileOnceWithProgress(taskId: string, fileToUpload: File): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/tasks/${taskId}/files`);
@@ -131,17 +150,38 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             const data = JSON.parse(xhr.responseText) as { error?: string };
             reject(new Error(data.error ?? `HTTP_${xhr.status}`));
           } catch {
-            reject(new Error('อัปโหลดไฟล์ไม่สำเร็จ'));
+            reject(new Error(`HTTP_${xhr.status}`));
           }
         }
       };
 
-      xhr.onerror = () => reject(new Error('อัปโหลดไฟล์ไม่สำเร็จ'));
+      xhr.onerror = () => reject(new Error('NETWORK_UPLOAD_FAILED'));
+      xhr.onabort = () => reject(new Error('UPLOAD_ABORTED'));
 
       const formData = new FormData();
       formData.append('file', fileToUpload);
       xhr.send(formData);
     });
+  }
+
+  async function uploadFileWithProgress(taskId: string, fileToUpload: File): Promise<void> {
+    let attempt = 0;
+    let lastError: unknown = null;
+    while (attempt <= MAX_UPLOAD_RETRIES) {
+      try {
+        setUploadProgress(0);
+        await uploadFileOnceWithProgress(taskId, fileToUpload);
+        return;
+      } catch (err) {
+        lastError = err;
+        if (!isRetryableUploadError(err) || attempt === MAX_UPLOAD_RETRIES) {
+          throw err;
+        }
+        await sleep(RETRY_BASE_DELAY_MS * (attempt + 1));
+      }
+      attempt += 1;
+    }
+    throw lastError instanceof Error ? lastError : new Error('อัปโหลดไฟล์ไม่สำเร็จ');
   }
 
   async function rollbackCreatedTask(taskId: string): Promise<boolean> {

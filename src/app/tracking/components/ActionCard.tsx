@@ -68,10 +68,29 @@ const REJECTED_STATUSES = new Set<TaskStatus>([
 ]);
 const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
 const MAX_IMAGE_SOURCE_TOTAL_SIZE = 300 * 1024 * 1024;
+const MAX_UPLOAD_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 900;
 
 function getFileExtension(name: string): string {
   const index = name.lastIndexOf('.');
   return index >= 0 ? name.slice(index + 1).toLowerCase() : '';
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableUploadError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes('http_5') ||
+    message.includes('http_429') ||
+    message.includes('timeout') ||
+    message.includes('network') ||
+    message.includes('failed to fetch') ||
+    message.includes('connection') ||
+    message.includes('econn')
+  );
 }
 
 function PipelineViz({ status }: { status: TaskStatus }) {
@@ -247,7 +266,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   }
 
   /* ── uploadFileAsync: returns Promise (no callback) ── */
-  const uploadFileAsync = useCallback((file: File): Promise<void> => {
+  const uploadFileOnceAsync = useCallback((file: File): Promise<void> => {
     return new Promise((resolve, reject) => {
       const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
       if (!['.docx', '.pdf'].includes(ext)) {
@@ -275,17 +294,41 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
             const d = JSON.parse(xhr.responseText) as { error?: string };
             reject(new Error(d.error ?? `HTTP_${xhr.status}`));
           } catch {
-            reject(new Error('อัปโหลดไม่สำเร็จ'));
+            reject(new Error(`HTTP_${xhr.status}`));
           }
         }
       });
       xhr.addEventListener('error', () => {
         setUploadProgress(null);
-        reject(new Error('ไม่สามารถเชื่อมต่อระบบเพื่ออัปโหลดไฟล์ได้'));
+        reject(new Error('NETWORK_UPLOAD_FAILED'));
+      });
+      xhr.addEventListener('abort', () => {
+        setUploadProgress(null);
+        reject(new Error('UPLOAD_ABORTED'));
       });
       xhr.send(formData);
     });
   }, [task.id]);
+
+  const uploadFileAsync = useCallback(async (file: File): Promise<void> => {
+    let attempt = 0;
+    let lastError: unknown = null;
+    while (attempt <= MAX_UPLOAD_RETRIES) {
+      try {
+        setUploadProgress(0);
+        await uploadFileOnceAsync(file);
+        return;
+      } catch (err) {
+        lastError = err;
+        if (!isRetryableUploadError(err) || attempt === MAX_UPLOAD_RETRIES) {
+          throw err;
+        }
+        await sleep(RETRY_BASE_DELAY_MS * (attempt + 1));
+      }
+      attempt += 1;
+    }
+    throw lastError instanceof Error ? lastError : new Error('อัปโหลดไฟล์ไม่สำเร็จ');
+  }, [uploadFileOnceAsync]);
 
   /* ── callStatusApi: calls the status PATCH endpoint ── */
   async function callStatusApi(actionKey: string, comment?: string): Promise<void> {
