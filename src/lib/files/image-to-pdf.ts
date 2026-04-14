@@ -1,16 +1,15 @@
-import { PDFDocument } from 'pdf-lib';
+﻿import { PDFDocument } from 'pdf-lib';
 
 const FALLBACK_PDF_BASENAME = 'image-attachment';
 const DEFAULT_MAX_PDF_PART_BYTES = 18 * 1024 * 1024; // smaller parts improve real-world upload success
-
-type EmbedFormat = 'jpg' | 'png';
+const HIGH_QUALITY_MAX_EDGE = 3000;
+const HIGH_QUALITY_JPEG_QUALITY = 0.9;
 
 interface PdfImageSource {
   name: string;
   bytes: Uint8Array;
   width: number;
   height: number;
-  format: EmbedFormat;
 }
 
 function toPdfBaseName(baseName: string) {
@@ -28,74 +27,59 @@ function getPartFileName(baseName: string, partIndex: number, totalParts: number
   return `${baseName}-part-${String(partIndex + 1).padStart(2, '0')}.pdf`;
 }
 
-async function convertToPngBytes(imageBitmap: ImageBitmap): Promise<Uint8Array> {
-  const canvas = document.createElement('canvas');
-  canvas.width = imageBitmap.width;
-  canvas.height = imageBitmap.height;
-
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('ไม่สามารถประมวลผลรูปภาพได้');
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, imageBitmap.width, imageBitmap.height);
-  ctx.drawImage(imageBitmap, 0, 0, imageBitmap.width, imageBitmap.height);
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (result) => {
-        if (result) {
-          resolve(result);
-          return;
-        }
-        reject(new Error('ไม่สามารถแปลงรูปภาพได้'));
-      },
-      'image/png',
-    );
-  });
-
-  return new Uint8Array(await blob.arrayBuffer());
-}
-
 async function readImageSource(file: File): Promise<PdfImageSource> {
   if (!file.type.startsWith('image/')) {
     throw new Error(`ไฟล์ ${file.name} ไม่ใช่รูปภาพ`);
   }
 
   const imageBitmap = await createImageBitmap(file);
-  const width = imageBitmap.width;
-  const height = imageBitmap.height;
-  const mimeType = file.type.toLowerCase();
-  const isJpeg = mimeType === 'image/jpeg' || mimeType === 'image/jpg';
-  const isPng = mimeType === 'image/png';
 
-  if (isJpeg || isPng) {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    imageBitmap.close();
+  try {
+    const longestEdge = Math.max(imageBitmap.width, imageBitmap.height);
+    const scale = longestEdge > HIGH_QUALITY_MAX_EDGE ? (HIGH_QUALITY_MAX_EDGE / longestEdge) : 1;
+    const targetWidth = Math.max(1, Math.round(imageBitmap.width * scale));
+    const targetHeight = Math.max(1, Math.round(imageBitmap.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('ไม่สามารถประมวลผลรูปภาพได้');
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (result) => {
+          if (result) {
+            resolve(result);
+            return;
+          }
+          reject(new Error('ไม่สามารถแปลงรูปภาพได้'));
+        },
+        'image/jpeg',
+        HIGH_QUALITY_JPEG_QUALITY,
+      );
+    });
+
     return {
       name: file.name,
-      bytes,
-      width,
-      height,
-      format: isPng ? 'png' : 'jpg',
+      bytes: new Uint8Array(await blob.arrayBuffer()),
+      width: targetWidth,
+      height: targetHeight,
     };
+  } finally {
+    imageBitmap.close();
   }
-
-  const pngBytes = await convertToPngBytes(imageBitmap);
-  imageBitmap.close();
-  return {
-    name: file.name,
-    bytes: pngBytes,
-    width,
-    height,
-    format: 'png',
-  };
 }
 
 async function appendImagePage(pdf: PDFDocument, source: PdfImageSource) {
-  const embedded = source.format === 'png'
-    ? await pdf.embedPng(source.bytes)
-    : await pdf.embedJpg(source.bytes);
-
+  const embedded = await pdf.embedJpg(source.bytes);
   const page = pdf.addPage([source.width, source.height]);
   page.drawImage(embedded, {
     x: 0,
