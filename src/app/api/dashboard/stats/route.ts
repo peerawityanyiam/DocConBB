@@ -24,7 +24,10 @@ export async function GET() {
     return NextResponse.json({
       total: tasks?.length ?? 0,
       byStatus: counts,
-      pending: (counts['SUBMITTED_TO_DOCCON'] ?? 0) + (counts['PENDING_REVIEW'] ?? 0),
+      pending:
+        (tasks?.length ?? 0)
+        - (counts['COMPLETED'] ?? 0)
+        - (counts['CANCELLED'] ?? 0),
       waitingApproval: (counts['WAITING_BOSS_APPROVAL'] ?? 0) + (counts['WAITING_SUPER_BOSS_APPROVAL'] ?? 0),
     });
   } catch (err) {
