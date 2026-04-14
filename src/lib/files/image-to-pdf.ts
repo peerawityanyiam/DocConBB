@@ -1,5 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
-import { DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES } from './upload-limits';
+import { DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES, TARGET_COMPRESSED_IMAGE_MAX_BYTES } from './upload-limits';
 
 const FALLBACK_PDF_BASENAME = 'image-attachment';
 const DEFAULT_MAX_PDF_PART_BYTES = DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES;
@@ -123,8 +123,13 @@ function estimateSourcePdfContribution(source: PdfImageSource): number {
 
 async function buildAdaptiveImageSource(image: File, maxPartSizeBytes: number): Promise<PdfImageSource> {
   let lastRenderedSize = 0;
+  let lastSourceSize = 0;
   for (const profile of CONVERSION_PROFILES) {
     const source = await readImageSource(image, profile);
+    lastSourceSize = source.bytes.byteLength;
+    if (source.bytes.byteLength > TARGET_COMPRESSED_IMAGE_MAX_BYTES) {
+      continue;
+    }
     const singlePagePdf = await renderPdfBytes([source]);
     lastRenderedSize = singlePagePdf.byteLength;
     if (singlePagePdf.byteLength <= maxPartSizeBytes) {
@@ -133,7 +138,7 @@ async function buildAdaptiveImageSource(image: File, maxPartSizeBytes: number): 
   }
 
   throw new Error(
-    `รูป ${image.name} ใหญ่เกินขีดจำกัดอัปโหลดต่อไฟล์ (${Math.ceil(lastRenderedSize / 1024 / 1024)}MB) กรุณาลดขนาดรูปก่อน`,
+    `รูป ${image.name} ยังใหญ่เกินขีดจำกัดหลังบีบอัด (รูป ${Math.ceil(lastSourceSize / 1024 / 1024)}MB / PDF ${Math.ceil(lastRenderedSize / 1024 / 1024)}MB) กรุณาลดขนาดรูปก่อน`,
   );
 }
 
@@ -196,11 +201,16 @@ export async function buildPdfFilesFromImages(
     adaptedSources.push(await buildAdaptiveImageSource(image, normalizedMaxPartSize));
   }
 
-  const groups = buildInitialGroups(adaptedSources, normalizedMaxPartSize);
   const rawParts: Uint8Array[] = [];
-  for (const group of groups) {
-    const rendered = await splitAndRenderGroup(group, normalizedMaxPartSize);
-    rawParts.push(...rendered);
+  const fullPdfBytes = await renderPdfBytes(adaptedSources);
+  if (fullPdfBytes.byteLength <= normalizedMaxPartSize) {
+    rawParts.push(fullPdfBytes);
+  } else {
+    const groups = buildInitialGroups(adaptedSources, normalizedMaxPartSize);
+    for (const group of groups) {
+      const rendered = await splitAndRenderGroup(group, normalizedMaxPartSize);
+      rawParts.push(...rendered);
+    }
   }
 
   const totalParts = rawParts.length;

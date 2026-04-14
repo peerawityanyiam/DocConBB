@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { buildPdfFilesFromImages } from '@/lib/files/image-to-pdf';
-import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
+import {
+  MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
+  MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
+  TARGET_COMPRESSED_IMAGE_MAX_LABEL,
+} from '@/lib/files/upload-limits';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
 interface UserOption {
@@ -319,7 +323,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     : 'ยังไม่ได้เลือกไฟล์แนบ';
   const attachmentSummaryHint = attachmentQueue.length > 0
     ? (pdfFiles.length > 1
-      ? 'ระบบจะแนบไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยยังคงความคมชัดของภาพ'
+      ? `ระบบจะแนบไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยบีบภาพให้เหมาะสม (เป้าต่อรูป ${TARGET_COMPRESSED_IMAGE_MAX_LABEL})`
       : 'ระบบจะอัปโหลดไฟล์เหล่านี้ทันทีหลังสร้างงาน')
     : `เลือกไฟล์ Word / PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}) หรือใช้ปุ่มแนบภาพเพื่อรวมเป็น PDF`;
   const submitDisabledReason = isConvertingImages

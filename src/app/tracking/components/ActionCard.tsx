@@ -6,7 +6,11 @@ import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
 import { buildPdfFilesFromImages } from '@/lib/files/image-to-pdf';
-import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
+import {
+  MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
+  MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
+  TARGET_COMPRESSED_IMAGE_MAX_LABEL,
+} from '@/lib/files/upload-limits';
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
@@ -572,6 +576,27 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const wordFileUrl = hasWordFile ? `https://drive.google.com/file/d/${task.drive_file_id}/view` : null;
   const hasRefFile = !!task.ref_file_id;
   const refFileUrl = hasRefFile ? `https://drive.google.com/file/d/${task.ref_file_id}/view` : null;
+  const displayRefFileName = (() => {
+    const raw = (task.ref_file_name ?? '').trim();
+    if (!raw) return raw;
+    if (!/-part-\d+\.pdf$/i.test(raw)) return raw;
+
+    const normalizedBase = raw.replace(/-part-\d+\.pdf$/i, '.pdf');
+    const basePrefix = normalizedBase.replace(/\.pdf$/i, '');
+    const escapedPrefix = basePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const partPattern = new RegExp(`^${escapedPrefix}-part-\\d+\\.pdf$`, 'i');
+    const batchMatches = (task.file_history ?? []).filter((entry) => (
+      entry.isPdf &&
+      typeof entry.fileName === 'string' &&
+      partPattern.test(entry.fileName)
+    ));
+
+    if (batchMatches.length > 1) {
+      return `${normalizedBase} + อีก ${batchMatches.length - 1} ไฟล์`;
+    }
+
+    return normalizedBase;
+  })();
 
   /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
@@ -613,7 +638,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   const attachmentSummaryHint = selectedWordFile
     ? (selectedImageCount
       ? (selectedPdfPartCount && selectedPdfPartCount > 1
-        ? 'ระบบจะส่งไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยยังคงความคมชัดของภาพ'
+        ? `ระบบจะส่งไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยบีบภาพให้เหมาะสม (เป้าต่อรูป ${TARGET_COMPRESSED_IMAGE_MAX_LABEL})`
         : 'ระบบจะส่งไฟล์ PDF ที่รวมจากรูปภาพเมื่อกดปุ่มดำเนินการ')
       : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
     : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
@@ -761,7 +786,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                   className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                 >
                   <span>📋</span>
-                  <span className="min-w-0 break-all">PDF: <span className="font-medium">{task.ref_file_name ?? 'document.pdf'}</span></span>
+                  <span className="min-w-0 break-all">PDF: <span className="font-medium">{displayRefFileName || task.ref_file_name || 'document.pdf'}</span></span>
                 </a>
               )}
             </div>
