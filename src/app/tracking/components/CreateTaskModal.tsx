@@ -336,7 +336,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const progressValue = uploadProgress ?? 0;
   const uploadStatusLabel = isConvertingImages ? 'กำลังเตรียมรูป / รวม PDF...' : 'กำลังอัปโหลดไฟล์...';
   const imagePickerStatusText = isConvertingImages
-    ? 'กำลังอัปโหลดรูป...'
+    ? 'กำลังเตรียมรูป...'
     : (pdfImageCount
       ? `เลือกรูปแล้ว ${pdfImageCount} รูป`
       : 'ยังไม่ได้เลือกไฟล์...');
@@ -507,7 +507,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 <div className="mt-2 space-y-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-2 max-h-32 overflow-y-auto">
                   {imageQueue.map((item, index) => (
                     <p key={`${item.name}-${index}`} className="text-[0.7rem] text-amber-800 break-all">
-                      {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังอัปโหลด' : item.status === 'done' ? 'อัปโหลดแล้ว' : 'รออัปโหลด'}: ${item.name}`}
+                      {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังเตรียม' : item.status === 'done' ? 'เตรียมแล้ว' : 'รอเตรียม'}: ${item.name}`}
                     </p>
                   ))}
                 </div>

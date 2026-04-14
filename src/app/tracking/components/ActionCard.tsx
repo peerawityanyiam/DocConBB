@@ -551,7 +551,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     ? selectedWordFile.name
     : (selectedImageCount ? `ภาพ ${selectedImageCount} รูป` : '');
   const imagePickerStatusText = isConvertingImages
-    ? 'กำลังอัปโหลดรูป...'
+    ? 'กำลังเตรียมรูป...'
     : (selectedImageCount
       ? `เลือกรูปแล้ว ${selectedImageCount} รูป`
       : 'ยังไม่ได้เลือกไฟล์...');
@@ -648,7 +648,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       <div className="mt-2 space-y-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 max-h-32 overflow-y-auto">
         {imageQueue.map((item, index) => (
           <p key={`${item.name}-${index}`} className="text-[0.68rem] text-amber-800 break-all">
-            {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังอัปโหลด' : item.status === 'done' ? 'อัปโหลดแล้ว' : 'รออัปโหลด'}: ${item.name}`}
+            {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังเตรียม' : item.status === 'done' ? 'เตรียมแล้ว' : 'รอเตรียม'}: ${item.name}`}
           </p>
         ))}
       </div>
