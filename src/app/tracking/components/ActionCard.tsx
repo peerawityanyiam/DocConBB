@@ -6,6 +6,7 @@ import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
 import { buildPdfFilesFromImages } from '@/lib/files/image-to-pdf';
+import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
@@ -66,7 +67,7 @@ const STATUS_STAGE_INDEX: Record<TaskStatus, number> = {
 const REJECTED_STATUSES = new Set<TaskStatus>([
   'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED',
 ]);
-const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_UPLOAD_FILE_SIZE = MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES;
 const MAX_IMAGE_SOURCE_TOTAL_SIZE = 300 * 1024 * 1024;
 const MAX_UPLOAD_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 900;
@@ -274,7 +275,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         return;
       }
       if (file.size > MAX_UPLOAD_FILE_SIZE) {
-        reject(new Error('ไฟล์มีขนาดเกิน 50MB'));
+        reject(new Error(`ไฟล์มีขนาดเกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`));
         return;
       }
       setUploadProgress(0);
@@ -443,7 +444,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     if (file.size > MAX_UPLOAD_FILE_SIZE) {
       e.target.value = '';
       clearSelectedUploadFiles();
-      setUploadError('ไฟล์มีขนาดใหญ่เกิน 50MB กรุณาเลือกไฟล์ใหม่');
+      setUploadError(`ไฟล์มีขนาดใหญ่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} กรุณาเลือกไฟล์ใหม่`);
       return;
     }
 
@@ -568,7 +569,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         ? 'ระบบจะส่งไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยยังคงความคมชัดของภาพ'
         : 'ระบบจะส่งไฟล์ PDF ที่รวมจากรูปภาพเมื่อกดปุ่มดำเนินการ')
       : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
-    : 'เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ"';
+    : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
   const renderAttachmentSummary = (hint: string) => (
     <div className={`mt-2 rounded-md border px-2.5 py-2 text-[0.7rem] ${selectedWordFile ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>
@@ -886,7 +887,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {renderAttachmentSummary(
                   docconSentBackFromBoss
                     ? 'กรณีส่งกลับจากหัวหน้างาน ต้องแนบ Word (.docx)'
-                    : 'รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF'
+                    : 'รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)'
                 )}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
@@ -967,7 +968,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF')}
+                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)')}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
@@ -1035,7 +1036,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF')}
+                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)')}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
@@ -1111,7 +1112,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 {selectedWordFile && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
-                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF')}
+                {renderAttachmentSummary('รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน 4MB ต่อไฟล์)')}
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}

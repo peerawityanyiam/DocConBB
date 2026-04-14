@@ -51,10 +51,12 @@ export function toFriendlyErrorMessage(
 
   if (
     normalized.includes('50mb') ||
+    normalized.includes('4mb') ||
+    normalized.includes('413') ||
     normalized.includes('too large') ||
     normalized.includes('payload too large')
   ) {
-    return 'ไฟล์มีขนาดใหญ่เกิน 50MB กรุณาเลือกไฟล์ขนาดเล็กลง';
+    return 'ไฟล์มีขนาดใหญ่เกินที่ระบบรองรับ กรุณาลดขนาดไฟล์หรือแบ่งอัปโหลด';
   }
 
   if (normalized.includes('.docx') && normalized.includes('.pdf')) {
@@ -85,11 +87,13 @@ export function toUploadFailureMessage(
 
   if (
     normalized.includes('50mb') ||
+    normalized.includes('4mb') ||
+    normalized.includes('413') ||
     normalized.includes('too large') ||
     normalized.includes('payload too large') ||
     normalized.includes('ใหญ่เกิน')
   ) {
-    return `${friendly}\nคำแนะนำ: ลดจำนวนรูปต่อครั้ง, บีบอัดรูปก่อนอัปโหลด, หรือแยกอัปโหลดเป็นหลายชุด`;
+    return `${friendly}\nคำแนะนำ: ใช้ปุ่มแนบภาพเพื่อแยก PDF อัตโนมัติ, ลดจำนวนรูปต่อครั้ง, หรือแบ่งอัปโหลดเป็นหลายชุด`;
   }
 
   if (

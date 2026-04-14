@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { buildPdfFilesFromImages } from '@/lib/files/image-to-pdf';
+import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
 interface UserOption {
@@ -17,9 +18,10 @@ interface CreateTaskModalProps {
   onCreated: () => void;
 }
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE = MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES;
 const MAX_IMAGE_SOURCE_TOTAL_SIZE = 300 * 1024 * 1024; // 300MB
 const MAX_UPLOAD_RETRIES = 2;
+const MAX_ROLLBACK_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 900;
 
 function sleep(ms: number) {
@@ -83,7 +85,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     const selected = e.target.files?.[0];
     if (!selected) return;
     if (!selected.name.toLowerCase().endsWith('.docx')) { setError('รองรับเฉพาะ .docx'); return; }
-    if (selected.size > MAX_FILE_SIZE) { setError('ขนาดไฟล์ต้องไม่เกิน 50MB'); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
     setError(''); setWordFile(selected);
   }
 
@@ -91,7 +93,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     const selected = e.target.files?.[0];
     if (!selected) return;
     if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('รองรับเฉพาะ .pdf'); return; }
-    if (selected.size > MAX_FILE_SIZE) { setError('ขนาดไฟล์ต้องไม่เกิน 50MB'); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
     setError('');
     setPdfFiles([selected]);
     setPdfImageCount(null);
@@ -185,12 +187,19 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   }
 
   async function rollbackCreatedTask(taskId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
-      return res.ok;
-    } catch {
-      return false;
+    for (let attempt = 0; attempt <= MAX_ROLLBACK_RETRIES; attempt += 1) {
+      try {
+        const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+        if (res.ok) return true;
+      } catch {
+        // continue retry
+      }
+
+      if (attempt < MAX_ROLLBACK_RETRIES) {
+        await sleep(RETRY_BASE_DELAY_MS * (attempt + 1));
+      }
     }
+    return false;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -273,7 +282,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     ? (pdfFiles.length > 1
       ? 'ระบบจะแนบไฟล์ PDF หลายไฟล์ต่อเนื่อง โดยยังคงความคมชัดของภาพ'
       : 'ระบบจะอัปโหลดไฟล์เหล่านี้ทันทีหลังสร้างงาน')
-    : 'เลือกไฟล์ Word / PDF หรือใช้ปุ่มแนบภาพเพื่อรวมเป็น PDF';
+    : `เลือกไฟล์ Word / PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}) หรือใช้ปุ่มแนบภาพเพื่อรวมเป็น PDF`;
   const submitDisabledReason = isConvertingImages
     ? 'กรุณารอระบบรวมภาพเป็น PDF ให้เสร็จก่อน'
     : (loading ? 'ระบบกำลังสร้างงานและอัปโหลดไฟล์ กรุณารอสักครู่' : '');

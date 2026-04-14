@@ -3,6 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
 import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists, trashFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
+import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 
 const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
 
@@ -27,9 +28,9 @@ export async function POST(
       return NextResponse.json({ error: 'รองรับเฉพาะ .docx และ .pdf' }, { status: 400 });
     }
 
-    // ตรวจขนาด (50MB)
-    if (file.size > 50 * 1024 * 1024) {
-      return NextResponse.json({ error: 'ไฟล์ใหญ่เกิน 50MB' }, { status: 400 });
+    // ตรวจขนาด (ตรงกับขีดจำกัด upload จริงของระบบหน้าเว็บ)
+    if (file.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
+      return NextResponse.json({ error: `ไฟล์ใหญ่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}` }, { status: 400 });
     }
 
     const admin = await createServiceRoleClient();

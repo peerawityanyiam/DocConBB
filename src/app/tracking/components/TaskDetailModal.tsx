@@ -6,6 +6,7 @@ import StatusTimeline from './StatusTimeline';
 import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
+import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 
 interface TaskDetailModalProps {
   taskId: string | null;
@@ -318,9 +319,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
   function handleFileUpload(file: File) {
     if (!task) return;
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES;
     if (file.size > maxSize) {
-      setUploadError('ไฟล์มีขนาดเกิน 50MB');
+      setUploadError(`ไฟล์มีขนาดเกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`);
       return;
     }
     const allowedTypes = [

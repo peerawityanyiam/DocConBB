@@ -7,6 +7,7 @@ import StatusTimeline from '../components/StatusTimeline';
 import type { Task, TaskUser } from '../components/TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
+import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 
 type ActionKey =
   | 'submit' | 'doccon_approve' | 'doccon_reject'
@@ -214,8 +215,8 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
       setUploadError('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น');
       return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-      setUploadError('ขนาดไฟล์ต้องไม่เกิน 50MB');
+    if (file.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
+      setUploadError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`);
       return;
     }
     setUploadError('');
@@ -483,7 +484,7 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
                   <p className="text-sm text-slate-500">
                     ลากไฟล์มาวาง หรือ <span className="text-yellow-600 font-medium">คลิกเพื่อเลือกไฟล์</span>
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">รองรับ .docx, .pdf (สูงสุด 50MB)</p>
+                  <p className="text-xs text-slate-400 mt-1">รองรับ .docx, .pdf (สูงสุด {MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL})</p>
                 </div>
                 {uploadProgress !== null && (
                   <div className="w-full bg-slate-200 rounded-full h-2">

@@ -1,9 +1,23 @@
-﻿import { PDFDocument } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
+import { DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES } from './upload-limits';
 
 const FALLBACK_PDF_BASENAME = 'image-attachment';
-const DEFAULT_MAX_PDF_PART_BYTES = 18 * 1024 * 1024; // smaller parts improve real-world upload success
-const HIGH_QUALITY_MAX_EDGE = 3000;
-const HIGH_QUALITY_JPEG_QUALITY = 0.9;
+const DEFAULT_MAX_PDF_PART_BYTES = DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES;
+const MIN_PART_SIZE_BYTES = 512 * 1024;
+const PDF_BASE_OVERHEAD_BYTES = 96 * 1024;
+const PDF_IMAGE_ESTIMATE_MULTIPLIER = 1.08;
+
+interface ConversionProfile {
+  maxEdge: number;
+  quality: number;
+}
+
+const CONVERSION_PROFILES: ConversionProfile[] = [
+  { maxEdge: 3000, quality: 0.9 },
+  { maxEdge: 2600, quality: 0.86 },
+  { maxEdge: 2200, quality: 0.82 },
+  { maxEdge: 1800, quality: 0.78 },
+];
 
 interface PdfImageSource {
   name: string;
@@ -12,7 +26,7 @@ interface PdfImageSource {
   height: number;
 }
 
-function toPdfBaseName(baseName: string) {
+function toPdfBaseName(baseName: string): string {
   const clean = baseName
     .replace(/\.[^/.]+$/, '')
     .replace(/[^\w\u0E00-\u0E7F\- ]+/g, '')
@@ -27,7 +41,12 @@ function getPartFileName(baseName: string, partIndex: number, totalParts: number
   return `${baseName}-part-${String(partIndex + 1).padStart(2, '0')}.pdf`;
 }
 
-async function readImageSource(file: File): Promise<PdfImageSource> {
+function normalizeMaxPartSize(maxPartSizeBytes: number): number {
+  if (!Number.isFinite(maxPartSizeBytes)) return DEFAULT_MAX_PDF_PART_BYTES;
+  return Math.max(Math.floor(maxPartSizeBytes), MIN_PART_SIZE_BYTES);
+}
+
+async function readImageSource(file: File, profile: ConversionProfile): Promise<PdfImageSource> {
   if (!file.type.startsWith('image/')) {
     throw new Error(`ไฟล์ ${file.name} ไม่ใช่รูปภาพ`);
   }
@@ -36,7 +55,7 @@ async function readImageSource(file: File): Promise<PdfImageSource> {
 
   try {
     const longestEdge = Math.max(imageBitmap.width, imageBitmap.height);
-    const scale = longestEdge > HIGH_QUALITY_MAX_EDGE ? (HIGH_QUALITY_MAX_EDGE / longestEdge) : 1;
+    const scale = longestEdge > profile.maxEdge ? (profile.maxEdge / longestEdge) : 1;
     const targetWidth = Math.max(1, Math.round(imageBitmap.width * scale));
     const targetHeight = Math.max(1, Math.round(imageBitmap.height * scale));
 
@@ -63,7 +82,7 @@ async function readImageSource(file: File): Promise<PdfImageSource> {
           reject(new Error('ไม่สามารถแปลงรูปภาพได้'));
         },
         'image/jpeg',
-        HIGH_QUALITY_JPEG_QUALITY,
+        profile.quality,
       );
     });
 
@@ -78,7 +97,7 @@ async function readImageSource(file: File): Promise<PdfImageSource> {
   }
 }
 
-async function appendImagePage(pdf: PDFDocument, source: PdfImageSource) {
+async function appendImagePage(pdf: PDFDocument, source: PdfImageSource): Promise<void> {
   const embedded = await pdf.embedJpg(source.bytes);
   const page = pdf.addPage([source.width, source.height]);
   page.drawImage(embedded, {
@@ -87,6 +106,76 @@ async function appendImagePage(pdf: PDFDocument, source: PdfImageSource) {
     width: source.width,
     height: source.height,
   });
+}
+
+async function renderPdfBytes(sources: PdfImageSource[]): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  for (const source of sources) {
+    await appendImagePage(pdf, source);
+  }
+  return Uint8Array.from(await pdf.save());
+}
+
+function estimateSourcePdfContribution(source: PdfImageSource): number {
+  return Math.ceil(source.bytes.byteLength * PDF_IMAGE_ESTIMATE_MULTIPLIER);
+}
+
+async function buildAdaptiveImageSource(image: File, maxPartSizeBytes: number): Promise<PdfImageSource> {
+  let lastRenderedSize = 0;
+  for (const profile of CONVERSION_PROFILES) {
+    const source = await readImageSource(image, profile);
+    const singlePagePdf = await renderPdfBytes([source]);
+    lastRenderedSize = singlePagePdf.byteLength;
+    if (singlePagePdf.byteLength <= maxPartSizeBytes) {
+      return source;
+    }
+  }
+
+  throw new Error(
+    `รูป ${image.name} ใหญ่เกินขีดจำกัดอัปโหลดต่อไฟล์ (${Math.ceil(lastRenderedSize / 1024 / 1024)}MB) กรุณาลดขนาดรูปก่อน`,
+  );
+}
+
+function buildInitialGroups(sources: PdfImageSource[], maxPartSizeBytes: number): PdfImageSource[][] {
+  const groups: PdfImageSource[][] = [];
+  let currentGroup: PdfImageSource[] = [];
+  let currentEstimatedSize = PDF_BASE_OVERHEAD_BYTES;
+
+  for (const source of sources) {
+    const estimatedContribution = estimateSourcePdfContribution(source);
+    const nextEstimatedSize = currentEstimatedSize + estimatedContribution;
+
+    if (currentGroup.length > 0 && nextEstimatedSize > maxPartSizeBytes) {
+      groups.push(currentGroup);
+      currentGroup = [];
+      currentEstimatedSize = PDF_BASE_OVERHEAD_BYTES;
+    }
+
+    currentGroup.push(source);
+    currentEstimatedSize += estimatedContribution;
+  }
+
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+
+  return groups;
+}
+
+async function splitAndRenderGroup(sources: PdfImageSource[], maxPartSizeBytes: number): Promise<Uint8Array[]> {
+  const bytes = await renderPdfBytes(sources);
+  if (bytes.byteLength <= maxPartSizeBytes) {
+    return [bytes];
+  }
+
+  if (sources.length <= 1) {
+    throw new Error(`รูป ${sources[0]?.name ?? ''} ใหญ่เกินขีดจำกัดอัปโหลดต่อไฟล์ กรุณาลดขนาดรูปก่อน`);
+  }
+
+  const middleIndex = Math.ceil(sources.length / 2);
+  const left = await splitAndRenderGroup(sources.slice(0, middleIndex), maxPartSizeBytes);
+  const right = await splitAndRenderGroup(sources.slice(middleIndex), maxPartSizeBytes);
+  return [...left, ...right];
 }
 
 export async function buildPdfFilesFromImages(
@@ -98,53 +187,32 @@ export async function buildPdfFilesFromImages(
     throw new Error('กรุณาเลือกรูปอย่างน้อย 1 รูป');
   }
 
+  const normalizedMaxPartSize = normalizeMaxPartSize(maxPartSizeBytes);
   const baseName = toPdfBaseName(outputName?.trim() || images[0]?.name || FALLBACK_PDF_BASENAME);
-  const sources: PdfImageSource[] = [];
+  const adaptedSources: PdfImageSource[] = [];
+
   for (const image of images) {
-    sources.push(await readImageSource(image));
+    adaptedSources.push(await buildAdaptiveImageSource(image, normalizedMaxPartSize));
   }
 
+  const groups = buildInitialGroups(adaptedSources, normalizedMaxPartSize);
   const rawParts: Uint8Array[] = [];
-  let cursor = 0;
-
-  while (cursor < sources.length) {
-    const pdf = await PDFDocument.create();
-    let addedCount = 0;
-    let lastGoodBytes: Uint8Array | null = null;
-
-    while ((cursor + addedCount) < sources.length) {
-      await appendImagePage(pdf, sources[cursor + addedCount]);
-      const candidateBytes = Uint8Array.from(await pdf.save());
-
-      if (candidateBytes.byteLength > maxPartSizeBytes) {
-        pdf.removePage(pdf.getPageCount() - 1);
-        break;
-      }
-
-      lastGoodBytes = candidateBytes;
-      addedCount += 1;
-    }
-
-    if (!lastGoodBytes || addedCount === 0) {
-      throw new Error(`รูป ${sources[cursor].name} มีขนาดใหญ่เกิน 50MB ต่อไฟล์`);
-    }
-
-    rawParts.push(lastGoodBytes);
-    cursor += addedCount;
+  for (const group of groups) {
+    const rendered = await splitAndRenderGroup(group, normalizedMaxPartSize);
+    rawParts.push(...rendered);
   }
 
   const totalParts = rawParts.length;
-  return rawParts.map((bytes, partIndex) => {
-    const normalizedBytes = Uint8Array.from(bytes);
-    return new File(
-      [normalizedBytes],
+  return rawParts.map((bytes, partIndex) => (
+    new File(
+      [Uint8Array.from(bytes)],
       getPartFileName(baseName, partIndex, totalParts),
       {
         type: 'application/pdf',
         lastModified: Date.now(),
       },
-    );
-  });
+    )
+  ));
 }
 
 export async function buildPdfFromImages(
