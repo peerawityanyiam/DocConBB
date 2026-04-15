@@ -129,6 +129,24 @@ async function renderPdfBytes(sources: PdfImageSource[]): Promise<Uint8Array> {
   return Uint8Array.from(await pdf.save());
 }
 
+async function readPreparedImageSource(file: File): Promise<PdfImageSource> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error(`unsupported_image_file:${file.name}`);
+  }
+
+  const imageBitmap = await createImageBitmap(file);
+  try {
+    return {
+      name: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      width: imageBitmap.width,
+      height: imageBitmap.height,
+    };
+  } finally {
+    imageBitmap.close();
+  }
+}
+
 function estimateSourcePdfContribution(source: PdfImageSource): number {
   return Math.ceil(source.bytes.byteLength * PDF_IMAGE_ESTIMATE_MULTIPLIER);
 }
@@ -252,29 +270,17 @@ async function splitAndRenderGroup(sources: PdfImageSource[], maxPartSizeBytes: 
   return [...left, ...right];
 }
 
-export async function buildPdfFilesFromImages(
-  images: File[],
-  outputName?: string,
-  maxPartSizeBytes = DEFAULT_MAX_PDF_PART_BYTES,
+async function buildPdfFilesFromSources(
+  sources: PdfImageSource[],
+  baseName: string,
+  normalizedMaxPartSize: number,
 ): Promise<File[]> {
-  if (!images.length) {
-    throw new Error('no_images_selected');
-  }
-
-  const normalizedMaxPartSize = normalizeMaxPartSize(maxPartSizeBytes);
-  const baseName = toPdfBaseName(outputName?.trim() || images[0]?.name || FALLBACK_PDF_BASENAME);
-  const adaptedSources: PdfImageSource[] = [];
-
-  for (const image of images) {
-    adaptedSources.push(await buildAdaptiveImageSource(image, normalizedMaxPartSize));
-  }
-
   const rawParts: Uint8Array[] = [];
-  const fullPdfBytes = await renderPdfBytes(adaptedSources);
+  const fullPdfBytes = await renderPdfBytes(sources);
   if (fullPdfBytes.byteLength <= normalizedMaxPartSize) {
     rawParts.push(fullPdfBytes);
   } else {
-    const groups = buildInitialGroups(adaptedSources, normalizedMaxPartSize);
+    const groups = buildInitialGroups(sources, normalizedMaxPartSize);
     for (const group of groups) {
       const rendered = await splitAndRenderGroup(group, normalizedMaxPartSize);
       rawParts.push(...rendered);
@@ -292,6 +298,46 @@ export async function buildPdfFilesFromImages(
       },
     )
   ));
+}
+
+export async function buildPdfFilesFromImages(
+  images: File[],
+  outputName?: string,
+  maxPartSizeBytes = DEFAULT_MAX_PDF_PART_BYTES,
+): Promise<File[]> {
+  if (!images.length) {
+    throw new Error('no_images_selected');
+  }
+
+  const normalizedMaxPartSize = normalizeMaxPartSize(maxPartSizeBytes);
+  const baseName = toPdfBaseName(outputName?.trim() || images[0]?.name || FALLBACK_PDF_BASENAME);
+  const adaptedSources: PdfImageSource[] = [];
+
+  for (const image of images) {
+    adaptedSources.push(await buildAdaptiveImageSource(image, normalizedMaxPartSize));
+  }
+
+  return buildPdfFilesFromSources(adaptedSources, baseName, normalizedMaxPartSize);
+}
+
+export async function buildPdfFilesFromPreparedImages(
+  images: File[],
+  outputName?: string,
+  maxPartSizeBytes = DEFAULT_MAX_PDF_PART_BYTES,
+): Promise<File[]> {
+  if (!images.length) {
+    throw new Error('no_images_selected');
+  }
+
+  const normalizedMaxPartSize = normalizeMaxPartSize(maxPartSizeBytes);
+  const baseName = toPdfBaseName(outputName?.trim() || images[0]?.name || FALLBACK_PDF_BASENAME);
+  const preparedSources: PdfImageSource[] = [];
+
+  for (const image of images) {
+    preparedSources.push(await readPreparedImageSource(image));
+  }
+
+  return buildPdfFilesFromSources(preparedSources, baseName, normalizedMaxPartSize);
 }
 
 export async function buildPdfFromImages(

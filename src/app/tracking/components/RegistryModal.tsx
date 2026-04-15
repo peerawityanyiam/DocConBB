@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface RegistryModalProps {
   open: boolean;
@@ -40,8 +40,7 @@ export default function RegistryModal({ open, onClose }: RegistryModalProps) {
   const [search, setSearch] = useState('');
   const [expandedRef, setExpandedRef] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  const loadEntries = useCallback(() => {
     setLoading(true);
     setSearch('');
     setExpandedRef(null);
@@ -50,7 +49,15 @@ export default function RegistryModal({ open, onClose }: RegistryModalProps) {
       .then((data: RegistryEntry[]) => setEntries(data))
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
-  }, [open]);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      void loadEntries();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, loadEntries]);
 
   if (!open) return null;
 

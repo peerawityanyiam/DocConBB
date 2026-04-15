@@ -5,7 +5,7 @@ import StatusBadge from './StatusBadge';
 import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
-import { buildPdfFilesFromImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
+import { buildPdfFilesFromPreparedImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
   MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
@@ -212,6 +212,12 @@ interface ImageQueueItem {
   outputBytes?: number;
 }
 
+interface UploadedFileMeta {
+  driveFileId: string;
+  driveFileName?: string;
+  isPdf: boolean;
+}
+
 export default function ActionCard({ task, activeRole, activeSubTab, userId, userRoles, onUpdated, onOpenHistory }: ActionCardProps) {
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
   const currentStageStuck = getCurrentStageStuckInfo({
@@ -285,8 +291,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
-  /* ── uploadFileAsync: returns Promise (no callback) ── */
-  const uploadFileOnceAsync = useCallback((file: File, batchMeta?: UploadBatchMeta): Promise<void> => {
+  /* ── uploadFileAsync: returns uploaded file metadata ── */
+  const uploadFileOnceAsync = useCallback((file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
     return new Promise((resolve, reject) => {
       const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
       if (!['.docx', '.pdf'].includes(ext)) {
@@ -314,7 +320,24 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       xhr.addEventListener('load', () => {
         setUploadProgress(null);
         if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
+          try {
+            const payload = JSON.parse(xhr.responseText) as {
+              driveFileId?: string;
+              driveFileName?: string;
+              isPdf?: boolean;
+            };
+            if (!payload.driveFileId) {
+              reject(new Error('missing_drive_file_id'));
+              return;
+            }
+            resolve({
+              driveFileId: payload.driveFileId,
+              driveFileName: payload.driveFileName,
+              isPdf: Boolean(payload.isPdf),
+            });
+          } catch {
+            reject(new Error('invalid_upload_response'));
+          }
         } else {
           try {
             const d = JSON.parse(xhr.responseText) as { error?: string; message?: string };
@@ -337,14 +360,13 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     });
   }, [task.id]);
 
-  const uploadFileAsync = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<void> => {
+  const uploadFileAsync = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
     let attempt = 0;
     let lastError: unknown = null;
     while (attempt <= MAX_UPLOAD_RETRIES) {
       try {
         setUploadProgress(0);
-        await uploadFileOnceAsync(file, batchMeta);
-        return;
+        return await uploadFileOnceAsync(file, batchMeta);
       } catch (err) {
         lastError = err;
         if (!isRetryableUploadError(err) || attempt === MAX_UPLOAD_RETRIES) {
@@ -387,27 +409,45 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     }
   }
 
+  async function rollbackUploadedPdfFiles(fileIds: string[]): Promise<void> {
+    if (fileIds.length === 0) return;
+    try {
+      await fetch(
+        `/api/tasks/${task.id}/files?drive_file_ids=${encodeURIComponent(fileIds.join(','))}`,
+        { method: 'DELETE' },
+      );
+    } catch {
+      // best effort cleanup
+    }
+  }
+
   async function uploadThenExecute(actionKey: string, comment?: string) {
     setActionLoading(true);
     setActionError('');
     setUploadError('');
     const hasSelectedUpload = !!selectedWordFile || selectedImageFiles.length > 0;
     let uploadFinished = !hasSelectedUpload;
-    let rollbackBatchId: string | null = null;
+    const rollbackBatchIds = new Set<string>();
+    const rollbackSinglePdfIds = new Set<string>();
     try {
       if (selectedWordFile) {
-        await uploadFileAsync(selectedWordFile);
+        const uploaded = await uploadFileAsync(selectedWordFile);
+        if (uploaded.isPdf) {
+          rollbackSinglePdfIds.add(uploaded.driveFileId);
+        }
         uploadFinished = true;
       }
       if (selectedImageFiles.length > 0) {
         setIsConvertingImages(true);
-        const generatedPdfFiles = await buildPdfFilesFromImages(selectedImageFiles);
+        const generatedPdfFiles = await buildPdfFilesFromPreparedImages(selectedImageFiles);
         if (generatedPdfFiles.length > MAX_IMAGE_PDF_PARTS) {
           throw new Error('too_many_pdf_parts');
         }
         const hasImageBatchMeta = generatedPdfFiles.length > 1;
         const pdfBatchId = hasImageBatchMeta ? `imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : '';
-        rollbackBatchId = hasImageBatchMeta ? pdfBatchId : null;
+        if (hasImageBatchMeta) {
+          rollbackBatchIds.add(pdfBatchId);
+        }
         const pdfBatchLabel = generatedPdfFiles[0].name.replace(/-part-\d+\.pdf$/i, '.pdf');
         for (let index = 0; index < generatedPdfFiles.length; index += 1) {
           const file = generatedPdfFiles[index];
@@ -419,24 +459,32 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
                 label: pdfBatchLabel,
               }
             : undefined;
-          await uploadFileAsync(file, batchMeta);
+          const uploaded = await uploadFileAsync(file, batchMeta);
+          if (!hasImageBatchMeta && uploaded.isPdf) {
+            rollbackSinglePdfIds.add(uploaded.driveFileId);
+          }
         }
         uploadFinished = true;
       }
-      clearSelectedUploadFiles();
       await callStatusApi(actionKey, comment);
+      clearSelectedUploadFiles();
       onUpdated();
     } catch (err) {
       const uploadMsg = toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ');
       const actionMsg = toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่');
       if (!uploadFinished && hasSelectedUpload) {
-        if (rollbackBatchId) {
-          await rollbackUploadedPdfBatch(rollbackBatchId);
+        for (const batchId of rollbackBatchIds) {
+          await rollbackUploadedPdfBatch(batchId);
         }
+        await rollbackUploadedPdfFiles(Array.from(rollbackSinglePdfIds));
         // upload failed — clear selection so user can pick again
         clearSelectedUploadFiles();
         setUploadError(uploadMsg);
       } else {
+        for (const batchId of rollbackBatchIds) {
+          await rollbackUploadedPdfBatch(batchId);
+        }
+        await rollbackUploadedPdfFiles(Array.from(rollbackSinglePdfIds));
         setActionError(actionMsg);
       }
     } finally {

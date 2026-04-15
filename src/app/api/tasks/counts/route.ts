@@ -6,7 +6,9 @@ export const dynamic = 'force-dynamic';
 
 const STAFF_ACTIONABLE = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
 
-async function countExact(query: any) {
+type CountResult = { count: number | null; error: unknown };
+
+async function countExact(query: PromiseLike<CountResult>) {
   const { count, error } = await query;
   if (error) throw error;
   return count ?? 0;

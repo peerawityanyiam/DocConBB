@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
 
 interface SummaryReportModalProps {
@@ -37,6 +37,19 @@ function formatDaysValue(days: number): string {
   return days.toFixed(1);
 }
 
+function SortIcon({
+  col,
+  sortKey,
+  sortDir,
+}: {
+  col: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+}) {
+  if (sortKey !== col) return <span className="text-slate-300 ml-1">↕</span>;
+  return <span className="text-yellow-500 ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>;
+}
+
 export default function SummaryReportModal({ open, onClose }: SummaryReportModalProps) {
   const [report, setReport] = useState<SummaryReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,7 +57,7 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
   const [sortKey, setSortKey] = useState<SortKey>('completedTasks');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const fetchReport = () => {
+  const fetchReport = useCallback(() => {
     setLoading(true);
     setError('');
     fetch('/api/tasks/summary-report')
@@ -55,12 +68,15 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
       .then((data: SummaryReport) => setReport(data))
       .catch(() => setError('ไม่สามารถโหลดรายงานสรุปได้'))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
-    fetchReport();
-  }, [open]);
+    const timer = window.setTimeout(() => {
+      void fetchReport();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, fetchReport]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -86,11 +102,6 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
   }, [report, sortKey, sortDir]);
 
   if (!open) return null;
-
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <span className="text-slate-300 ml-1">↕</span>;
-    return <span className="text-yellow-500 ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>;
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
@@ -189,31 +200,31 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
                               className="text-left px-4 py-2.5 font-semibold text-slate-600 cursor-pointer hover:text-slate-900 select-none"
                               onClick={() => handleSort('display_name')}
                             >
-                              ชื่อเจ้าหน้าที่<SortIcon col="display_name" />
+                              ชื่อเจ้าหน้าที่<SortIcon col="display_name" sortKey={sortKey} sortDir={sortDir} />
                             </th>
                             <th
                               className="text-center px-4 py-2.5 font-semibold text-slate-600 cursor-pointer hover:text-slate-900 select-none"
                               onClick={() => handleSort('activeTasks')}
                             >
-                              กำลังดำเนินการ<SortIcon col="activeTasks" />
+                              กำลังดำเนินการ<SortIcon col="activeTasks" sortKey={sortKey} sortDir={sortDir} />
                             </th>
                             <th
                               className="text-center px-4 py-2.5 font-semibold text-slate-600 cursor-pointer hover:text-slate-900 select-none"
                               onClick={() => handleSort('completedTasks')}
                             >
-                              เสร็จ<SortIcon col="completedTasks" />
+                              เสร็จ<SortIcon col="completedTasks" sortKey={sortKey} sortDir={sortDir} />
                             </th>
                             <th
                               className="text-center px-4 py-2.5 font-semibold text-slate-600 cursor-pointer hover:text-slate-900 select-none"
                               onClick={() => handleSort('cancelledTasks')}
                             >
-                              ยกเลิก<SortIcon col="cancelledTasks" />
+                              ยกเลิก<SortIcon col="cancelledTasks" sortKey={sortKey} sortDir={sortDir} />
                             </th>
                             <th
                               className="text-center px-4 py-2.5 font-semibold text-slate-600 cursor-pointer hover:text-slate-900 select-none"
                               onClick={() => handleSort('avgDaysToComplete')}
                             >
-                              เฉลี่ย (วัน)<SortIcon col="avgDaysToComplete" />
+                              เฉลี่ย (วัน)<SortIcon col="avgDaysToComplete" sortKey={sortKey} sortDir={sortDir} />
                             </th>
                           </tr>
                         </thead>

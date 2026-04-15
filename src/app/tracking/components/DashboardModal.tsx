@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { STATUS_LABELS, STATUS_COLORS, type TaskStatus } from '@/lib/constants/status';
 
 interface DashboardModalProps {
@@ -35,8 +35,7 @@ export default function DashboardModal({ open, onClose }: DashboardModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!open) return;
+  const loadStats = useCallback(() => {
     setLoading(true);
     setError('');
     fetch('/api/dashboard/stats', { cache: 'no-store' })
@@ -47,7 +46,15 @@ export default function DashboardModal({ open, onClose }: DashboardModalProps) {
       .then((data: DashboardStats) => setStats(data))
       .catch(() => setError('ไม่สามารถโหลดข้อมูลภาพรวมได้'))
       .finally(() => setLoading(false));
-  }, [open]);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      void loadStats();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, loadStats]);
 
   if (!open) return null;
 
@@ -107,18 +114,7 @@ export default function DashboardModal({ open, onClose }: DashboardModalProps) {
               <p className="text-3xl mb-3">⚠️</p>
               <p className="text-sm text-slate-500">{error}</p>
               <button
-                onClick={() => {
-                  setLoading(true);
-                  setError('');
-                  fetch('/api/dashboard/stats', { cache: 'no-store' })
-                    .then(r => {
-                      if (!r.ok) throw new Error('');
-                      return r.json();
-                    })
-                    .then((data: DashboardStats) => setStats(data))
-                    .catch(() => setError('ไม่สามารถโหลดข้อมูลภาพรวมได้'))
-                    .finally(() => setLoading(false));
-                }}
+                onClick={loadStats}
                 className="mt-3 px-4 py-1.5 text-sm bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-medium rounded-lg transition-colors"
               >
                 ลองใหม่

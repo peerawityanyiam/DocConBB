@@ -315,8 +315,9 @@ export async function DELETE(
 
     const { taskId } = await params;
     const uploadBatchId = request.nextUrl.searchParams.get('upload_batch_id')?.trim();
-    if (!uploadBatchId) {
-      return errorResponse(400, 'missing_upload_batch_id', 'Missing upload_batch_id.');
+    const driveFileIdsParam = request.nextUrl.searchParams.get('drive_file_ids')?.trim();
+    if (!uploadBatchId && !driveFileIdsParam) {
+      return errorResponse(400, 'missing_rollback_selector', 'Missing upload_batch_id or drive_file_ids.');
     }
 
     const admin = await createServiceRoleClient();
@@ -330,14 +331,21 @@ export async function DELETE(
       uploadedBy?: string;
     };
     const fileHistory = (task.file_history as FileHistoryEntry[] | null) ?? [];
+    const targetDriveIds = new Set(
+      (driveFileIdsParam ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    );
 
-    const toRollback = fileHistory.filter((entry) => (
-      entry.isPdf
-      && entry.uploadBatchId === uploadBatchId
-      && entry.uploadedBy === user.email
-      && typeof entry.driveFileId === 'string'
-      && entry.driveFileId.length > 0
-    ));
+    const toRollback = fileHistory.filter((entry) => {
+      if (!entry.isPdf) return false;
+      if (entry.uploadedBy !== user.email) return false;
+      if (typeof entry.driveFileId !== 'string' || entry.driveFileId.length === 0) return false;
+      if (uploadBatchId && entry.uploadBatchId === uploadBatchId) return true;
+      if (targetDriveIds.has(entry.driveFileId)) return true;
+      return false;
+    });
 
     if (toRollback.length === 0) {
       return NextResponse.json({ ok: true, removed: 0 });
@@ -345,11 +353,13 @@ export async function DELETE(
 
     const rollbackIds = Array.from(new Set(toRollback.map((entry) => entry.driveFileId as string)));
 
-    const filteredHistory = fileHistory.filter((entry) => !(
-      entry.isPdf
-      && entry.uploadBatchId === uploadBatchId
-      && entry.uploadedBy === user.email
-    ));
+    const rollbackIdSet = new Set(rollbackIds);
+    const filteredHistory = fileHistory.filter((entry) => {
+      if (!entry.isPdf) return true;
+      if (entry.uploadedBy !== user.email) return true;
+      if (typeof entry.driveFileId !== 'string' || entry.driveFileId.length === 0) return true;
+      return !rollbackIdSet.has(entry.driveFileId);
+    });
 
     const updates: Record<string, unknown> = {
       file_history: filteredHistory,
@@ -391,5 +401,4 @@ export async function DELETE(
     return errorResponse(500, 'rollback_failed', 'Unable to rollback partial uploaded files.');
   }
 }
-
 
