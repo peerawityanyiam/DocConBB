@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
 import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists, trashFile } from '@/lib/google-drive/files';
@@ -14,14 +14,17 @@ function toPositiveInt(raw: FormDataEntryValue | null): number | null {
   return parsed;
 }
 
-// POST /api/tasks/[taskId]/files â€” à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ (docx/pdf) à¹€à¸‚à¹‰à¸² task folder
+function errorResponse(status: number, error: string, message: string, extra?: Record<string, unknown>) {
+  return NextResponse.json({ error, message, ...(extra ?? {}) }, { status });
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const user = await getAuthUser('tracking');
-    if (!user) return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบก่อนใช้งาน' }, { status: 401 });
+    if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.');
 
     const { taskId } = await params;
     const formData = await request.formData();
@@ -31,7 +34,7 @@ export async function POST(
     const uploadBatchIndex = toPositiveInt(formData.get('upload_batch_index'));
     const uploadBatchTotal = toPositiveInt(formData.get('upload_batch_total'));
 
-    if (!file) return NextResponse.json({ error: 'à¹„à¸¡à¹ˆà¸žà¸šà¹„à¸Ÿà¸¥à¹Œ' }, { status: 400 });
+    if (!file) return errorResponse(400, 'file_required', 'No file was provided.');
     const uploadBatchId = typeof uploadBatchIdRaw === 'string' ? uploadBatchIdRaw.trim() : '';
     const uploadBatchLabel = typeof uploadBatchLabelRaw === 'string' ? uploadBatchLabelRaw.trim() : '';
     const hasPdfBatchMeta = Boolean(
@@ -42,15 +45,13 @@ export async function POST(
       uploadBatchIndex <= uploadBatchTotal,
     );
 
-    // à¸•à¸£à¸§à¸ˆà¸™à¸²à¸¡à¸ªà¸à¸¸à¸¥
     const ext = file.name.toLowerCase().split('.').pop();
     if (!['docx', 'pdf'].includes(ext ?? '')) {
-      return NextResponse.json({ error: 'à¸£à¸­à¸‡à¸£à¸±à¸šà¹€à¸‰à¸žà¸²à¸° .docx à¹à¸¥à¸° .pdf' }, { status: 400 });
+      return errorResponse(400, 'unsupported_file_type', 'Only .docx and .pdf are supported.');
     }
 
-    // à¸•à¸£à¸§à¸ˆà¸‚à¸™à¸²à¸” (à¸•à¸£à¸‡à¸à¸±à¸šà¸‚à¸µà¸”à¸ˆà¸³à¸à¸±à¸” upload à¸ˆà¸£à¸´à¸‡à¸‚à¸­à¸‡à¸£à¸°à¸šà¸šà¸«à¸™à¹‰à¸²à¹€à¸§à¹‡à¸š)
     if (file.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
-      return NextResponse.json({ error: `à¹„à¸Ÿà¸¥à¹Œà¹ƒà¸«à¸à¹ˆà¹€à¸à¸´à¸™ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}` }, { status: 400 });
+      return errorResponse(400, 'file_too_large', `File exceeds ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}.`);
     }
 
     const admin = await createServiceRoleClient();
@@ -60,13 +61,11 @@ export async function POST(
       .select('id, display_name')
       .eq('email', user.email)
       .single();
-    if (!dbUser) throw new AuthError('à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸œà¸¹à¹‰à¹ƒà¸Šà¹‰', 404);
+    if (!dbUser) throw new AuthError('User profile not found.', 404);
 
-    // à¸”à¸¶à¸‡ task
     const { data: task } = await admin.from('tasks').select('*').eq('id', taskId).single();
-    if (!task) return NextResponse.json({ error: 'à¹„à¸¡à¹ˆà¸žà¸šà¸‡à¸²à¸™' }, { status: 404 });
+    if (!task) return errorResponse(404, 'task_not_found', 'Task not found.');
 
-    // â”€â”€ à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸ªà¸´à¸—à¸˜à¸´à¹Œà¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸•à¸²à¸¡ relationship + role + status â”€â”€
     const { data: userRoleRows } = await admin
       .from('user_roles')
       .select('role')
@@ -78,67 +77,67 @@ export async function POST(
     const isReviewer = task.reviewer_id === dbUser.id;
     const isCreator = task.created_by === dbUser.id;
 
-    // à¸ªà¸–à¸²à¸™à¸°à¸—à¸µà¹ˆà¹à¸•à¹ˆà¸¥à¸° role à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸”à¹‰
     const officerStatuses = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
 
     let canUpload = false;
-    // Also check roles from the auth token (user_project_roles), not just user_roles table
     const authRolesSet = new Set(user.roles);
 
-    // à¹€à¸ˆà¹‰à¸²à¸«à¸™à¹‰à¸²à¸—à¸µà¹ˆ (officer) â€” à¹€à¸Šà¹‡à¸„à¸ˆà¸²à¸ relationship à¹„à¸¡à¹ˆà¸•à¹‰à¸­à¸‡à¸¡à¸µ role à¸à¹‡à¹„à¸”à¹‰
     if (isOfficer && officerStatuses.includes(s)) canUpload = true;
-    // Boss (à¸œà¸¹à¹‰à¸ªà¸±à¹ˆà¸‡à¸‡à¸²à¸™) â€” à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸”à¹‰à¸—à¸±à¹‰à¸‡ ASSIGNED (à¸•à¸­à¸™à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™) à¹à¸¥à¸° WAITING_BOSS_APPROVAL
     if (isCreator && (s === 'ASSIGNED' || s === 'WAITING_BOSS_APPROVAL')) canUpload = true;
-    // DocCon â€” check both tables
     if ((userRolesSet.has('DOCCON') || authRolesSet.has('DOCCON')) && s === 'SUBMITTED_TO_DOCCON') canUpload = true;
-    // Reviewer â€” à¹€à¸Šà¹‡à¸„à¸ˆà¸²à¸ relationship
     if (isReviewer && s === 'PENDING_REVIEW') canUpload = true;
-    // SuperBoss â€” check both tables
     if ((userRolesSet.has('SUPER_BOSS') || authRolesSet.has('SUPER_BOSS')) && s === 'WAITING_SUPER_BOSS_APPROVAL') canUpload = true;
-    // SuperAdmin
     if (userRolesSet.has('SUPER_ADMIN') || authRolesSet.has('SUPER_ADMIN')) canUpload = true;
 
     if (!canUpload) {
       const rolesStr = Array.from(userRolesSet).join(', ') || 'none';
-      return NextResponse.json({
-        error: `à¸„à¸¸à¸“à¹„à¸¡à¹ˆà¸¡à¸µà¸ªà¸´à¸—à¸˜à¸´à¹Œà¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹ƒà¸™à¸ªà¸–à¸²à¸™à¸°à¸™à¸µà¹‰ (roles: ${rolesStr}, status: ${s}, officer: ${isOfficer}, reviewer: ${isReviewer}, creator: ${isCreator})`,
-      }, { status: 403 });
+      return errorResponse(
+        403,
+        'forbidden_upload_state',
+        'You do not have permission to upload files in this status.',
+        {
+          debug: {
+            roles: rolesStr,
+            status: s,
+            officer: isOfficer,
+            reviewer: isReviewer,
+            creator: isCreator,
+          },
+        },
+      );
     }
 
-    // PDF logic: PDF à¹ƒà¸Šà¹‰à¸›à¸£à¸°à¸à¸­à¸šà¸à¸²à¸£à¸•à¸µà¸à¸¥à¸±à¸šà¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™
-    // - à¹€à¸‰à¸žà¸²à¸° DocCon/Reviewer/Boss/SuperBoss à¸—à¸µà¹ˆà¸à¸³à¸¥à¸±à¸‡à¸ˆà¸°à¸•à¸µà¸à¸¥à¸±à¸š à¸ªà¹ˆà¸‡ PDF à¹„à¸”à¹‰
-    // - Boss (creator) à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™à¹ƒà¸«à¸¡à¹ˆà¸ªà¸–à¸²à¸™à¸° ASSIGNED à¸ªà¸²à¸¡à¸²à¸£à¸–à¹à¸™à¸š PDF à¹„à¸”à¹‰
-    // - à¹€à¸ˆà¹‰à¸²à¸«à¸™à¹‰à¸²à¸—à¸µà¹ˆà¸—à¸µà¹ˆà¸–à¸¹à¸à¸•à¸µà¸à¸¥à¸±à¸š à¸ªà¹ˆà¸‡ PDF à¹„à¸¡à¹ˆà¹„à¸”à¹‰ (à¸•à¹‰à¸­à¸‡à¹à¸à¹‰à¸•à¸²à¸¡à¸ªà¸±à¹ˆà¸‡ à¸ªà¹ˆà¸‡ word à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™)
     const isPdfFile = ext === 'pdf';
     if (isPdfFile) {
       const pdfAllowedStatuses = ['SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'];
-      // Allow PDF at ASSIGNED if the uploader is the task creator (Boss creating a task)
       const isCreatorUploadingAtAssigned = isCreator && s === 'ASSIGNED';
       if (!pdfAllowedStatuses.includes(s) && !isCreatorUploadingAtAssigned) {
-        return NextResponse.json({ error: 'à¸ªà¸–à¸²à¸™à¸°à¸™à¸µà¹‰à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸”à¹‰à¹€à¸‰à¸žà¸²à¸°à¹„à¸Ÿà¸¥à¹Œ .docx à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™ (PDF à¹ƒà¸Šà¹‰à¸›à¸£à¸°à¸à¸­à¸šà¸à¸²à¸£à¸•à¸µà¸à¸¥à¸±à¸š)' }, { status: 400 });
+        return errorResponse(
+          400,
+          'pdf_not_allowed_in_status',
+          'This status accepts only .docx files (PDF is for rejection reference).',
+        );
       }
-      // Bug 5: DocCon cannot upload PDF when task was sent back from Boss/SuperBoss
       if (s === 'SUBMITTED_TO_DOCCON' && (userRolesSet.has('DOCCON') || authRolesSet.has('DOCCON')) && !isCreator) {
         const history = (task.status_history as Array<{status?: string; note?: string}>) ?? [];
-        // Find last SUBMITTED_TO_DOCCON entry with sentBackToDocconBy note
         for (let i = history.length - 1; i >= 0; i--) {
           const h = history[i];
           if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) {
-            return NextResponse.json({ error: 'à¹€à¸¡à¸·à¹ˆà¸­à¸‡à¸²à¸™à¸–à¸¹à¸à¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¸ˆà¸²à¸ Boss/Super Boss à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸”à¹‰à¹€à¸‰à¸žà¸²à¸°à¹„à¸Ÿà¸¥à¹Œ .docx à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™' }, { status: 400 });
+            return errorResponse(
+              400,
+              'doccon_word_only_after_boss_sendback',
+              'When sent back from Boss/Super Boss, only .docx upload is allowed.',
+            );
           }
-          // Stop searching once we hit a non-sentBack entry at SUBMITTED_TO_DOCCON
           if (h.status === 'SUBMITTED_TO_DOCCON') break;
         }
       }
     }
 
-    // à¸ªà¸£à¹‰à¸²à¸‡/à¸«à¸² task folder à¹ƒà¸™ Shared Drive
-    // à¸–à¹‰à¸² task à¸¡à¸µ folder à¹€à¸à¹ˆà¸² à¸•à¸£à¸§à¸ˆà¸§à¹ˆà¸²à¸¢à¸±à¸‡à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™ Shared Drive à¹„à¸«à¸¡ à¸–à¹‰à¸²à¹„à¸¡à¹ˆ à¸ªà¸£à¹‰à¸²à¸‡à¹ƒà¸«à¸¡à¹ˆ
     let taskFolderId = task.task_folder_id;
     let needNewFolder = !taskFolderId;
 
     if (taskFolderId) {
-      // Validate existing folder is accessible (might be in old My Drive)
       const folderOk = await checkFolderExists(taskFolderId);
       if (!folderOk) {
         console.warn('[FILE_UPLOAD] Existing task_folder_id is invalid/inaccessible:', taskFolderId);
@@ -152,7 +151,6 @@ export async function POST(
       await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
     }
 
-    // à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”
     const buffer = Buffer.from(await file.arrayBuffer());
     let driveFileId: string;
     let driveFileName: string;
@@ -167,7 +165,6 @@ export async function POST(
       driveFileName = result.name;
     } catch (uploadErr: unknown) {
       const errMsg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
-      // If quota error â†’ folder somehow still in My Drive, force create in Shared Drive
       if (errMsg.includes('storage quota') || errMsg.includes('storageQuotaExceeded')) {
         console.warn('[FILE_UPLOAD] Quota error! Force recreating folder in Shared Drive. Old:', taskFolderId);
         taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code);
@@ -185,7 +182,6 @@ export async function POST(
       }
     }
 
-    // à¸•à¸±à¹‰à¸‡ public
     await setFilePublic(driveFileId);
 
     const isPdf = ext === 'pdf';
@@ -237,7 +233,6 @@ export async function POST(
     updates.file_history = fileHistory;
 
     if (isPdf) {
-      // PDF is a reference file. For multi-part image batches, set ref only when all parts are uploaded.
       if (hasPdfBatchMeta) {
         const summaryBaseName = (uploadBatchLabel || driveFileName).replace(/-part-\d+\.pdf$/i, '.pdf');
         const sameBatch = fileHistory
@@ -261,14 +256,13 @@ export async function POST(
 
         if (isBatchComplete && sameBatch[0]?.driveFileId) {
           updates.ref_file_id = sameBatch[0].driveFileId;
-          updates.ref_file_name = `${summaryBaseName} + à¸­à¸µà¸ ${expectedTotal - 1} à¹„à¸Ÿà¸¥à¹Œ`;
+          updates.ref_file_name = `${summaryBaseName} + ${expectedTotal - 1} files`;
         }
       } else {
         updates.ref_file_id = driveFileId;
         updates.ref_file_name = driveFileName;
       }
     } else {
-      // DOCX â†’ à¹„à¸Ÿà¸¥à¹Œà¸«à¸¥à¸±à¸ â€” replace old DOCX only, keep ref PDF intact
       const oldDocxId = task.drive_file_id ?? latestOldDocxFromHistory;
       if (oldDocxId && oldDocxId !== driveFileId) {
         await removeOldFile(oldDocxId, 'DOCX');
@@ -279,7 +273,6 @@ export async function POST(
 
     await admin.from('tasks').update(updates).eq('id', taskId);
 
-    // à¸šà¸±à¸™à¸—à¸¶à¸à¹ƒà¸™ uploaded_files table
     await admin.from('uploaded_files').insert({
       task_id: taskId,
       uploader_id: dbUser.id,
@@ -300,34 +293,35 @@ export async function POST(
   } catch (err) {
     if (err instanceof AuthError) return handleAuthError(err);
     console.error('[FILE_UPLOAD_ERROR]', err);
-    const message = err instanceof Error ? err.message : 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ';
+    const message = err instanceof Error ? err.message : 'Upload failed.';
     if (/unauthorized_client/i.test(message)) {
-      return NextResponse.json({
-        error: 'à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸² Google Service Account à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£ impersonate à¸à¸£à¸¸à¸“à¸²à¹ƒà¸Šà¹‰à¹‚à¸«à¸¡à¸” service account à¸›à¸à¸•à¸´ (à¸›à¸´à¸” GOOGLE_ENABLE_IMPERSONATION) à¸«à¸£à¸·à¸­à¹ƒà¸«à¹‰à¸œà¸¹à¹‰à¸”à¸¹à¹à¸¥à¸£à¸°à¸šà¸šà¹€à¸›à¸´à¸” Domain-wide Delegation à¸à¹ˆà¸­à¸™',
-      }, { status: 500 });
+      return errorResponse(
+        500,
+        'unauthorized_client',
+        'Google service-account impersonation is not authorized. Disable impersonation or enable domain-wide delegation.',
+      );
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(500, 'upload_failed', message);
   }
 }
 
-// DELETE /api/tasks/[taskId]/files?upload_batch_id=... â€” rollback partial image batch uploads
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const user = await getAuthUser('tracking');
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.');
 
     const { taskId } = await params;
     const uploadBatchId = request.nextUrl.searchParams.get('upload_batch_id')?.trim();
     if (!uploadBatchId) {
-      return NextResponse.json({ error: 'à¹„à¸¡à¹ˆà¸£à¸°à¸šà¸¸ upload_batch_id' }, { status: 400 });
+      return errorResponse(400, 'missing_upload_batch_id', 'Missing upload_batch_id.');
     }
 
     const admin = await createServiceRoleClient();
     const { data: task } = await admin.from('tasks').select('ref_file_id, file_history').eq('id', taskId).single();
-    if (!task) return NextResponse.json({ error: 'à¹„à¸¡à¹ˆà¸žà¸šà¸‡à¸²à¸™' }, { status: 404 });
+    if (!task) return errorResponse(404, 'task_not_found', 'Task not found.');
 
     type FileHistoryEntry = {
       driveFileId?: string;
@@ -394,7 +388,8 @@ export async function DELETE(
   } catch (err) {
     if (err instanceof AuthError) return handleAuthError(err);
     console.error('[FILE_UPLOAD_ROLLBACK_ERROR]', err);
-    return NextResponse.json({ error: 'ไม่สามารถล้างไฟล์ที่อัปโหลดค้างได้' }, { status: 500 });
+    return errorResponse(500, 'rollback_failed', 'Unable to rollback partial uploaded files.');
   }
 }
+
 

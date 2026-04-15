@@ -61,7 +61,7 @@ function normalizeMaxPartSize(maxPartSizeBytes: number): number {
 
 async function readImageSource(file: File, profile: ConversionProfile): Promise<PdfImageSource> {
   if (!file.type.startsWith('image/')) {
-    throw new Error(`ไฟล์ ${file.name} ไม่ใช่รูปภาพ`);
+    throw new Error(`unsupported_image_file:${file.name}`);
   }
 
   const imageBitmap = await createImageBitmap(file);
@@ -77,7 +77,7 @@ async function readImageSource(file: File, profile: ConversionProfile): Promise<
     canvas.height = targetHeight;
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('ไม่สามารถประมวลผลรูปภาพได้');
+    if (!ctx) throw new Error('image_processing_failed');
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
@@ -92,7 +92,7 @@ async function readImageSource(file: File, profile: ConversionProfile): Promise<
             resolve(result);
             return;
           }
-          reject(new Error('ไม่สามารถแปลงรูปภาพได้'));
+          reject(new Error('image_conversion_failed'));
         },
         'image/jpeg',
         profile.quality,
@@ -153,7 +153,7 @@ async function buildAdaptiveImageSource(image: File, maxPartSizeBytes: number): 
   }
 
   throw new Error(
-    `รูป ${image.name} ยังใหญ่เกินขีดจำกัดหลังบีบอัด (รูป ${Math.ceil(lastSourceSize / 1024 / 1024)}MB / PDF ${Math.ceil(lastRenderedSize / 1024 / 1024)}MB) กรุณาลดขนาดรูปก่อน`,
+    `image_too_large_after_compress:${image.name}:${Math.ceil(lastSourceSize / 1024 / 1024)}:${Math.ceil(lastRenderedSize / 1024 / 1024)}`,
   );
 }
 
@@ -162,14 +162,14 @@ export async function prepareImagesForPdf(
   onProgress?: (progress: PreparedImageProgress) => void,
 ): Promise<File[]> {
   if (!images.length) {
-    throw new Error('กรุณาเลือกรูปอย่างน้อย 1 รูป');
+    throw new Error('no_images_selected');
   }
 
   const prepared: File[] = [];
   for (let index = 0; index < images.length; index += 1) {
     const image = images[index];
     if (!image.type.startsWith('image/')) {
-      throw new Error(`ไฟล์ ${image.name} ไม่ใช่รูปภาพ`);
+      throw new Error(`unsupported_image_file:${image.name}`);
     }
 
     onProgress?.({
@@ -189,7 +189,7 @@ export async function prepareImagesForPdf(
     }
 
     if (!selectedSource) {
-      throw new Error(`ไม่สามารถเตรียมรูป ${image.name} ได้`);
+      throw new Error(`prepare_image_failed:${image.name}`);
     }
 
     const preparedName = image.name.replace(/\.[^/.]+$/, '.jpg');
@@ -243,7 +243,7 @@ async function splitAndRenderGroup(sources: PdfImageSource[], maxPartSizeBytes: 
   }
 
   if (sources.length <= 1) {
-    throw new Error(`รูป ${sources[0]?.name ?? ''} ใหญ่เกินขีดจำกัดอัปโหลดต่อไฟล์ กรุณาลดขนาดรูปก่อน`);
+    throw new Error(`image_too_large_after_compress:${sources[0]?.name ?? ''}`);
   }
 
   const middleIndex = Math.ceil(sources.length / 2);
@@ -258,7 +258,7 @@ export async function buildPdfFilesFromImages(
   maxPartSizeBytes = DEFAULT_MAX_PDF_PART_BYTES,
 ): Promise<File[]> {
   if (!images.length) {
-    throw new Error('กรุณาเลือกรูปอย่างน้อย 1 รูป');
+    throw new Error('no_images_selected');
   }
 
   const normalizedMaxPartSize = normalizeMaxPartSize(maxPartSizeBytes);
@@ -300,7 +300,7 @@ export async function buildPdfFromImages(
 ): Promise<File> {
   const files = await buildPdfFilesFromImages(images, outputName);
   if (files.length !== 1) {
-    throw new Error('จำนวนรูปเยอะเกินไปสำหรับ PDF ไฟล์เดียว กรุณาใช้โหมดแปลงเป็นหลายไฟล์');
+    throw new Error('too_many_pdf_parts');
   }
   return files[0];
 }

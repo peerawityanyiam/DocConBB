@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import StatusBadge from './StatusBadge';
@@ -9,6 +9,10 @@ import { buildPdfFilesFromImages, prepareImagesForPdf } from '@/lib/files/image-
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
   MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
+  MAX_IMAGE_BATCH_COUNT,
+  MAX_IMAGE_BATCH_TOTAL_BYTES,
+  MAX_IMAGE_BATCH_TOTAL_LABEL,
+  MAX_IMAGE_PDF_PARTS,
 } from '@/lib/files/upload-limits';
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
@@ -71,7 +75,6 @@ const REJECTED_STATUSES = new Set<TaskStatus>([
   'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED',
 ]);
 const MAX_UPLOAD_FILE_SIZE = MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES;
-const MAX_IMAGE_SOURCE_TOTAL_SIZE = 300 * 1024 * 1024;
 const MAX_UPLOAD_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 900;
 
@@ -314,8 +317,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
           resolve();
         } else {
           try {
-            const d = JSON.parse(xhr.responseText) as { error?: string };
-            reject(new Error(d.error ?? `HTTP_${xhr.status}`));
+            const d = JSON.parse(xhr.responseText) as { error?: string; message?: string };
+            const rawError = [d.error, d.message].filter(Boolean).join(' ').trim();
+            reject(new Error(rawError || `HTTP_${xhr.status}`));
           } catch {
             reject(new Error(`HTTP_${xhr.status}`));
           }
@@ -398,6 +402,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       if (selectedImageFiles.length > 0) {
         setIsConvertingImages(true);
         const generatedPdfFiles = await buildPdfFilesFromImages(selectedImageFiles);
+        if (generatedPdfFiles.length > MAX_IMAGE_PDF_PARTS) {
+          throw new Error('too_many_pdf_parts');
+        }
         const hasImageBatchMeta = generatedPdfFiles.length > 1;
         const pdfBatchId = hasImageBatchMeta ? `imgpdf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : '';
         rollbackBatchId = hasImageBatchMeta ? pdfBatchId : null;
@@ -523,12 +530,15 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     setImageQueue(images.map((image) => ({ name: image.name, status: 'pending' })));
     setIsConvertingImages(true);
     try {
+      if (images.length > MAX_IMAGE_BATCH_COUNT) {
+        throw new Error('too_many_images');
+      }
       const nonImageFile = images.find((file) => !file.type.startsWith('image/'));
       if (nonImageFile) {
         throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
       }
-      if (sourceTotalBytes > MAX_IMAGE_SOURCE_TOTAL_SIZE) {
-        throw new Error('รูปที่เลือกมีขนาดรวมสูงเกิน 300MB กรุณาแบ่งอัปโหลดเป็นหลายรอบ');
+      if (sourceTotalBytes > MAX_IMAGE_BATCH_TOTAL_BYTES) {
+        throw new Error('image_total_too_large');
       }
 
       const preparedImages = await prepareImagesForPdf(images, (progress) => {
@@ -659,8 +669,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     ? (selectedImageCount
       ? 'ระบบจะรวมรูปที่เตรียมครบเป็น PDF ตอนกดปุ่มดำเนินการ'
       : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
-    : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
-  const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} ต่อไฟล์)`;
+    : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
+  const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
   const renderAttachmentSummary = (hint: string) => (
     <div className={`mt-2 rounded-md border px-2.5 py-2 text-[0.7rem] ${(selectedWordFile || selectedImageFiles.length > 0) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>
