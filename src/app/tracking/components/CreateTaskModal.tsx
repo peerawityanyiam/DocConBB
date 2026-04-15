@@ -89,7 +89,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         const data: UserOption[] = await res.json();
         setUsers(Array.isArray(data) ? data : []);
       } catch (err) {
-        setError(toFriendlyErrorMessage(err, 'à¹‚à¸«à¸¥à¸”à¸£à¸²à¸¢à¸Šà¸·à¹ˆà¸­à¸œà¸¹à¹‰à¹ƒà¸Šà¹‰à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ'));
+        setError(toFriendlyErrorMessage(err, 'โหลดรายชื่อผู้ใช้ไม่สำเร็จ'));
       }
     })();
   }, [open]);
@@ -111,16 +111,16 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   function handleWordChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0];
     if (!selected) return;
-    if (!selected.name.toLowerCase().endsWith('.docx')) { setError('à¸£à¸­à¸‡à¸£à¸±à¸šà¹€à¸‰à¸žà¸²à¸° .docx'); return; }
-    if (selected.size > MAX_FILE_SIZE) { setError(`à¸‚à¸™à¸²à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¹‰à¸­à¸‡à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
+    if (!selected.name.toLowerCase().endsWith('.docx')) { setError('รองรับเฉพาะ .docx'); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
     setError(''); setWordFile(selected);
   }
 
   function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0];
     if (!selected) return;
-    if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('à¸£à¸­à¸‡à¸£à¸±à¸šà¹€à¸‰à¸žà¸²à¸° .pdf'); return; }
-    if (selected.size > MAX_FILE_SIZE) { setError(`à¸‚à¸™à¸²à¸”à¹„à¸Ÿà¸¥à¹Œà¸•à¹‰à¸­à¸‡à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
+    if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('รองรับเฉพาะ .pdf'); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
     setError('');
     setPdfFile(selected);
     setPreparedImageFiles([]);
@@ -148,7 +148,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       }
       const nonImageFile = selectedImages.find((file) => !file.type.startsWith('image/'));
       if (nonImageFile) {
-        throw new Error(`à¹„à¸Ÿà¸¥à¹Œ ${nonImageFile.name} à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆà¸£à¸¹à¸›à¸ à¸²à¸ž`);
+        throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
       }
       if (sourceTotalBytes > MAX_IMAGE_SOURCE_TOTAL_SIZE) {
         throw new Error('image_total_too_large');
@@ -174,7 +174,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       setPreparedImageFiles([]);
       setPdfImageCount(null);
       setImageQueue([]);
-      setError(toUploadFailureMessage(err, 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸•à¸£à¸µà¸¢à¸¡à¸£à¸¹à¸›à¹€à¸žà¸·à¹ˆà¸­à¸ªà¹ˆà¸‡à¹„à¸”à¹‰'));
+      setError(toUploadFailureMessage(err, 'ไม่สามารถเตรียมรูปเพื่อส่งได้'));
     } finally {
       setIsConvertingImages(false);
       e.target.value = '';
@@ -245,7 +245,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       }
       attempt += 1;
     }
-    throw lastError instanceof Error ? lastError : new Error('à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+    throw lastError instanceof Error ? lastError : new Error('อัปโหลดไฟล์ไม่สำเร็จ');
   }
 
   async function rollbackCreatedTask(taskId: string): Promise<boolean> {
@@ -267,9 +267,9 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (!title.trim()) { setError('à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸Šà¸·à¹ˆà¸­à¸‡à¸²à¸™'); return; }
-    if (!officerId) { setError('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸š'); return; }
-    if (!reviewerId) { setError('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸œà¸¹à¹‰à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š'); return; }
+    if (!title.trim()) { setError('กรุณากรอกชื่องาน'); return; }
+    if (!officerId) { setError('กรุณาเลือกผู้รับผิดชอบ'); return; }
+    if (!reviewerId) { setError('กรุณาเลือกผู้ตรวจสอบ'); return; }
 
     setLoading(true);
     setUploadProgress(null);
@@ -284,7 +284,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       const data = await res.json();
       createdTaskId = data.id ?? null;
       if (!createdTaskId) throw new Error('MISSING_TASK_ID');
-      if (!res.ok) throw new Error(data.error ?? 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”');
+      if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
 
       // 2) Upload files if selected
       if (wordFile) {
@@ -326,13 +326,13 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       if (createdTaskId) {
         const rolledBack = await rollbackCreatedTask(createdTaskId);
         if (rolledBack) {
-          setError(toUploadFailureMessage(err, 'à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸£à¸°à¸šà¸šà¸¥à¸šà¸‡à¸²à¸™à¸—à¸µà¹ˆà¹€à¸žà¸´à¹ˆà¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¹à¸¥à¹‰à¸§'));
+          setError(toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ ระบบลบงานที่เพิ่งสร้างอัตโนมัติแล้ว'));
           return;
         }
-        setError(toUploadFailureMessage(err, 'à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¹à¸¥à¸°à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¥à¸šà¸‡à¸²à¸™à¸—à¸µà¹ˆà¸ªà¸£à¹‰à¸²à¸‡à¹„à¸§à¹‰à¹„à¸”à¹‰ à¸à¸£à¸¸à¸“à¸²à¸¥à¸šà¸‡à¸²à¸™à¸”à¹‰à¸§à¸¢à¸•à¸™à¹€à¸­à¸‡'));
+        setError(toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ และไม่สามารถลบงานที่สร้างไว้ได้ กรุณาลบงานด้วยตนเอง'));
         return;
       }
-      setError(toFriendlyErrorMessage(err, 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸” à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆà¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡'));
+      setError(toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'));
     } finally {
       setIsConvertingImages(false);
       setLoading(false);
@@ -344,28 +344,28 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
 
   const isUploading = uploadProgress !== null || isConvertingImages;
   const progressValue = uploadProgress ?? 0;
-  const uploadStatusLabel = isConvertingImages ? 'à¸à¸³à¸¥à¸±à¸‡à¹€à¸•à¸£à¸µà¸¢à¸¡à¸£à¸¹à¸› / à¸£à¸§à¸¡ PDF...' : 'à¸à¸³à¸¥à¸±à¸‡à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ...';
+  const uploadStatusLabel = isConvertingImages ? 'กำลังเตรียมรูป / รวม PDF...' : 'กำลังอัปโหลดไฟล์...';
   const imagePickerStatusText = isConvertingImages
-    ? 'à¸à¸³à¸¥à¸±à¸‡à¹€à¸•à¸£à¸µà¸¢à¸¡à¸£à¸¹à¸›...'
+    ? 'กำลังเตรียมรูป...'
     : (pdfImageCount
-      ? `à¹€à¸¥à¸·à¸­à¸à¸£à¸¹à¸›à¹à¸¥à¹‰à¸§ ${pdfImageCount} à¸£à¸¹à¸›`
-      : 'à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ...');
+      ? `เลือกรูปแล้ว ${pdfImageCount} รูป`
+      : 'ยังไม่ได้เลือกไฟล์...');
   const attachmentQueue = [
     wordFile ? `Word: ${wordFile.name}` : null,
     pdfFile ? `PDF: ${pdfFile.name}` : null,
-    preparedImageFiles.length > 0 ? `à¸ à¸²à¸ž: ${preparedImageFiles.length} à¸£à¸¹à¸› (à¸£à¸§à¸¡à¹€à¸›à¹‡à¸™ PDF à¸•à¸­à¸™à¸à¸”à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™)` : null,
+    preparedImageFiles.length > 0 ? `ภาพ: ${preparedImageFiles.length} รูป (รวมเป็น PDF ตอนกดสร้างงาน)` : null,
   ].filter((item): item is string => item !== null);
   const attachmentSummaryLabel = attachmentQueue.length > 0
     ? attachmentQueue.join(' | ')
-    : 'à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¹à¸™à¸š';
+    : 'ยังไม่ได้เลือกไฟล์แนบ';
   const attachmentSummaryHint = attachmentQueue.length > 0
     ? (preparedImageFiles.length > 0
-      ? 'à¸£à¸°à¸šà¸šà¸ˆà¸°à¸£à¸§à¸¡à¸ à¸²à¸žà¸—à¸µà¹ˆà¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸„à¸£à¸šà¹à¸¥à¹‰à¸§à¹€à¸›à¹‡à¸™ PDF à¸•à¸­à¸™à¸à¸”à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™'
-      : 'à¸£à¸°à¸šà¸šà¸ˆà¸°à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹€à¸«à¸¥à¹ˆà¸²à¸™à¸µà¹‰à¸—à¸±à¸™à¸—à¸µà¸«à¸¥à¸±à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™')
-    : `à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ Word / PDF (à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}) à¸«à¸£à¸·à¸­à¹ƒà¸Šà¹‰à¸›à¸¸à¹ˆà¸¡à¹à¸™à¸šà¸ à¸²à¸ž (à¸ªà¸¹à¸‡à¸ªà¸¸à¸” ${MAX_IMAGE_BATCH_COUNT} à¸£à¸¹à¸› / ${MAX_IMAGE_BATCH_TOTAL_LABEL} à¸•à¹ˆà¸­à¸„à¸£à¸±à¹‰à¸‡, à¹à¸•à¸ PDF à¹„à¸”à¹‰à¸ªà¸¹à¸‡à¸ªà¸¸à¸” ${MAX_IMAGE_PDF_PARTS} part)`;
+      ? 'ระบบจะรวมภาพที่อัปโหลดครบแล้วเป็น PDF ตอนกดสร้างงาน'
+      : 'ระบบจะอัปโหลดไฟล์เหล่านี้ทันทีหลังสร้างงาน')
+    : `เลือกไฟล์ Word / PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}) หรือใช้ปุ่มแนบภาพ (สูงสุด ${MAX_IMAGE_BATCH_COUNT} รูป / ${MAX_IMAGE_BATCH_TOTAL_LABEL} ต่อครั้ง, แตก PDF ได้สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
   const submitDisabledReason = isConvertingImages
-    ? 'à¸à¸£à¸¸à¸“à¸²à¸£à¸­à¸£à¸°à¸šà¸šà¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸£à¸¹à¸›à¹ƒà¸«à¹‰à¸„à¸£à¸šà¸à¹ˆà¸­à¸™'
-    : (loading ? 'à¸£à¸°à¸šà¸šà¸à¸³à¸¥à¸±à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™à¹à¸¥à¸°à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ à¸à¸£à¸¸à¸“à¸²à¸£à¸­à¸ªà¸±à¸à¸„à¸£à¸¹à¹ˆ' : '');
+    ? 'กรุณารอระบบเตรียมรูปให้ครบก่อน'
+    : (loading ? 'ระบบกำลังสร้างงานและอัปโหลดไฟล์ กรุณารอสักครู่' : '');
 
   return (
     <div
@@ -380,7 +380,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         {/* Header - matches ref modal with accent bg */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#e2e8f0]" style={{ background: '#00c2a8', borderRadius: '12px 12px 0 0' }}>
           <h2 className="text-[0.95rem] font-bold text-white flex items-center gap-2">
-            ï¼‹ à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™à¹ƒà¸«à¸¡à¹ˆ
+            + สร้างงานใหม่
           </h2>
           <button onClick={() => { reset(); onClose(); }} className="text-white/80 hover:text-white text-xl leading-none">&times;</button>
         </div>
@@ -388,49 +388,49 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">à¸Šà¸·à¹ˆà¸­à¸‡à¸²à¸™ <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">ชื่องาน <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="à¸Šà¸·à¹ˆà¸­à¸‡à¸²à¸™ / à¸Šà¸·à¹ˆà¸­à¹€à¸­à¸à¸ªà¸²à¸£"
+              placeholder="ชื่องาน / ชื่อเอกสาร"
               className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”</label>
+            <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">รายละเอียด</label>
             <textarea
               value={detail}
               onChange={e => setDetail(e.target.value)}
               rows={3}
-              placeholder="à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¹€à¸žà¸´à¹ˆà¸¡à¹€à¸•à¸´à¸¡"
+              placeholder="รายละเอียดเพิ่มเติม"
               className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8] resize-none"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">à¹€à¸ˆà¹‰à¸²à¸«à¸™à¹‰à¸²à¸—à¸µà¹ˆà¸œà¸¹à¹‰à¸£à¸±à¸šà¸‡à¸²à¸™ <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">เจ้าหน้าที่ผู้รับงาน <span className="text-red-500">*</span></label>
               <select
                 value={officerId}
                 onChange={e => setOfficerId(e.target.value)}
                 className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
               >
-                <option value="">-- à¹€à¸¥à¸·à¸­à¸ --</option>
+                <option value="">-- เลือก --</option>
                 {users.filter(u => u.roles?.includes('STAFF')).map(u => (
                   <option key={u.id} value={u.id}>{u.display_name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">à¸œà¸¹à¹‰à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-semibold text-[#0d1b2e] mb-1.5">ผู้ตรวจสอบ <span className="text-red-500">*</span></label>
               <select
                 value={reviewerId}
                 onChange={e => setReviewerId(e.target.value)}
                 className="w-full border border-[#e2e8f0] rounded-md px-3.5 py-2.5 text-sm text-[#0d1b2e] focus:outline-none focus:ring-2 focus:ring-[#00c2a8]/30 focus:border-[#00c2a8]"
               >
-                <option value="">-- à¹€à¸¥à¸·à¸­à¸ --</option>
+                <option value="">-- เลือก --</option>
                 {users.filter(u => u.roles?.includes('REVIEWER')).map(u => (
                   <option key={u.id} value={u.id}>{u.display_name}</option>
                 ))}
@@ -438,19 +438,19 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             </div>
           </div>
 
-          {/* File attachments â€” word + pdf */}
+          {/* File attachments - word + pdf */}
           <div className="space-y-3">
             <label className="block text-sm font-semibold text-[#0d1b2e]">
-              à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œà¹€à¸­à¸à¸ªà¸²à¸£ <span className="text-[#6b7f96] font-normal">(à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸š)</span>
+              แนบไฟล์เอกสาร <span className="text-[#6b7f96] font-normal">(ไม่บังคับ)</span>
             </label>
             <div className={`rounded-lg border px-3 py-2 text-xs ${attachmentQueue.length > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
-              <p className="font-semibold">à¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¸žà¸£à¹‰à¸­à¸¡à¸ªà¹ˆà¸‡</p>
+              <p className="font-semibold">ไฟล์ที่พร้อมส่ง</p>
               <p className="mt-0.5 break-all">{attachmentSummaryLabel}</p>
               <p className="mt-0.5 text-[0.68rem] opacity-80">{attachmentSummaryHint}</p>
             </div>
             {/* Word */}
             <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
-              <label className="text-xs font-semibold text-[#374f6b] mb-1.5 block">ðŸ“„ à¹„à¸Ÿà¸¥à¹Œ Word (.docx)</label>
+              <label className="text-xs font-semibold text-[#374f6b] mb-1.5 block">📄 ไฟล์ Word (.docx)</label>
               <input
                 ref={wordInputRef}
                 type="file"
@@ -460,14 +460,14 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
               />
               {wordFile && (
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
-                  <span>âœ… {wordFile.name}</span>
-                  <button type="button" onClick={() => { setWordFile(null); if (wordInputRef.current) wordInputRef.current.value = ''; }} className="text-red-400 hover:text-red-600">âœ•</button>
+                  <span>✅ {wordFile.name}</span>
+                  <button type="button" onClick={() => { setWordFile(null); if (wordInputRef.current) wordInputRef.current.value = ''; }} className="text-red-400 hover:text-red-600">✕</button>
                 </div>
               )}
             </div>
             {/* PDF */}
             <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
-              <label className="text-xs font-semibold text-[#374f6b] mb-1.5 block">ðŸ“‹ à¹„à¸Ÿà¸¥à¹Œ PDF (.pdf)</label>
+              <label className="text-xs font-semibold text-[#374f6b] mb-1.5 block">📋 ไฟล์ PDF (.pdf)</label>
               <input
                 ref={pdfInputRef}
                 type="file"
@@ -490,13 +490,13 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                   disabled={loading || isConvertingImages}
                   className="inline-flex items-center px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  ðŸ–¼ï¸ à¹à¸™à¸šà¸ à¸²à¸ž
+                  🖼️ แนบภาพ
                 </button>
                 <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
               </div>
               {pdfFile && (
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
-                  <span>âœ… {pdfFile.name}</span>
+                  <span>✅ {pdfFile.name}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -509,7 +509,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                     }}
                     className="text-red-400 hover:text-red-600"
                   >
-                    âœ•
+                    ✕
                   </button>
                 </div>
               )}
@@ -517,7 +517,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 <div className="mt-2 space-y-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-2 max-h-32 overflow-y-auto">
                   {imageQueue.map((item, index) => (
                     <p key={`${item.name}-${index}`} className="text-[0.7rem] text-amber-800 break-all">
-                      {`à¸£à¸¹à¸› ${index + 1} ${item.status === 'uploading' ? 'à¸à¸³à¸¥à¸±à¸‡à¹€à¸•à¸£à¸µà¸¢à¸¡' : item.status === 'done' ? 'à¹€à¸•à¸£à¸µà¸¢à¸¡à¹à¸¥à¹‰à¸§' : 'à¸£à¸­à¹€à¸•à¸£à¸µà¸¢à¸¡'}: ${item.name}`}
+                      {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังเตรียม' : item.status === 'done' ? 'เตรียมแล้ว' : 'รอเตรียม'}: ${item.name}`}
                     </p>
                   ))}
                 </div>
@@ -553,18 +553,18 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
             <button type="button" onClick={() => { reset(); onClose(); }}
               className="px-4 py-2 text-sm text-[#374f6b] border border-[#e2e8f0] rounded-lg hover:bg-[#f8fafc] font-semibold">
-              à¸¢à¸à¹€à¸¥à¸´à¸
+              ยกเลิก
             </button>
             <button type="submit" disabled={loading || isConvertingImages}
               title={submitDisabledReason || undefined}
               className="px-5 py-2 text-white font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors"
               style={{ background: '#00c2a8' }}>
-              {loading ? (isUploading ? 'à¸à¸³à¸¥à¸±à¸‡à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”...' : 'à¸à¸³à¸¥à¸±à¸‡à¸ªà¸£à¹‰à¸²à¸‡...') : 'ðŸ“¨ à¸ªà¸£à¹‰à¸²à¸‡à¸‡à¸²à¸™'}
+              {loading ? (isUploading ? 'กำลังอัปโหลด...' : 'กำลังสร้าง...') : '📨 สร้างงาน'}
             </button>
           </div>
           {submitDisabledReason && (
             <p className="text-[0.68rem] text-amber-700 text-right mt-2">
-              â„¹ {submitDisabledReason}
+              ℹ {submitDisabledReason}
             </p>
           )}
           </div>
