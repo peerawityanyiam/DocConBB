@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { ROLE_LABELS, ROLE_COLORS } from '@/lib/constants/roles';
@@ -101,7 +101,7 @@ export default function UserManagement({ initialUsers, projects, currentUserId }
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Page header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">จัดการผู้ใช้งาน</h1>
+        <h1 className="text-2xl font-bold text-slate-900">จัดการผู้ใช้ - ระบบติดตามเอกสาร</h1>
         <p className="text-slate-500 text-sm mt-1">
           บริหารสิทธิ์บุคลากร {stats.total} คน
         </p>
@@ -274,3 +274,4 @@ export default function UserManagement({ initialUsers, projects, currentUserId }
     </div>
   );
 }
+

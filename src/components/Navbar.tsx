@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -10,8 +10,9 @@ const DOCUMENT_CONTROL_GAS_URL =
   'https://accounts.google.com/AccountChooser?continue=https://script.google.com/a/macros/medicine.psu.ac.th/s/AKfycbx0oytFnXvNDaMfPkfLTUQKd8zr-uHpNhuaJNv2csLnM3pKADaWxpa0laQcVciTvRe-/exec';
 
 const NAV_ITEMS = [
+  { href: '/', label: 'กลับหน้าแรก', exact: true },
   { href: '/tracking', label: 'ติดตามเอกสาร' },
-  { href: DOCUMENT_CONTROL_GAS_URL, label: 'คลังเอกสาร' },
+  { href: DOCUMENT_CONTROL_GAS_URL, label: 'คลังเอกสาร', external: true },
   { href: '/admin', label: 'จัดการผู้ใช้' },
 ];
 
@@ -64,6 +65,12 @@ export default function Navbar() {
     window.location.href = '/login';
   };
 
+  const isNavItemActive = (item: (typeof NAV_ITEMS)[number]) => {
+    if (item.external) return false;
+    if (item.exact) return pathname === item.href;
+    return pathname.startsWith(item.href);
+  };
+
   return (
     <nav
       className="sticky top-0 z-50 shadow-[0_2px_12px_rgba(0,0,0,0.15)]"
@@ -87,7 +94,7 @@ export default function Navbar() {
               key={item.href}
               href={item.href}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                pathname.startsWith(item.href)
+                isNavItemActive(item)
                   ? 'bg-[#00c2a8] text-white'
                   : 'text-slate-400 hover:text-white hover:bg-white/10'
               }`}
@@ -153,7 +160,7 @@ export default function Navbar() {
               href={item.href}
               onClick={() => setMenuOpen(false)}
               className={`block px-3 py-2 rounded-lg text-sm font-medium ${
-                pathname.startsWith(item.href)
+                isNavItemActive(item)
                   ? 'bg-[#00c2a8] text-white'
                   : 'text-slate-300 hover:bg-white/10'
               }`}
@@ -187,3 +194,4 @@ export default function Navbar() {
     </nav>
   );
 }
+

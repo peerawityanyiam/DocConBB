@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { STATUS_LABELS, STATUS_COLORS, type TaskStatus } from '@/lib/constants/status';
@@ -131,7 +131,7 @@ export default function DashboardModal({ open, onClose }: DashboardModalProps) {
                 <h3 className="text-sm font-semibold text-slate-700 mb-3">สรุปภาพรวม</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <SummaryCard label="งานทั้งหมด" value={stats.total} accent="bg-slate-100 text-slate-700" icon="📋" />
-                  <SummaryCard label="รอดำเนินการ" value={stats.pending} accent="bg-yellow-50 text-yellow-700" icon="⏳" />
+                  <SummaryCard label="กำลังดำเนินการ" value={stats.pending} accent="bg-yellow-50 text-yellow-700" icon="⏳" />
                   <SummaryCard label="รออนุมัติ" value={stats.waitingApproval} accent="bg-purple-50 text-purple-700" icon="✍️" />
                   <SummaryCard label="เสร็จสมบูรณ์" value={completedCount} accent="bg-green-50 text-green-700" icon="✅" />
                 </div>
@@ -227,3 +227,4 @@ function SummaryCard({ label, value, accent, icon }: { label: string; value: num
     </div>
   );
 }
+

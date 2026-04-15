@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation';
+﻿import { redirect } from 'next/navigation';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import Navbar from '@/components/Navbar';
 
-export const metadata = { title: 'จัดการผู้ใช้งาน — DocTrack' };
+export const metadata = { title: 'จัดการผู้ใช้ - ระบบติดตามเอกสาร' };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
@@ -39,3 +39,4 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     </>
   );
 }
+
