@@ -99,13 +99,23 @@ export async function POST(
 
     if (!canUpload) {
       const rolesStr = Array.from(userRolesSet).join(', ') || 'none';
+      const authRolesStr = Array.from(authRolesSet).join(', ') || 'none';
+      const isStaffLike = userRolesSet.has('STAFF') || authRolesSet.has('STAFF');
+      const statusInOfficerFlow = officerStatuses.includes(s);
+      const denyCode = isStaffLike && statusInOfficerFlow && !isOfficer
+        ? 'not_task_officer'
+        : 'forbidden_upload_state';
+      const denyMessage = denyCode === 'not_task_officer'
+        ? 'This task is not assigned to your account.'
+        : 'You do not have permission to upload files in this status.';
       return errorResponse(
         403,
-        'forbidden_upload_state',
-        'You do not have permission to upload files in this status.',
+        denyCode,
+        denyMessage,
         {
           debug: {
             roles: rolesStr,
+            authRoles: authRolesStr,
             status: s,
             officer: isOfficer,
             reviewer: isReviewer,

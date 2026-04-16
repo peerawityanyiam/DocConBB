@@ -40,6 +40,14 @@ export function toFriendlyErrorMessage(
     return 'File size exceeds 4MB per file.';
   }
 
+  if (normalized.includes('forbidden_upload_state')) {
+    return 'You do not have permission to upload files for this task/status.';
+  }
+
+  if (normalized.includes('not_task_officer')) {
+    return 'This task is not assigned to your account.';
+  }
+
   if (normalized.includes('unsupported_file_type') || normalized.includes('unsupported_image_file')) {
     return 'Only Word (.docx), PDF (.pdf), and image files are supported.';
   }
@@ -90,11 +98,7 @@ export function toFriendlyErrorMessage(
   }
 
   if (
-    normalized.includes('50mb') ||
-    normalized.includes('4mb') ||
-    normalized.includes('8mb') ||
     normalized.includes('413') ||
-    normalized.includes('too large') ||
     normalized.includes('payload too large')
   ) {
     return 'File size is too large for this system. Please reduce size or split upload.';
@@ -132,11 +136,7 @@ export function toUploadFailureMessage(
     normalized.includes('too_many_images') ||
     normalized.includes('image_total_too_large') ||
     normalized.includes('too_many_pdf_parts') ||
-    normalized.includes('50mb') ||
-    normalized.includes('4mb') ||
-    normalized.includes('8mb') ||
     normalized.includes('413') ||
-    normalized.includes('too large') ||
     normalized.includes('payload too large') ||
     normalized.includes('file_too_large')
   ) {
@@ -174,5 +174,5 @@ export function toUploadFailureMessage(
     return friendly + '\nSuggestion: sign out and sign in again before retrying.';
   }
 
-  return friendly + '\nSuggestion: reduce file count or size, then upload again.';
+  return friendly + '\nSuggestion: try again, and if the issue persists contact admin.';
 }
