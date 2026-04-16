@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export type AppRole = 'STAFF' | 'DOCCON' | 'REVIEWER' | 'BOSS' | 'SUPER_BOSS' | 'SUPER_ADMIN';
@@ -15,8 +15,9 @@ export async function getAuthUser(projectSlug: string): Promise<AuthUser | null>
 
   if (!user?.email) return null;
   const normalizedEmail = user.email.trim().toLowerCase();
+  const admin = await createServiceRoleClient();
 
-  const { data: dbUser } = await supabase
+  const { data: dbUser } = await admin
     .from('users')
     .select('id')
     .ilike('email', normalizedEmail)
@@ -24,16 +25,26 @@ export async function getAuthUser(projectSlug: string): Promise<AuthUser | null>
 
   if (!dbUser) return null;
 
-  const { data: roles } = await supabase
+  const { data: projectRoles } = await admin
     .from('user_project_roles')
     .select('role, projects!inner(slug)')
     .eq('user_id', dbUser.id)
     .eq('projects.slug', projectSlug);
 
+  // Backward compatibility: some older users may still have roles in legacy user_roles only.
+  const { data: legacyRoles } = await admin
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', dbUser.id);
+
+  const mergedRoles = new Set<AppRole>();
+  for (const row of projectRoles ?? []) mergedRoles.add(row.role as AppRole);
+  for (const row of legacyRoles ?? []) mergedRoles.add(row.role as AppRole);
+
   return {
     id: dbUser.id,
     email: normalizedEmail,
-    roles: (roles ?? []).map((r: { role: AppRole }) => r.role),
+    roles: Array.from(mergedRoles),
   };
 }
 
