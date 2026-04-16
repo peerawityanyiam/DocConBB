@@ -336,7 +336,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
               isPdf: Boolean(payload.isPdf),
             });
           } catch {
-            reject(new Error('invalid_upload_response'));
+            const responsePreview = (xhr.responseText || '').slice(0, 200);
+            reject(new Error(`invalid_upload_response ${responsePreview}`));
           }
         } else {
           try {

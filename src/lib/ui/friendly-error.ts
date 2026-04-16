@@ -17,7 +17,7 @@ function parseSingleImageTooLargeFileName(raw: string): string | null {
 
 export function toFriendlyErrorMessage(
   error: unknown,
-  fallback = 'Something went wrong. Please try again.'
+  fallback = 'เกิดข้อผิดพลาด กรุณาลองใหม่'
 ): string {
   const raw = extractRawMessage(error);
   if (!raw) return fallback;
@@ -25,47 +25,55 @@ export function toFriendlyErrorMessage(
   const normalized = raw.toLowerCase();
 
   if (normalized.includes('too_many_images')) {
-    return 'You can select up to 20 images per upload.';
+    return 'เลือกรูปได้สูงสุด 20 รูปต่อครั้ง';
   }
 
   if (normalized.includes('image_total_too_large')) {
-    return 'Total image size exceeds 80MB per upload. Please split into smaller batches.';
+    return 'ขนาดรวมรูปเกิน 80MB ต่อครั้ง กรุณาแบ่งอัปโหลด';
   }
 
   if (normalized.includes('too_many_pdf_parts')) {
-    return 'Selected images produce more than 20 PDF parts. Please reduce image count or split upload.';
+    return 'รูปที่เลือกแปลงเป็น PDF ได้เกิน 20 ส่วน กรุณาลดจำนวนรูปหรือแบ่งอัปโหลด';
   }
 
   if (normalized.includes('file_too_large')) {
-    return 'File size exceeds 4MB per file.';
+    return 'ขนาดไฟล์เกิน 4MB ต่อไฟล์';
   }
 
   if (normalized.includes('forbidden_upload_state')) {
-    return 'You do not have permission to upload files for this task/status.';
+    return 'ไม่มีสิทธิ์อัปโหลดไฟล์ในสถานะงานนี้';
   }
 
   if (normalized.includes('not_task_officer')) {
-    return 'This task is not assigned to your account.';
+    return 'งานนี้ไม่ได้มอบหมายให้บัญชีของคุณ';
+  }
+
+  if (normalized.includes('missing_drive_file_id') || normalized.includes('invalid_upload_response')) {
+    return 'ระบบอัปโหลดตอบกลับไม่ครบถ้วน กรุณาลองใหม่';
+  }
+
+  if (normalized.includes('upload_failed')) {
+    return 'อัปโหลดไฟล์ไม่สำเร็จ';
   }
 
   if (normalized.includes('unsupported_file_type') || normalized.includes('unsupported_image_file')) {
-    return 'Only Word (.docx), PDF (.pdf), and image files are supported.';
+    return 'รองรับเฉพาะไฟล์ Word (.docx), PDF (.pdf) และรูปภาพ';
   }
 
   if (normalized.includes('image_too_large_after_compress')) {
     const fileName = parseSingleImageTooLargeFileName(raw);
     if (fileName) {
-      return 'Image ' + fileName + ' is still too large after conversion. Please reduce size and try again.';
+      return 'รูป ' + fileName + ' ยังมีขนาดใหญ่เกินหลังแปลง กรุณาลดขนาดและลองใหม่';
     }
-    return 'At least one image is still too large after conversion. Please reduce image size and try again.';
+    return 'มีรูปอย่างน้อย 1 รูปที่ยังใหญ่เกินหลังแปลง กรุณาลดขนาดรูปและลองใหม่';
   }
 
   if (normalized.includes('no_images_selected')) {
-    return 'Please select at least one image.';
+    return 'กรุณาเลือกรูปอย่างน้อย 1 รูป';
   }
 
   if (normalized.includes('image_processing_failed') || normalized.includes('image_conversion_failed') || normalized.includes('prepare_image_failed')) {
-    return 'Unable to prepare images. Please try again.';
+    return 'ไม่สามารถเตรียมรูปสำหรับอัปโหลดได้ กรุณาลองใหม่';
   }
 
   if (
@@ -76,11 +84,11 @@ export function toFriendlyErrorMessage(
     normalized.includes('access token') ||
     normalized.includes('scope')
   ) {
-    return 'Insufficient permissions. Please sign out and sign in again.';
+    return 'สิทธิ์การเข้าถึงไม่เพียงพอ กรุณาออกจากระบบและเข้าสู่ระบบใหม่';
   }
 
   if (normalized === 'unauthorized' || normalized.includes('401')) {
-    return 'Session expired. Please sign in again.';
+    return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
   }
 
   if (
@@ -90,36 +98,36 @@ export function toFriendlyErrorMessage(
     normalized.includes('load failed') ||
     normalized.includes('econn')
   ) {
-    return 'Cannot connect to server. Please check your internet connection and try again.';
+    return 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่';
   }
 
   if (normalized.includes('timeout')) {
-    return 'Request timed out. Please try again.';
+    return 'การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่';
   }
 
   if (
     normalized.includes('413') ||
     normalized.includes('payload too large')
   ) {
-    return 'File size is too large for this system. Please reduce size or split upload.';
+    return 'ไฟล์มีขนาดใหญ่เกินกว่าที่ระบบรองรับ กรุณาลดขนาดหรือแบ่งอัปโหลด';
   }
 
   if (normalized.includes('.docx') && normalized.includes('.pdf')) {
-    return 'Only .docx or .pdf files are supported.';
+    return 'รองรับเฉพาะ .docx หรือ .pdf';
   }
 
   if (normalized.includes('.docx')) {
-    return 'Only Word (.docx) files are supported.';
+    return 'รองรับเฉพาะไฟล์ Word (.docx)';
   }
 
   if (normalized.includes('.pdf')) {
-    return 'Only PDF (.pdf) files are supported.';
+    return 'รองรับเฉพาะไฟล์ PDF (.pdf)';
   }
 
   if (THAI_PATTERN.test(raw)) return raw;
 
   if (normalized.includes('internal') || normalized.includes('500')) {
-    return 'Temporary server error. Please try again.';
+    return 'เซิร์ฟเวอร์ขัดข้องชั่วคราว กรุณาลองใหม่';
   }
 
   return fallback;
@@ -127,8 +135,9 @@ export function toFriendlyErrorMessage(
 
 export function toUploadFailureMessage(
   error: unknown,
-  fallback = 'Upload failed.'
+  fallback = 'อัปโหลดไฟล์ไม่สำเร็จ'
 ): string {
+  const raw = extractRawMessage(error);
   const friendly = toFriendlyErrorMessage(error, fallback);
   const normalized = getNormalizedText(error, friendly);
 
@@ -140,7 +149,7 @@ export function toUploadFailureMessage(
     normalized.includes('payload too large') ||
     normalized.includes('file_too_large')
   ) {
-    return friendly + '\nSystem limits: max 4MB per file, max 20 images / 80MB per upload, max 20 PDF parts.';
+    return friendly + '\nข้อจำกัดระบบ: ต่อไฟล์ไม่เกิน 4MB, ต่อครั้งไม่เกิน 20 รูป/80MB, และแตก PDF ได้สูงสุด 20 ส่วน';
   }
 
   if (
@@ -151,7 +160,7 @@ export function toUploadFailureMessage(
     normalized.includes('econn') ||
     normalized.includes('timeout')
   ) {
-    return friendly + '\nSuggestion: check internet connection and try again, or split into smaller batches.';
+    return friendly + '\nคำแนะนำ: ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่ หรือแบ่งอัปโหลดเป็นชุดเล็กลง';
   }
 
   if (
@@ -162,7 +171,7 @@ export function toUploadFailureMessage(
     normalized.includes('unsupported_file_type') ||
     normalized.includes('unsupported_image_file')
   ) {
-    return friendly + '\nSuggestion: use .docx / .pdf files, or attach images for auto-PDF conversion.';
+    return friendly + '\nคำแนะนำ: ใช้ไฟล์ .docx / .pdf หรือแนบรูปเพื่อให้ระบบรวมเป็น PDF อัตโนมัติ';
   }
 
   if (
@@ -171,8 +180,12 @@ export function toUploadFailureMessage(
     normalized.includes('forbidden') ||
     normalized.includes('scope')
   ) {
-    return friendly + '\nSuggestion: sign out and sign in again before retrying.';
+    return friendly + '\nคำแนะนำ: ออกจากระบบแล้วเข้าสู่ระบบใหม่ก่อนลองอีกครั้ง';
   }
 
-  return friendly + '\nSuggestion: try again, and if the issue persists contact admin.';
+  if (raw) {
+    return friendly + '\nรายละเอียด: ' + raw;
+  }
+
+  return friendly;
 }
