@@ -54,8 +54,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const allowedDomain = process.env.ALLOWED_DOMAIN || 'medicine.psu.ac.th';
-  if (user.email && !user.email.endsWith(`@${allowedDomain}`)) {
+  const allowedDomains = (process.env.ALLOWED_DOMAIN || 'medicine.psu.ac.th')
+    .split(',').map(d => d.trim()).filter(Boolean);
+  if (user.email && !allowedDomains.some(d => user.email!.endsWith(`@${d}`))) {
     await supabase.auth.signOut();
     const url = request.nextUrl.clone();
     url.pathname = '/login';
