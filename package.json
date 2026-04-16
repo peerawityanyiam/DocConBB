@@ -12,6 +12,7 @@
     "@serwist/next": "^9.5.7",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
+    "@vercel/analytics": "^2.0.1",
     "googleapis": "^171.4.0",
     "next": "16.2.2",
     "pdf-lib": "^1.17.1",

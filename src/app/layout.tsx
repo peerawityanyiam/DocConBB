@@ -1,9 +1,10 @@
-﻿import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import SessionIdleGuard from "@/components/SessionIdleGuard";
+import { Analytics } from "@vercel/analytics/next";
 
 const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   weight: ["300", "400", "500", "600", "700"],
@@ -51,6 +52,7 @@ export default function RootLayout({
           {children}
           <PWAInstallPrompt />
         </ToastProvider>
+        <Analytics />
       </body>
     </html>
   );
