@@ -1,6 +1,6 @@
-// Files are uploaded directly to Google Drive (bypassing Vercel's 4.5MB limit).
-export const MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES = 100 * 1024 * 1024;
-export const MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL = '100MB';
+// Deployed on Vercel serverless: keep under request payload ceiling (~4.5MB) with headroom.
+export const MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES = 4 * 1024 * 1024;
+export const MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL = '4MB';
 export const TARGET_COMPRESSED_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 export const TARGET_COMPRESSED_IMAGE_MAX_LABEL = '4MB';
 
