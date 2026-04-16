@@ -49,6 +49,14 @@ export async function POST(
     if (!['docx', 'pdf'].includes(ext ?? '')) {
       return errorResponse(400, 'unsupported_file_type', 'Only .docx and .pdf are supported.');
     }
+    // Mobile browsers sometimes send missing/legacy MIME (e.g. application/msword).
+    // Force canonical MIME by extension so Drive keeps correct file type behavior.
+    const normalizedMimeType =
+      ext === 'docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : ext === 'pdf'
+          ? 'application/pdf'
+          : (file.type || 'application/octet-stream');
 
     if (file.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
       return errorResponse(400, 'file_too_large', `File exceeds ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}.`);
@@ -158,7 +166,7 @@ export async function POST(
       const result = await uploadFile(
         taskFolderId,
         file.name,
-        file.type || 'application/octet-stream',
+        normalizedMimeType,
         buffer
       );
       driveFileId = result.id;
@@ -172,7 +180,7 @@ export async function POST(
         const result = await uploadFile(
           taskFolderId,
           file.name,
-          file.type || 'application/octet-stream',
+          normalizedMimeType,
           buffer
         );
         driveFileId = result.id;
@@ -401,4 +409,3 @@ export async function DELETE(
     return errorResponse(500, 'rollback_failed', 'Unable to rollback partial uploaded files.');
   }
 }
-
