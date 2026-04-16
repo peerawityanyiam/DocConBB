@@ -1,8 +1,11 @@
+const primaryDomain = (process.env.ALLOWED_DOMAIN || 'medicine.psu.ac.th')
+  .split(',')[0].trim();
+
 export const AUTH_CONFIG = {
   allowedDomain: process.env.ALLOWED_DOMAIN || 'medicine.psu.ac.th',
   oauthProvider: 'google' as const,
   oauthQueryParams: {
-    hd: 'medicine.psu.ac.th',
+    hd: primaryDomain,
     prompt: 'select_account',
   },
   loginPath: '/login',
