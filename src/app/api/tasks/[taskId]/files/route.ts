@@ -25,6 +25,7 @@ export async function POST(
   try {
     const user = await getAuthUser('tracking');
     if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.');
+    const normalizedUserEmail = user.email.trim().toLowerCase();
 
     const { taskId } = await params;
     const formData = await request.formData();
@@ -67,40 +68,33 @@ export async function POST(
     const { data: dbUser } = await admin
       .from('users')
       .select('id, display_name')
-      .eq('email', user.email)
+      .eq('id', user.id)
       .single();
     if (!dbUser) throw new AuthError('User profile not found.', 404);
 
     const { data: task } = await admin.from('tasks').select('*').eq('id', taskId).single();
     if (!task) return errorResponse(404, 'task_not_found', 'Task not found.');
 
-    const { data: userRoleRows } = await admin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', dbUser.id);
-    const userRolesSet = new Set((userRoleRows ?? []).map(r => r.role));
-
     const s = task.status;
-    const isOfficer = task.officer_id === dbUser.id;
-    const isReviewer = task.reviewer_id === dbUser.id;
-    const isCreator = task.created_by === dbUser.id;
+    const isOfficer = task.officer_id === user.id;
+    const isReviewer = task.reviewer_id === user.id;
+    const isCreator = task.created_by === user.id;
 
     const officerStatuses = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
 
     let canUpload = false;
-    const authRolesSet = new Set(user.roles);
+    const projectRolesSet = new Set(user.roles.map((role) => role.toUpperCase()));
 
     if (isOfficer && officerStatuses.includes(s)) canUpload = true;
     if (isCreator && (s === 'ASSIGNED' || s === 'WAITING_BOSS_APPROVAL')) canUpload = true;
-    if ((userRolesSet.has('DOCCON') || authRolesSet.has('DOCCON')) && s === 'SUBMITTED_TO_DOCCON') canUpload = true;
+    if (projectRolesSet.has('DOCCON') && s === 'SUBMITTED_TO_DOCCON') canUpload = true;
     if (isReviewer && s === 'PENDING_REVIEW') canUpload = true;
-    if ((userRolesSet.has('SUPER_BOSS') || authRolesSet.has('SUPER_BOSS')) && s === 'WAITING_SUPER_BOSS_APPROVAL') canUpload = true;
-    if (userRolesSet.has('SUPER_ADMIN') || authRolesSet.has('SUPER_ADMIN')) canUpload = true;
+    if (projectRolesSet.has('SUPER_BOSS') && s === 'WAITING_SUPER_BOSS_APPROVAL') canUpload = true;
+    if (projectRolesSet.has('SUPER_ADMIN')) canUpload = true;
 
     if (!canUpload) {
-      const rolesStr = Array.from(userRolesSet).join(', ') || 'none';
-      const authRolesStr = Array.from(authRolesSet).join(', ') || 'none';
-      const isStaffLike = userRolesSet.has('STAFF') || authRolesSet.has('STAFF');
+      const rolesStr = Array.from(projectRolesSet).join(', ') || 'none';
+      const isStaffLike = projectRolesSet.has('STAFF');
       const statusInOfficerFlow = officerStatuses.includes(s);
       const denyCode = isStaffLike && statusInOfficerFlow && !isOfficer
         ? 'not_task_officer'
@@ -115,7 +109,6 @@ export async function POST(
         {
           debug: {
             roles: rolesStr,
-            authRoles: authRolesStr,
             status: s,
             officer: isOfficer,
             reviewer: isReviewer,
@@ -136,7 +129,7 @@ export async function POST(
           'This status accepts only .docx files (PDF is for rejection reference).',
         );
       }
-      if (s === 'SUBMITTED_TO_DOCCON' && (userRolesSet.has('DOCCON') || authRolesSet.has('DOCCON')) && !isCreator) {
+      if (s === 'SUBMITTED_TO_DOCCON' && projectRolesSet.has('DOCCON') && !isCreator) {
         const history = (task.status_history as Array<{status?: string; note?: string}>) ?? [];
         for (let i = history.length - 1; i >= 0; i--) {
           const h = history[i];
@@ -239,7 +232,7 @@ export async function POST(
     const newFileHistoryEntry = {
       fileName: driveFileName,
       uploadedAt: now,
-      uploadedBy: user.email,
+      uploadedBy: normalizedUserEmail,
       uploadedByName: dbUser.display_name,
       driveFileId,
       isPdf,
@@ -293,7 +286,7 @@ export async function POST(
 
     await admin.from('uploaded_files').insert({
       task_id: taskId,
-      uploader_id: dbUser.id,
+      uploader_id: user.id,
       drive_file_id: driveFileId,
       drive_file_name: driveFileName,
       file_type: ext?.toUpperCase(),
@@ -330,6 +323,7 @@ export async function DELETE(
   try {
     const user = await getAuthUser('tracking');
     if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.');
+    const normalizedUserEmail = user.email.trim().toLowerCase();
 
     const { taskId } = await params;
     const uploadBatchId = request.nextUrl.searchParams.get('upload_batch_id')?.trim();
@@ -358,7 +352,7 @@ export async function DELETE(
 
     const toRollback = fileHistory.filter((entry) => {
       if (!entry.isPdf) return false;
-      if (entry.uploadedBy !== user.email) return false;
+      if ((entry.uploadedBy ?? '').toLowerCase() !== normalizedUserEmail) return false;
       if (typeof entry.driveFileId !== 'string' || entry.driveFileId.length === 0) return false;
       if (uploadBatchId && entry.uploadBatchId === uploadBatchId) return true;
       if (targetDriveIds.has(entry.driveFileId)) return true;
@@ -374,7 +368,7 @@ export async function DELETE(
     const rollbackIdSet = new Set(rollbackIds);
     const filteredHistory = fileHistory.filter((entry) => {
       if (!entry.isPdf) return true;
-      if (entry.uploadedBy !== user.email) return true;
+      if ((entry.uploadedBy ?? '').toLowerCase() !== normalizedUserEmail) return true;
       if (typeof entry.driveFileId !== 'string' || entry.driveFileId.length === 0) return true;
       return !rollbackIdSet.has(entry.driveFileId);
     });

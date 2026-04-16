@@ -14,11 +14,12 @@ export async function getAuthUser(projectSlug: string): Promise<AuthUser | null>
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user?.email) return null;
+  const normalizedEmail = user.email.trim().toLowerCase();
 
   const { data: dbUser } = await supabase
     .from('users')
     .select('id')
-    .eq('email', user.email)
+    .ilike('email', normalizedEmail)
     .single();
 
   if (!dbUser) return null;
@@ -31,7 +32,7 @@ export async function getAuthUser(projectSlug: string): Promise<AuthUser | null>
 
   return {
     id: dbUser.id,
-    email: user.email,
+    email: normalizedEmail,
     roles: (roles ?? []).map((r: { role: AppRole }) => r.role),
   };
 }

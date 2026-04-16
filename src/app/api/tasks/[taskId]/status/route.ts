@@ -42,6 +42,7 @@ export async function PATCH(
   try {
     const user = await getAuthUser('tracking');
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const normalizedUserEmail = user.email.trim().toLowerCase();
 
     const { taskId } = await params;
     const { action, comment, doc_ref } = await request.json() as {
@@ -61,7 +62,7 @@ export async function PATCH(
     const { data: dbUser } = await admin
       .from('users')
       .select('id, display_name')
-      .eq('email', user.email)
+      .eq('id', user.id)
       .single();
     if (!dbUser) throw new AuthError('ไม่พบข้อมูลผู้ใช้', 404);
 
@@ -132,7 +133,7 @@ export async function PATCH(
           if (!latestFile || latestFile.isPdf) {
             throw new AuthError('กรุณาอัปโหลดไฟล์ Word (.docx) ก่อนส่งกลับไปอนุมัติ', 400);
           }
-          if (latestFile.uploadedBy && latestFile.uploadedBy !== user.email) {
+          if (latestFile.uploadedBy && latestFile.uploadedBy.toLowerCase() !== normalizedUserEmail) {
             throw new AuthError('ต้องอัปโหลดไฟล์ Word ด้วยบัญชี DocCon คนปัจจุบันก่อนส่งกลับไปอนุมัติ', 400);
           }
           if (
@@ -234,14 +235,14 @@ export async function PATCH(
     const statusEntry = {
       status: newStatus,
       changedAt: now,
-      changedBy: user.email,
+      changedBy: normalizedUserEmail,
       changedByName: dbUser.display_name,
       note: noteMap[action] ?? (comment ?? ''),
     };
 
     const newStatusHistory = [...(task.status_history ?? []), statusEntry];
     const newCommentHistory = comment?.trim()
-      ? [...(task.comment_history ?? []), { text: comment.trim(), by: user.email, byName: dbUser.display_name, at: now }]
+      ? [...(task.comment_history ?? []), { text: comment.trim(), by: normalizedUserEmail, byName: dbUser.display_name, at: now }]
       : task.comment_history;
 
     // เมื่องานถูกส่งต่อ/อนุมัติแล้ว ให้ล้างไฟล์ PDF อ้างอิงที่ใช้ประกอบการแก้ไข
