@@ -5,6 +5,8 @@ import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists, 
 import { setFilePublic } from '@/lib/google-drive/permissions';
 import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 
+export const maxDuration = 60;
+
 const UPLOAD_FOLDER_ID = process.env.GOOGLE_UPLOAD_FOLDER_ID || process.env.GOOGLE_SHARED_FOLDER_ID!;
 
 function toPositiveInt(raw: FormDataEntryValue | null): number | null {
