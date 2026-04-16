@@ -218,6 +218,14 @@ interface UploadedFileMeta {
   isPdf: boolean;
 }
 
+interface UploadApiResponse {
+  driveFileId?: string;
+  driveFileName?: string;
+  isPdf?: boolean;
+  error?: string;
+  message?: string;
+}
+
 export default function ActionCard({ task, activeRole, activeSubTab, userId, userRoles, onUpdated, onOpenHistory }: ActionCardProps) {
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
   const currentStageStuck = getCurrentStageStuckInfo({
@@ -292,6 +300,50 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
   }
 
   /* ── uploadFileAsync: returns uploaded file metadata ── */
+  function buildUploadFormData(file: File, batchMeta?: UploadBatchMeta) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (batchMeta) {
+      formData.append('upload_batch_id', batchMeta.id);
+      formData.append('upload_batch_index', String(batchMeta.index));
+      formData.append('upload_batch_total', String(batchMeta.total));
+      formData.append('upload_batch_label', batchMeta.label);
+    }
+    return formData;
+  }
+
+  function parseUploadPayload(payload: UploadApiResponse): UploadedFileMeta {
+    if (!payload.driveFileId) {
+      throw new Error('missing_drive_file_id');
+    }
+    return {
+      driveFileId: payload.driveFileId,
+      driveFileName: payload.driveFileName,
+      isPdf: Boolean(payload.isPdf),
+    };
+  }
+
+  async function uploadWithFetchFallback(file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> {
+    const res = await fetch(`/api/tasks/${task.id}/files`, {
+      method: 'POST',
+      body: buildUploadFormData(file, batchMeta),
+    });
+
+    let payload: UploadApiResponse | null = null;
+    try {
+      payload = await res.json() as UploadApiResponse;
+    } catch {
+      payload = null;
+    }
+
+    if (!res.ok) {
+      const rawError = [payload?.error, payload?.message].filter(Boolean).join(' ').trim();
+      throw new Error(rawError || `HTTP_${res.status}`);
+    }
+
+    return parseUploadPayload(payload ?? {});
+  }
+
   const uploadFileOnceAsync = useCallback((file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
     return new Promise((resolve, reject) => {
       const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -304,14 +356,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         return;
       }
       setUploadProgress(0);
-      const formData = new FormData();
-      formData.append('file', file);
-      if (batchMeta) {
-        formData.append('upload_batch_id', batchMeta.id);
-        formData.append('upload_batch_index', String(batchMeta.index));
-        formData.append('upload_batch_total', String(batchMeta.total));
-        formData.append('upload_batch_label', batchMeta.label);
-      }
+      const formData = buildUploadFormData(file, batchMeta);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/tasks/${task.id}/files`);
       xhr.upload.addEventListener('progress', (e) => {
@@ -321,20 +366,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
         setUploadProgress(null);
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            const payload = JSON.parse(xhr.responseText) as {
-              driveFileId?: string;
-              driveFileName?: string;
-              isPdf?: boolean;
-            };
-            if (!payload.driveFileId) {
-              reject(new Error('missing_drive_file_id'));
-              return;
-            }
-            resolve({
-              driveFileId: payload.driveFileId,
-              driveFileName: payload.driveFileName,
-              isPdf: Boolean(payload.isPdf),
-            });
+            const payload = JSON.parse(xhr.responseText) as UploadApiResponse;
+            resolve(parseUploadPayload(payload));
           } catch {
             const responsePreview = (xhr.responseText || '').slice(0, 200);
             reject(new Error(`invalid_upload_response ${responsePreview}`));
@@ -351,7 +384,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       });
       xhr.addEventListener('error', () => {
         setUploadProgress(null);
-        reject(new Error('NETWORK_UPLOAD_FAILED'));
+        uploadWithFetchFallback(file, batchMeta)
+          .then(resolve)
+          .catch((fallbackError) => {
+            reject(fallbackError instanceof Error ? fallbackError : new Error('NETWORK_UPLOAD_FAILED'));
+          });
       });
       xhr.addEventListener('abort', () => {
         setUploadProgress(null);
