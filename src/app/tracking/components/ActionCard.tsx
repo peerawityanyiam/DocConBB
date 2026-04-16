@@ -91,6 +91,7 @@ function isRetryableUploadError(error: unknown): boolean {
   const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
   return (
     message.includes('http_5') ||
+    message.includes('drive_upload_http_5') ||
     message.includes('http_429') ||
     message.includes('timeout') ||
     message.includes('network') ||
@@ -226,6 +227,15 @@ interface UploadApiResponse {
   message?: string;
 }
 
+interface InitiateResponse {
+  ok?: boolean;
+  uploadUri?: string;
+  taskFolderId?: string;
+  hasPdfBatchMeta?: boolean;
+  error?: string;
+  message?: string;
+}
+
 export default function ActionCard({ task, activeRole, activeSubTab, userId, userRoles, onUpdated, onOpenHistory }: ActionCardProps) {
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
   const currentStageStuck = getCurrentStageStuckInfo({
@@ -299,103 +309,111 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
-  /* ── uploadFileAsync: returns uploaded file metadata ── */
-  function buildUploadFormData(file: File, batchMeta?: UploadBatchMeta) {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (batchMeta) {
-      formData.append('upload_batch_id', batchMeta.id);
-      formData.append('upload_batch_index', String(batchMeta.index));
-      formData.append('upload_batch_total', String(batchMeta.total));
-      formData.append('upload_batch_label', batchMeta.label);
+  /* ── Direct Drive upload: initiate → XHR to Drive → confirm ── */
+  const uploadFileOnceAsync = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!['.docx', '.pdf'].includes(ext)) {
+      throw new Error('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น');
     }
-    return formData;
-  }
-
-  function parseUploadPayload(payload: UploadApiResponse): UploadedFileMeta {
-    if (!payload.driveFileId) {
-      throw new Error('missing_drive_file_id');
+    if (file.size > MAX_UPLOAD_FILE_SIZE) {
+      throw new Error(`ไฟล์มีขนาดเกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`);
     }
-    return {
-      driveFileId: payload.driveFileId,
-      driveFileName: payload.driveFileName,
-      isPdf: Boolean(payload.isPdf),
-    };
-  }
 
-  async function uploadWithFetchFallback(file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> {
-    const res = await fetch(`/api/tasks/${task.id}/files`, {
+    const normalizedMimeType = ext === '.docx'
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : 'application/pdf';
+
+    // Step 1: Initiate — server creates Drive resumable session
+    setUploadProgress(0);
+    const initiateRes = await fetch(`/api/tasks/${task.id}/files/initiate`, {
       method: 'POST',
-      body: buildUploadFormData(file, batchMeta),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: normalizedMimeType,
+        fileSize: file.size,
+        uploadBatchId: batchMeta?.id,
+        uploadBatchLabel: batchMeta?.label,
+        uploadBatchIndex: batchMeta?.index,
+        uploadBatchTotal: batchMeta?.total,
+      }),
     });
-
-    let payload: UploadApiResponse | null = null;
-    try {
-      payload = await res.json() as UploadApiResponse;
-    } catch {
-      payload = null;
+    const initiateData = await initiateRes.json() as InitiateResponse;
+    if (!initiateRes.ok) {
+      const rawError = [initiateData.error, initiateData.message].filter(Boolean).join(' ').trim();
+      throw new Error(rawError || `HTTP_${initiateRes.status}`);
     }
+    const { uploadUri, taskFolderId } = initiateData;
+    if (!uploadUri) throw new Error('missing_upload_uri');
 
-    if (!res.ok) {
-      const rawError = [payload?.error, payload?.message].filter(Boolean).join(' ').trim();
-      throw new Error(rawError || `HTTP_${res.status}`);
-    }
-
-    return parseUploadPayload(payload ?? {});
-  }
-
-  const uploadFileOnceAsync = useCallback((file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
-    return new Promise((resolve, reject) => {
-      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-      if (!['.docx', '.pdf'].includes(ext)) {
-        reject(new Error('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น'));
-        return;
-      }
-      if (file.size > MAX_UPLOAD_FILE_SIZE) {
-        reject(new Error(`ไฟล์มีขนาดเกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`));
-        return;
-      }
-      setUploadProgress(0);
-      const formData = buildUploadFormData(file, batchMeta);
+    // Step 2: Upload file directly to Google Drive via XHR (progress tracking)
+    const driveResult = await new Promise<{ fileId: string; fileName: string }>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/tasks/${task.id}/files`);
+      xhr.open('PUT', uploadUri);
+      xhr.setRequestHeader('Content-Type', normalizedMimeType);
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
       });
       xhr.addEventListener('load', () => {
-        setUploadProgress(null);
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            const payload = JSON.parse(xhr.responseText) as UploadApiResponse;
-            resolve(parseUploadPayload(payload));
+            const resp = JSON.parse(xhr.responseText) as { id?: string; name?: string };
+            if (!resp.id) { reject(new Error('invalid_drive_response')); return; }
+            resolve({ fileId: resp.id, fileName: resp.name ?? file.name });
           } catch {
-            const responsePreview = (xhr.responseText || '').slice(0, 200);
-            reject(new Error(`invalid_upload_response ${responsePreview}`));
+            reject(new Error('invalid_drive_response'));
           }
         } else {
+          let errCode = `drive_upload_http_${xhr.status}`;
           try {
-            const d = JSON.parse(xhr.responseText) as { error?: string; message?: string };
-            const rawError = [d.error, d.message].filter(Boolean).join(' ').trim();
-            reject(new Error(rawError || `HTTP_${xhr.status}`));
-          } catch {
-            reject(new Error(`HTTP_${xhr.status}`));
-          }
+            const d = JSON.parse(xhr.responseText) as { error?: { errors?: Array<{ reason?: string }>; message?: string } };
+            const reason = d?.error?.errors?.[0]?.reason;
+            if (reason === 'storageQuotaExceeded') errCode = 'storage_quota_exceeded';
+          } catch { /* ignore */ }
+          reject(new Error(errCode));
         }
       });
       xhr.addEventListener('error', () => {
         setUploadProgress(null);
-        uploadWithFetchFallback(file, batchMeta)
-          .then(resolve)
-          .catch((fallbackError) => {
-            reject(fallbackError instanceof Error ? fallbackError : new Error('NETWORK_UPLOAD_FAILED'));
-          });
+        reject(new Error('NETWORK_UPLOAD_FAILED'));
       });
       xhr.addEventListener('abort', () => {
         setUploadProgress(null);
         reject(new Error('UPLOAD_ABORTED'));
       });
-      xhr.send(formData);
+      xhr.send(file);
     });
+
+    setUploadProgress(null);
+
+    // Step 3: Confirm — server verifies, sets public, updates DB
+    const confirmRes = await fetch(`/api/tasks/${task.id}/files/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        driveFileId: driveResult.fileId,
+        driveFileName: driveResult.fileName,
+        mimeType: normalizedMimeType,
+        fileSizeBytes: file.size,
+        taskFolderId,
+        isPdf: ext === '.pdf',
+        uploadBatchId: batchMeta?.id,
+        uploadBatchLabel: batchMeta?.label,
+        uploadBatchIndex: batchMeta?.index,
+        uploadBatchTotal: batchMeta?.total,
+      }),
+    });
+    const confirmData = await confirmRes.json() as UploadApiResponse;
+    if (!confirmRes.ok) {
+      const rawError = [confirmData.error, confirmData.message].filter(Boolean).join(' ').trim();
+      throw new Error(rawError || `HTTP_${confirmRes.status}`);
+    }
+    if (!confirmData.driveFileId) throw new Error('missing_drive_file_id');
+    return {
+      driveFileId: confirmData.driveFileId,
+      driveFileName: confirmData.driveFileName,
+      isPdf: Boolean(confirmData.isPdf),
+    };
   }, [task.id]);
 
   const uploadFileAsync = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {

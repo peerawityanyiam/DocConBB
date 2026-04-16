@@ -37,7 +37,31 @@ export function toFriendlyErrorMessage(
   }
 
   if (normalized.includes('file_too_large')) {
-    return 'ขนาดไฟล์เกิน 4MB ต่อไฟล์';
+    return 'ขนาดไฟล์เกิน 100MB ต่อไฟล์';
+  }
+
+  if (normalized.includes('storage_quota_exceeded') || normalized.includes('storagequotaexceeded')) {
+    return 'Google Drive เต็มหรือเกิน quota กรุณาติดต่อผู้ดูแลระบบ';
+  }
+
+  if (normalized.includes('drive_session_failed') || normalized.includes('missing_upload_uri')) {
+    return 'ไม่สามารถสร้าง session อัปโหลดได้ กรุณาลองใหม่';
+  }
+
+  if (normalized.includes('drive_file_not_found') || normalized.includes('invalid_drive_response')) {
+    return 'ตรวจสอบไฟล์ที่อัปโหลดไม่ได้ กรุณาลองใหม่';
+  }
+
+  if (normalized.includes('initiate_failed') || normalized.includes('confirm_failed')) {
+    return 'กระบวนการอัปโหลดไม่สมบูรณ์ กรุณาลองใหม่';
+  }
+
+  if (normalized.includes('drive_upload_http')) {
+    return 'อัปโหลดไปยัง Google Drive ไม่สำเร็จ กรุณาลองใหม่';
+  }
+
+  if (normalized.includes('network_upload_failed')) {
+    return 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่';
   }
 
   if (normalized.includes('forbidden_upload_state')) {
@@ -149,7 +173,7 @@ export function toUploadFailureMessage(
     normalized.includes('payload too large') ||
     normalized.includes('file_too_large')
   ) {
-    return friendly + '\nข้อจำกัดระบบ: ต่อไฟล์ไม่เกิน 4MB, ต่อครั้งไม่เกิน 20 รูป/80MB, และแตก PDF ได้สูงสุด 20 ส่วน';
+    return friendly + '\nข้อจำกัดระบบ: ต่อไฟล์ไม่เกิน 100MB, ต่อครั้งไม่เกิน 20 รูป/80MB, และแตก PDF ได้สูงสุด 20 ส่วน';
   }
 
   if (
