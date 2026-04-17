@@ -1,42 +1,17 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import StatusBadge from './StatusBadge';
 import StatusTimeline from './StatusTimeline';
 import type { Task } from './TaskCard';
 import type { AppRole } from '@/lib/auth/guards';
-import type { TaskStatus } from '@/lib/constants/status';
-import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 
 interface TaskDetailModalProps {
   taskId: string | null;
   userRoles: AppRole[];
-  userId: string;      // DB user id
+  userId: string;
   onClose: () => void;
   onUpdated: () => void;
-}
-
-type ActionKey =
-  | 'submit'
-  | 'doccon_approve'
-  | 'doccon_reject'
-  | 'reviewer_approve'
-  | 'reviewer_reject'
-  | 'boss_approve'
-  | 'boss_reject'
-  | 'boss_send_to_doccon'
-  | 'super_boss_approve'
-  | 'super_boss_reject'
-  | 'super_boss_send_to_doccon'
-  | 'cancel';
-
-interface ActionDef {
-  label: string;
-  action: ActionKey;
-  style: 'primary' | 'danger' | 'secondary' | 'warning';
-  needsComment?: boolean;
-  needsDocRef?: boolean;
-  confirmText?: string;
 }
 
 interface StaffUser {
@@ -45,73 +20,14 @@ interface StaffUser {
   roles: string[];
 }
 
-interface DocRefCheckResult {
-  exists: boolean;
-  task_code?: string;
-  title?: string;
-}
-
-interface PreCheckResult {
-  hasDuplicate: boolean;
-  existingTask?: {
-    task_code: string;
-    title: string;
-    doc_ref: string;
-    status: string;
-  };
-}
-
-function getAvailableActions(task: Task, roles: AppRole[], userId: string): ActionDef[] {
-  const actions: ActionDef[] = [];
-  const s = task.status;
-
-  if (roles.includes('STAFF') && task.officer_id === userId) {
-    const submitableFrom: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
-    if (submitableFrom.includes(s)) {
-      actions.push({ label: 'ส่งงาน', action: 'submit', style: 'primary' });
-    }
-  }
-
-  if (roles.includes('DOCCON') && s === 'SUBMITTED_TO_DOCCON') {
-    actions.push({ label: 'ผ่านตรวจรูปแบบ', action: 'doccon_approve', style: 'primary', needsDocRef: true });
-    actions.push({ label: 'ตีกลับ (DocCon)', action: 'doccon_reject', style: 'danger', needsComment: true });
-  }
-
-  if (roles.includes('REVIEWER') && task.reviewer_id === userId && s === 'PENDING_REVIEW') {
-    actions.push({ label: 'ผ่านตรวจสอบเนื้อหา', action: 'reviewer_approve', style: 'primary' });
-    actions.push({ label: 'ตีกลับ (ผู้ตรวจสอบ)', action: 'reviewer_reject', style: 'danger', needsComment: true });
-  }
-
-  if (roles.includes('BOSS') && task.created_by === userId && s === 'WAITING_BOSS_APPROVAL') {
-    actions.push({ label: 'อนุมัติ (หัวหน้า)', action: 'boss_approve', style: 'primary' });
-    actions.push({ label: 'ส่งตรวจรูปแบบใหม่', action: 'boss_send_to_doccon', style: 'warning', needsComment: true });
-    actions.push({ label: 'ตีกลับ (หัวหน้า)', action: 'boss_reject', style: 'danger', needsComment: true });
-  }
-
-  if (roles.includes('SUPER_BOSS') && s === 'WAITING_SUPER_BOSS_APPROVAL') {
-    actions.push({ label: 'อนุมัติ (ผู้บริหาร)', action: 'super_boss_approve', style: 'primary', confirmText: 'เมื่ออนุมัติแล้ว งานจะเสร็จสมบูรณ์และถูก archive' });
-    actions.push({ label: 'ส่งตรวจรูปแบบใหม่', action: 'super_boss_send_to_doccon', style: 'warning', needsComment: true });
-    actions.push({ label: 'ตีกลับ (ผู้บริหาร)', action: 'super_boss_reject', style: 'danger', needsComment: true });
-  }
-
-  if (roles.includes('BOSS') && task.created_by === userId && !['COMPLETED', 'CANCELLED'].includes(s)) {
-    actions.push({ label: 'ยกเลิกงาน', action: 'cancel', style: 'danger', needsComment: true, confirmText: 'การยกเลิกงานไม่สามารถย้อนกลับได้' });
-  }
-
-  return actions;
-}
-
-const ACTION_STYLE: Record<string, string> = {
-  primary: 'bg-[#00c2a8] hover:bg-[#009e88] text-white font-semibold',
-  danger: 'bg-[#ef4444] hover:bg-[#dc2626] text-white font-semibold',
-  secondary: 'bg-[#f8fafc] hover:bg-[#e2e8f0] text-[#374f6b] border border-[#e2e8f0]',
-  warning: 'bg-[#f59e0b] hover:bg-[#d97706] text-white font-semibold',
-};
-
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('th-TH', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Bangkok',
   });
 }
 
@@ -121,70 +37,20 @@ function calcAgeDays(createdAt: string): number {
   return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-/* Upload context per role (matches reference GAS getUploadContext) */
-function getUploadContext(task: Task, roles: AppRole[], userId: string): { canUpload: boolean; acceptDocx: boolean; acceptPdf: boolean; hint: string } {
-  const s = task.status;
-  const officerStatuses: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
-
-  // Officer: docx only at actionable statuses
-  if ((roles.includes('STAFF') || task.officer_id === userId) && officerStatuses.includes(s)) {
-    return { canUpload: true, acceptDocx: true, acceptPdf: false, hint: 'รองรับเฉพาะ .docx (Word)' };
-  }
-  // DocCon: docx + pdf at SUBMITTED_TO_DOCCON
-  if (roles.includes('DOCCON') && s === 'SUBMITTED_TO_DOCCON') {
-    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
-  }
-  // Reviewer: docx + pdf at PENDING_REVIEW
-  if (roles.includes('REVIEWER') && task.reviewer_id === userId && s === 'PENDING_REVIEW') {
-    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
-  }
-  // Boss: docx + pdf at WAITING_BOSS_APPROVAL
-  if (roles.includes('BOSS') && s === 'WAITING_BOSS_APPROVAL') {
-    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
-  }
-  // Super Boss: docx + pdf at WAITING_SUPER_BOSS_APPROVAL
-  if (roles.includes('SUPER_BOSS') && s === 'WAITING_SUPER_BOSS_APPROVAL') {
-    return { canUpload: true, acceptDocx: true, acceptPdf: true, hint: 'Word (.docx) หรือ PDF อ้างอิง (.pdf)' };
-  }
-  return { canUpload: false, acceptDocx: false, acceptPdf: false, hint: '' };
-}
-
 export default function TaskDetailModal({ taskId, userRoles, userId, onClose, onUpdated }: TaskDetailModalProps) {
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<'detail' | 'files' | 'timeline'>('detail');
-  const [pendingAction, setPendingAction] = useState<ActionDef | null>(null);
-  const [comment, setComment] = useState('');
-  const [docRef, setDocRef] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState('');
-  const [newComment, setNewComment] = useState('');
-  const [commentLoading, setCommentLoading] = useState(false);
 
-  // File upload state
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [uploadError, setUploadError] = useState('');
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // DocRef check state
-  const [docRefCheck, setDocRefCheck] = useState<DocRefCheckResult | null>(null);
-  const [docRefChecking, setDocRefChecking] = useState(false);
-  const docRefTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Reassign state
   const [reassignField, setReassignField] = useState<'officer_id' | 'reviewer_id' | null>(null);
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [staffListLoading, setStaffListLoading] = useState(false);
   const [reassignLoading, setReassignLoading] = useState(false);
   const [reassignError, setReassignError] = useState('');
+
   const [bossCancelReason, setBossCancelReason] = useState('');
   const [bossCancelLoading, setBossCancelLoading] = useState(false);
   const [bossCancelError, setBossCancelError] = useState('');
-
-  // SuperBoss pre-check state
-  const [preCheckResult, setPreCheckResult] = useState<PreCheckResult | null>(null);
-  const [preCheckLoading, setPreCheckLoading] = useState(false);
 
   const fetchTask = useCallback(async () => {
     if (!taskId) return;
@@ -200,76 +66,13 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   useEffect(() => {
     setTask(null);
     setTab('detail');
-    setPendingAction(null);
-    setComment('');
-    setDocRef('');
-    setActionError('');
-    setUploadProgress(null);
-    setUploadError('');
-    setDocRefCheck(null);
     setReassignField(null);
     setReassignError('');
-    setPreCheckResult(null);
-    setPreCheckLoading(false);
     setBossCancelReason('');
     setBossCancelLoading(false);
     setBossCancelError('');
-    fetchTask();
+    void fetchTask();
   }, [fetchTask]);
-
-  // DocRef duplicate check with debounce
-  useEffect(() => {
-    if (!pendingAction?.needsDocRef || !docRef.trim() || !taskId) {
-      setDocRefCheck(null);
-      return;
-    }
-    if (docRefTimerRef.current) clearTimeout(docRefTimerRef.current);
-    docRefTimerRef.current = setTimeout(async () => {
-      setDocRefChecking(true);
-      try {
-        const res = await fetch(`/api/tasks/check-doc-ref?doc_ref=${encodeURIComponent(docRef.trim())}&task_id=${taskId}`);
-        if (res.ok) {
-          setDocRefCheck(await res.json());
-        }
-      } catch {
-        // ignore check errors
-      } finally {
-        setDocRefChecking(false);
-      }
-    }, 500);
-    return () => {
-      if (docRefTimerRef.current) clearTimeout(docRefTimerRef.current);
-    };
-  }, [docRef, pendingAction?.needsDocRef, taskId]);
-
-  async function handleAction() {
-    if (!pendingAction || !task) return;
-    setActionLoading(true);
-    setActionError('');
-    try {
-      const body: Record<string, string> = { action: pendingAction.action };
-      if (comment.trim()) body.comment = comment.trim();
-      if (docRef.trim()) body.doc_ref = docRef.trim();
-
-      const res = await fetch(`/api/tasks/${task.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
-      setPendingAction(null);
-      setComment('');
-      setDocRef('');
-      setDocRefCheck(null);
-      onUpdated();
-      fetchTask();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
-    } finally {
-      setActionLoading(false);
-    }
-  }
 
   async function handleBossCancelFromDetail() {
     if (!task) return;
@@ -294,98 +97,12 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
       setBossCancelReason('');
       onUpdated();
-      fetchTask();
+      await fetchTask();
     } catch (err) {
       setBossCancelError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally {
       setBossCancelLoading(false);
     }
-  }
-
-  async function handleAddComment(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newComment.trim() || !task) return;
-    setCommentLoading(true);
-    try {
-      await fetch(`/api/tasks/${task.id}/comment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: newComment.trim() }),
-      });
-      setNewComment('');
-      fetchTask();
-    } finally {
-      setCommentLoading(false);
-    }
-  }
-
-  function handleFileUpload(file: File) {
-    if (!task) return;
-    const maxSize = MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES;
-    if (file.size > maxSize) {
-      setUploadError(`ไฟล์มีขนาดเกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`);
-      return;
-    }
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/pdf',
-    ];
-    const allowedExts = ['.docx', '.pdf'];
-    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
-      setUploadError('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น');
-      return;
-    }
-
-    setUploadError('');
-    setUploadProgress(0);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `/api/tasks/${task.id}/files`);
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) {
-        setUploadProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    });
-
-    xhr.addEventListener('load', () => {
-      setUploadProgress(null);
-      if (xhr.status >= 200 && xhr.status < 300) {
-        fetchTask();
-        onUpdated();
-      } else {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          setUploadError(data.error ?? 'อัปโหลดไม่สำเร็จ');
-        } catch {
-          setUploadError('อัปโหลดไม่สำเร็จ');
-        }
-      }
-    });
-
-    xhr.addEventListener('error', () => {
-      setUploadProgress(null);
-      setUploadError('เกิดข้อผิดพลาดในการอัปโหลด');
-    });
-
-    xhr.send(formData);
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
-  }
-
-  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) handleFileUpload(file);
-    e.target.value = '';
   }
 
   async function openReassign(field: 'officer_id' | 'reviewer_id') {
@@ -394,9 +111,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     setStaffListLoading(true);
     try {
       const res = await fetch('/api/tasks/staff-list');
-      if (res.ok) {
-        setStaffList(await res.json());
-      }
+      if (res.ok) setStaffList(await res.json());
     } finally {
       setStaffListLoading(false);
     }
@@ -413,11 +128,11 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
         body: JSON.stringify({ field: reassignField, new_user_id: newUserId }),
       });
       const data = await res.json().catch(() => ({} as { error?: string }));
-      if (!res.ok) throw new Error(data.error || 'โอนงานไม่สำเร็จ');
+      if (!res.ok) throw new Error(data.error ?? 'โอนงานไม่สำเร็จ');
 
       setReassignField(null);
       onUpdated();
-      fetchTask();
+      await fetchTask();
     } catch (err) {
       setReassignError(err instanceof Error ? err.message : 'โอนงานไม่สำเร็จ');
     } finally {
@@ -425,20 +140,16 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     }
   }
 
-  const uploadCtx = task ? getUploadContext(task, userRoles, userId) : null;
-  const canUploadFile = uploadCtx?.canUpload ?? false;
-
-  const canReassign = task &&
-    userRoles.includes('BOSS') &&
-    task.created_by === userId &&
-    !['COMPLETED', 'CANCELLED'].includes(task.status);
-  const canBossCancelInDetail = canReassign;
-
   if (!taskId) return null;
 
   const ageDays = task ? calcAgeDays(task.created_at) : 0;
   const ageColor = ageDays > 14 ? 'bg-red-100 text-red-700' : ageDays > 7 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600';
   const isSupersededCompleted = !!task && task.status === 'COMPLETED' && !!task.superseded_by;
+
+  const canReassign = !!task &&
+    userRoles.includes('BOSS') &&
+    task.created_by === userId &&
+    !['COMPLETED', 'CANCELLED'].includes(task.status);
 
   const filteredStaffForReassign = reassignField === 'officer_id'
     ? staffList.filter(u => u.roles?.includes('STAFF'))
@@ -447,13 +158,11 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200 shrink-0">
           <div>
             {task ? (
               <>
                 <div className="flex items-center gap-2 mb-0.5">
-                  {/* Age Chip */}
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ageColor}`}>
                     ⏱ {ageDays} วัน
                   </span>
@@ -470,17 +179,18 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-[#e2e8f0] px-6 shrink-0">
           {(['detail', 'files', 'timeline'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`py-2 px-4 text-[0.8rem] font-semibold border-b-2 -mb-px transition-colors ${tab === t ? 'border-[#00c2a8] text-[#00c2a8]' : 'border-transparent text-[#6b7f96] hover:text-[#374f6b] hover:border-[#e2e8f0]'}`}>
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`py-2 px-4 text-[0.8rem] font-semibold border-b-2 -mb-px transition-colors ${tab === t ? 'border-[#00c2a8] text-[#00c2a8]' : 'border-transparent text-[#6b7f96] hover:text-[#374f6b] hover:border-[#e2e8f0]'}`}
+            >
               {t === 'detail' ? 'รายละเอียด' : t === 'files' ? 'ประวัติไฟล์' : 'ประวัติสถานะ'}
             </button>
           ))}
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {loading && !task ? (
             <div className="space-y-3">
@@ -490,11 +200,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
             <p className="text-slate-400 text-sm text-center py-8">ไม่พบข้อมูลงาน</p>
           ) : (
             <>
-              {/* Detail Tab */}
               {tab === 'detail' && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    {/* Officer with reassign */}
                     <div>
                       <p className="text-slate-500 text-xs mb-0.5">ผู้รับผิดชอบ</p>
                       <div className="flex items-center gap-2">
@@ -518,7 +226,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                                 <select
                                   className="w-full text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                                   defaultValue=""
-                                  onChange={e => { if (e.target.value) handleReassign(e.target.value); }}
+                                  onChange={e => { if (e.target.value) void handleReassign(e.target.value); }}
                                   disabled={reassignLoading}
                                 >
                                   <option value="" disabled>เลือกผู้รับผิดชอบใหม่</option>
@@ -540,7 +248,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                       )}
                     </div>
 
-                    {/* Reviewer with reassign */}
                     <div>
                       <p className="text-slate-500 text-xs mb-0.5">ผู้ตรวจสอบ</p>
                       <div className="flex items-center gap-2">
@@ -564,7 +271,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                                 <select
                                   className="w-full text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                                   defaultValue=""
-                                  onChange={e => { if (e.target.value) handleReassign(e.target.value); }}
+                                  onChange={e => { if (e.target.value) void handleReassign(e.target.value); }}
                                   disabled={reassignLoading}
                                 >
                                   <option value="" disabled>เลือกผู้ตรวจสอบใหม่</option>
@@ -619,11 +326,10 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
                   {isSupersededCompleted && (
                     <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
-                      มีเอกสารใหม่ทับรหัสเดียวกันแล้ว จึงไม่อนุญาตโหลด Word จากรายการนี้
+                      มีเอกสารใหม่ทับรหัสเดียวกันแล้ว จึงไม่อนุญาตให้โหลด Word จากรายการนี้
                     </div>
                   )}
 
-                  {/* Main file display */}
                   {task.drive_file_name && (
                     <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <span className="text-blue-500">📎</span>
@@ -647,7 +353,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                     </div>
                   )}
 
-                  {/* Ref PDF display */}
                   {task.ref_file_name && (
                     <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg p-3">
                       <span className="text-orange-500">📄</span>
@@ -669,7 +374,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                     </div>
                   )}
 
-                  {canBossCancelInDetail && (
+                  {canReassign && (
                     <div className="border border-red-200 bg-red-50 rounded-lg p-3 space-y-2">
                       <p className="text-sm font-semibold text-red-700">ยกเลิกงาน (ผู้สั่งงาน)</p>
                       <textarea
@@ -682,12 +387,10 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                         rows={2}
                         className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 resize-none"
                       />
-                      {bossCancelError && (
-                        <p className="text-xs text-red-600">⚠️ {bossCancelError}</p>
-                      )}
+                      {bossCancelError && <p className="text-xs text-red-600">⚠️ {bossCancelError}</p>}
                       <div className="flex justify-end">
                         <button
-                          onClick={handleBossCancelFromDetail}
+                          onClick={() => void handleBossCancelFromDetail()}
                           disabled={bossCancelLoading || !bossCancelReason.trim()}
                           className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -696,14 +399,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                       </div>
                     </div>
                   )}
-
-                  {/* Upload zone removed — use ActionCard inline actions instead */}
-
-                  {/* Actions removed — use ActionCard inline actions instead */}
                 </div>
               )}
 
-              {/* Files Tab */}
               {tab === 'files' && (
                 <div className="space-y-3">
                   {isSupersededCompleted ? (
@@ -745,7 +443,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                 </div>
               )}
 
-              {/* Timeline Tab */}
               {tab === 'timeline' && (
                 <StatusTimeline
                   history={task.status_history ?? []}
@@ -754,8 +451,6 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                   completedAt={task.completed_at}
                 />
               )}
-
-              {/* Comments tab removed — comments are only collected during rejections */}
             </>
           )}
         </div>

@@ -1,16 +1,8 @@
 ﻿import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import SessionIdleGuard from "@/components/SessionIdleGuard";
-
-const ibmPlexSansThai = IBM_Plex_Sans_Thai({
-  weight: ["300", "400", "500", "600", "700"],
-  subsets: ["thai", "latin"],
-  variable: "--font-thai",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "BB document center - ระบบเอกสารคุณภาพ - รพ.สงขลานครินทร์",
@@ -44,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${ibmPlexSansThai.variable} h-full antialiased`}>
+    <html lang="th" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-[family-name:var(--font-thai)]">
         <ToastProvider>
           <SessionIdleGuard />
@@ -55,4 +47,3 @@ export default function RootLayout({
     </html>
   );
 }
-

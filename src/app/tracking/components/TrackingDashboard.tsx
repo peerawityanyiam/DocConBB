@@ -134,6 +134,13 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
   ],
 };
 
+const RANGE_WINDOW_DAYS: Record<Exclude<CompletedRange, 'all'>, number> = {
+  '1m': 30,
+  '3m': 90,
+  '6m': 180,
+  '1y': 365,
+};
+
 export default function TrackingDashboard({ userRoles, userId, userEmail }: TrackingDashboardProps) {
   const availableTabs = ROLE_TABS.filter(t => userRoles.includes(t.role));
   const [activeTab, setActiveTab] = useState<TabKey>(availableTabs[0]?.role ?? 'completed');
@@ -156,7 +163,10 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
   const deferredSearch = useDeferredValue(search);
 
   const isCompletedTab = activeTab === 'completed';
-  const subTabs = !isCompletedTab ? (ROLE_SUB_TABS[activeTab] ?? []) : [];
+  const subTabs = useMemo(
+    () => (!isCompletedTab ? (ROLE_SUB_TABS[activeTab] ?? []) : []),
+    [activeTab, isCompletedTab],
+  );
   const currentSubTab = subTabs.find(st => st.key === activeSubTab) ?? subTabs[0];
   const isCompletedView = isCompletedTab || currentSubTab?.key === 'completed';
   const fetchScope = useMemo<'active' | 'completed'>(() => (
@@ -269,13 +279,6 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
         : searchFiltered
   ), [currentSubTab, isCompletedTab, searchFiltered, userId]);
 
-  const rangeWindowDays: Record<Exclude<CompletedRange, 'all'>, number> = {
-    '1m': 30,
-    '3m': 90,
-    '6m': 180,
-    '1y': 365,
-  };
-
   const getCompletedTime = (task: Task) => {
     const parsed = Date.parse(task.completed_at ?? task.updated_at ?? task.created_at);
     return Number.isNaN(parsed) ? 0 : parsed;
@@ -289,7 +292,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
     let next = [...baseFiltered];
 
     if (completedRange !== 'all') {
-      const cutoff = Date.now() - (rangeWindowDays[completedRange] * 24 * 60 * 60 * 1000);
+      const cutoff = Date.now() - (RANGE_WINDOW_DAYS[completedRange] * 24 * 60 * 60 * 1000);
       next = next.filter((t) => getCompletedTime(t) >= cutoff);
     }
 
@@ -558,7 +561,6 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
                   activeRole={activeTab as string}
                   activeSubTab={activeSubTab}
                   userId={userId}
-                  userRoles={userRoles}
                   onUpdated={refreshTasksAndCounts}
                   onOpenHistory={(id) => setSelectedTaskId(id)}
                 />

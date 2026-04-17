@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import StandardCard, { type Standard } from './StandardCard';
 import AdminSettingsModal from './AdminSettingsModal';
-import UploadModal from './UploadModal';
 import ImportExcelModal from './ImportExcelModal';
 import type { AppRole } from '@/lib/auth/guards';
 import { calculateDocStatus } from '@/lib/utils/status';
@@ -20,11 +19,10 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
   const [standards, setStandards] = useState<Standard[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [filter] = useState<FilterStatus>('all');
   const [sort, setSort] = useState<SortValue>('default');
   const [settingsTarget, setSettingsTarget] = useState<Standard | null>(null);
   const [settingsMode, setSettingsMode] = useState<'create' | 'edit'>('create');
-  const [uploadTarget, setUploadTarget] = useState<Standard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Standard | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
@@ -240,7 +238,6 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
                 key={s.id}
                 standard={s}
                 userRoles={userRoles}
-                onUpload={setUploadTarget}
                 onRename={std => { setRenameTarget(std); setRenameName(std.name); }}
                 onSettings={std => { setSettingsMode('edit'); setSettingsTarget(std); }}
                 onDelete={std => { setDeleteTarget(std); setDeleteReason(''); }}
@@ -260,12 +257,6 @@ export default function LibraryDashboard({ userRoles, userEmail }: LibraryDashbo
           onSaved={fetchStandards}
         />
       )}
-
-      <UploadModal
-        standard={uploadTarget}
-        onClose={() => setUploadTarget(null)}
-        onUploaded={fetchStandards}
-      />
 
       <ImportExcelModal
         open={importOpen}

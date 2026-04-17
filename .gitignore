@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-prodcheck*/
 /out/
 
 # production
@@ -35,6 +36,7 @@ yarn-error.log*
 
 # vercel
 .vercel
+scripts/build-check.mjs
 
 # typescript
 *.tsbuildinfo

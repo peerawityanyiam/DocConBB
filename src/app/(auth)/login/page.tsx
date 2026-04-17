@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { AUTH_CONFIG } from '@/lib/auth/config';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo, useState } from 'react';
 
@@ -73,9 +74,11 @@ function LoginContent() {
         <section className="px-5 py-5 sm:px-6 sm:py-6">
           <div className="mb-5 flex items-center gap-3">
             <div className="h-12 w-12 overflow-hidden rounded-xl">
-              <img
+              <Image
                 src="/icons/icon-192.png"
                 alt="BB icon"
+                width={48}
+                height={48}
                 className="h-full w-full scale-110 object-cover"
               />
             </div>

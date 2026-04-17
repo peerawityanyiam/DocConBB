@@ -268,7 +268,6 @@ export default function UserManagement({ initialUsers, projects, currentUserId }
           user={roleUser}
           projects={projects}
           onSave={handleRolesSaved}
-          onClose={() => setRoleUser(null)}
         />
       )}
     </div>

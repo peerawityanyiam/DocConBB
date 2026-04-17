@@ -25,7 +25,6 @@ export interface Standard {
 interface StandardCardProps {
   standard: Standard;
   userRoles: AppRole[];
-  onUpload: (standard: Standard) => void;
   onRename: (standard: Standard) => void;
   onSettings: (standard: Standard) => void;
   onDelete: (standard: Standard) => void;
@@ -89,7 +88,6 @@ function infoMsg(status: DocStatus, openDate: string | null | undefined) {
 export default function StandardCard({
   standard,
   userRoles,
-  onUpload: _onUpload,
   onRename,
   onSettings,
   onDelete,

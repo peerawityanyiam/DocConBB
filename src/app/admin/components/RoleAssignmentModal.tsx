@@ -28,12 +28,11 @@ interface Props {
   user: User;
   projects: Project[];
   onSave: (userId: string, newRoles: UserRole[]) => void;
-  onClose: () => void;
 }
 
 const ALL_ROLES: AppRole[] = ['STAFF', 'DOCCON', 'REVIEWER', 'BOSS', 'SUPER_BOSS', 'SUPER_ADMIN'];
 
-export default function RoleAssignmentModal({ user, projects, onSave, onClose }: Props) {
+export default function RoleAssignmentModal({ user, projects, onSave }: Props) {
   // currentRoles: set of "projectId|role" strings
   const [currentRoles, setCurrentRoles] = useState<Set<string>>(
     new Set(user.roles.map(r => `${r.project_id}|${r.role}`))

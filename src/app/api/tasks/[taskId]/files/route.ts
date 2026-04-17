@@ -4,6 +4,7 @@ import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
 import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists, trashFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
+import { getRequestIdFromHeaders, logEvent } from '@/lib/ops/observability';
 
 export const maxDuration = 60;
 
@@ -16,17 +17,24 @@ function toPositiveInt(raw: FormDataEntryValue | null): number | null {
   return parsed;
 }
 
-function errorResponse(status: number, error: string, message: string, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error, message, ...(extra ?? {}) }, { status });
+function errorResponse(
+  status: number,
+  error: string,
+  message: string,
+  extra?: Record<string, unknown>,
+  requestId?: string,
+) {
+  return NextResponse.json({ error, message, requestId, ...(extra ?? {}) }, { status });
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const requestId = getRequestIdFromHeaders(request.headers);
   try {
     const user = await getAuthUser('tracking');
-    if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.');
+    if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.', undefined, requestId);
     const normalizedUserEmail = user.email.trim().toLowerCase();
 
     const { taskId } = await params;
@@ -37,7 +45,7 @@ export async function POST(
     const uploadBatchIndex = toPositiveInt(formData.get('upload_batch_index'));
     const uploadBatchTotal = toPositiveInt(formData.get('upload_batch_total'));
 
-    if (!file) return errorResponse(400, 'file_required', 'No file was provided.');
+    if (!file) return errorResponse(400, 'file_required', 'No file was provided.', undefined, requestId);
     const uploadBatchId = typeof uploadBatchIdRaw === 'string' ? uploadBatchIdRaw.trim() : '';
     const uploadBatchLabel = typeof uploadBatchLabelRaw === 'string' ? uploadBatchLabelRaw.trim() : '';
     const hasPdfBatchMeta = Boolean(
@@ -50,7 +58,7 @@ export async function POST(
 
     const ext = file.name.toLowerCase().split('.').pop();
     if (!['docx', 'pdf'].includes(ext ?? '')) {
-      return errorResponse(400, 'unsupported_file_type', 'Only .docx and .pdf are supported.');
+      return errorResponse(400, 'unsupported_file_type', 'Only .docx and .pdf are supported.', undefined, requestId);
     }
     // Mobile browsers sometimes send missing/legacy MIME (e.g. application/msword).
     // Force canonical MIME by extension so Drive keeps correct file type behavior.
@@ -62,7 +70,7 @@ export async function POST(
           : (file.type || 'application/octet-stream');
 
     if (file.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
-      return errorResponse(400, 'file_too_large', `File exceeds ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}.`);
+      return errorResponse(400, 'file_too_large', `File exceeds ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}.`, undefined, requestId);
     }
 
     const admin = await createServiceRoleClient();
@@ -75,7 +83,7 @@ export async function POST(
     if (!dbUser) throw new AuthError('User profile not found.', 404);
 
     const { data: task } = await admin.from('tasks').select('*').eq('id', taskId).single();
-    if (!task) return errorResponse(404, 'task_not_found', 'Task not found.');
+    if (!task) return errorResponse(404, 'task_not_found', 'Task not found.', undefined, requestId);
 
     const s = task.status;
     const isOfficer = task.officer_id === user.id;
@@ -108,7 +116,7 @@ export async function POST(
         403,
         denyCode,
         denyMessage,
-        {
+        process.env.NODE_ENV === 'production' ? undefined : {
           debug: {
             roles: rolesStr,
             status: s,
@@ -117,6 +125,7 @@ export async function POST(
             creator: isCreator,
           },
         },
+        requestId,
       );
     }
 
@@ -125,12 +134,14 @@ export async function POST(
       const pdfAllowedStatuses = ['SUBMITTED_TO_DOCCON', 'PENDING_REVIEW', 'WAITING_BOSS_APPROVAL', 'WAITING_SUPER_BOSS_APPROVAL'];
       const isCreatorUploadingAtAssigned = isCreator && s === 'ASSIGNED';
       if (!pdfAllowedStatuses.includes(s) && !isCreatorUploadingAtAssigned) {
-        return errorResponse(
-          400,
-          'pdf_not_allowed_in_status',
-          'This status accepts only .docx files (PDF is for rejection reference).',
-        );
-      }
+          return errorResponse(
+            400,
+            'pdf_not_allowed_in_status',
+            'This status accepts only .docx files (PDF is for rejection reference).',
+            undefined,
+            requestId,
+          );
+        }
       if (s === 'SUBMITTED_TO_DOCCON' && projectRolesSet.has('DOCCON') && !isCreator) {
         const history = (task.status_history as Array<{status?: string; note?: string}>) ?? [];
         for (let i = history.length - 1; i >= 0; i--) {
@@ -140,6 +151,8 @@ export async function POST(
               400,
               'doccon_word_only_after_boss_sendback',
               'When sent back from Boss/Super Boss, only .docx upload is allowed.',
+              undefined,
+              requestId,
             );
           }
           if (h.status === 'SUBMITTED_TO_DOCCON') break;
@@ -153,13 +166,16 @@ export async function POST(
     if (taskFolderId) {
       const folderOk = await checkFolderExists(taskFolderId);
       if (!folderOk) {
-        console.warn('[FILE_UPLOAD] Existing task_folder_id is invalid/inaccessible:', taskFolderId);
+      logEvent('warn', 'file_upload', requestId, 'Existing task_folder_id is invalid/inaccessible', { taskFolderId });
         needNewFolder = true;
       }
     }
 
     if (needNewFolder) {
-      console.log('[FILE_UPLOAD] Creating new folder in Shared Drive. Parent:', UPLOAD_FOLDER_ID, 'Task:', task.task_code);
+      logEvent('info', 'file_upload', requestId, 'Creating task folder', {
+        parentFolderId: UPLOAD_FOLDER_ID,
+        taskCode: task.task_code,
+      });
       taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code);
       await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
     }
@@ -179,7 +195,7 @@ export async function POST(
     } catch (uploadErr: unknown) {
       const errMsg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
       if (errMsg.includes('storage quota') || errMsg.includes('storageQuotaExceeded')) {
-        console.warn('[FILE_UPLOAD] Quota error! Force recreating folder in Shared Drive. Old:', taskFolderId);
+        logEvent('warn', 'file_upload', requestId, 'Quota error, recreating task folder', { taskFolderId });
         taskFolderId = await getOrCreateFolder(UPLOAD_FOLDER_ID, task.task_code);
         await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
         const result = await uploadFile(
@@ -297,6 +313,7 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
+      requestId,
       driveFileId,
       driveFileName,
       isPdf,
@@ -305,16 +322,20 @@ export async function POST(
     }, { status: 201 });
   } catch (err) {
     if (err instanceof AuthError) return handleAuthError(err);
-    console.error('[FILE_UPLOAD_ERROR]', err);
+    logEvent('error', 'file_upload', requestId, 'Upload failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     const message = err instanceof Error ? err.message : 'Upload failed.';
     if (/unauthorized_client/i.test(message)) {
       return errorResponse(
         500,
         'unauthorized_client',
         'Google service-account impersonation is not authorized. Disable impersonation or enable domain-wide delegation.',
+        undefined,
+        requestId,
       );
     }
-    return errorResponse(500, 'upload_failed', message);
+    return errorResponse(500, 'upload_failed', message, undefined, requestId);
   }
 }
 
@@ -322,21 +343,22 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const requestId = getRequestIdFromHeaders(request.headers);
   try {
     const user = await getAuthUser('tracking');
-    if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.');
+    if (!user) return errorResponse(401, 'unauthorized', 'Please sign in first.', undefined, requestId);
     const normalizedUserEmail = user.email.trim().toLowerCase();
 
     const { taskId } = await params;
     const uploadBatchId = request.nextUrl.searchParams.get('upload_batch_id')?.trim();
     const driveFileIdsParam = request.nextUrl.searchParams.get('drive_file_ids')?.trim();
     if (!uploadBatchId && !driveFileIdsParam) {
-      return errorResponse(400, 'missing_rollback_selector', 'Missing upload_batch_id or drive_file_ids.');
+      return errorResponse(400, 'missing_rollback_selector', 'Missing upload_batch_id or drive_file_ids.', undefined, requestId);
     }
 
     const admin = await createServiceRoleClient();
     const { data: task } = await admin.from('tasks').select('ref_file_id, file_history').eq('id', taskId).single();
-    if (!task) return errorResponse(404, 'task_not_found', 'Task not found.');
+    if (!task) return errorResponse(404, 'task_not_found', 'Task not found.', undefined, requestId);
 
     type FileHistoryEntry = {
       driveFileId?: string;
@@ -406,12 +428,15 @@ export async function DELETE(
 
     return NextResponse.json({
       ok: true,
+      requestId,
       removed: rollbackIds.length,
       cleanupWarnings,
     });
   } catch (err) {
     if (err instanceof AuthError) return handleAuthError(err);
-    console.error('[FILE_UPLOAD_ROLLBACK_ERROR]', err);
-    return errorResponse(500, 'rollback_failed', 'Unable to rollback partial uploaded files.');
+    logEvent('error', 'file_upload_rollback', requestId, 'Rollback failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return errorResponse(500, 'rollback_failed', 'Unable to rollback partial uploaded files.', undefined, requestId);
   }
 }

@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import StatusBadge from './StatusBadge';
 import type { Task } from './TaskCard';
-import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
 import { buildPdfFilesFromPreparedImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
 import {
@@ -31,7 +30,6 @@ interface ActionCardProps {
   activeRole: string;
   activeSubTab: string;
   userId: string;
-  userRoles: AppRole[];
   onUpdated: () => void;
   onOpenHistory: (taskId: string) => void;
 }
@@ -226,7 +224,7 @@ interface UploadApiResponse {
   message?: string;
 }
 
-export default function ActionCard({ task, activeRole, activeSubTab, userId, userRoles, onUpdated, onOpenHistory }: ActionCardProps) {
+export default function ActionCard({ task, activeRole, activeSubTab, userId, onUpdated, onOpenHistory }: ActionCardProps) {
   const borderColor = ROLE_BORDER_COLOR[activeRole] ?? '#94a3b8';
   const currentStageStuck = getCurrentStageStuckInfo({
     status: task.status,
@@ -323,7 +321,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     };
   }
 
-  async function uploadWithFetchFallback(file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> {
+  const uploadWithFetchFallback = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
     const res = await fetch(`/api/tasks/${task.id}/files`, {
       method: 'POST',
       body: buildUploadFormData(file, batchMeta),
@@ -342,7 +340,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
     }
 
     return parseUploadPayload(payload ?? {});
-  }
+  }, [task.id]);
 
   const uploadFileOnceAsync = useCallback((file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
     return new Promise((resolve, reject) => {
@@ -396,7 +394,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, use
       });
       xhr.send(formData);
     });
-  }, [task.id]);
+  }, [task.id, uploadWithFetchFallback]);
 
   const uploadFileAsync = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
     let attempt = 0;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
 
 // GET /api/users — รายชื่อผู้ใช้ทั้งหมด พร้อม roles

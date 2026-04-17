@@ -5,8 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:prod": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "clean:next": "node scripts/clean-next.mjs",
+    "preflight": "node scripts/preflight-check.mjs",
+    "check:prod": "npm run preflight && npm run lint"
   },
   "dependencies": {
     "@serwist/next": "^9.5.7",

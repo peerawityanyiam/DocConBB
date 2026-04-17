@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+:root {
+  --font-thai: 'Sarabun', 'Noto Sans Thai', 'Segoe UI', Tahoma, sans-serif;
+}
+
 @theme inline {
   --font-sans: var(--font-thai);
 }
