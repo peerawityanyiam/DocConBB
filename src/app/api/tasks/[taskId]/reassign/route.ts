@@ -30,7 +30,7 @@ export async function PATCH(
     const { data: dbUser } = await admin
       .from('users')
       .select('id, display_name')
-      .eq('email', user!.email)
+      .eq('id', user!.id)
       .single();
     if (!dbUser) throw new AuthError('ไม่พบข้อมูลผู้ใช้', 404);
 
@@ -54,7 +54,32 @@ export async function PATCH(
 
     // หาชื่อ user เก่าและใหม่
     const oldUserId = task[field];
-    const { data: newUser } = await admin.from('users').select('display_name, email').eq('id', new_user_id).single();
+    if (oldUserId === new_user_id) {
+      throw new AuthError('ผู้รับโอนเป็นคนเดิม', 400);
+    }
+
+    const { data: newUser } = await admin
+      .from('users')
+      .select('id, display_name, email, is_active')
+      .eq('id', new_user_id)
+      .single();
+    if (!newUser || newUser.is_active === false) {
+      throw new AuthError('ไม่พบผู้รับโอน หรือผู้รับโอนไม่ได้เปิดใช้งาน', 400);
+    }
+
+    const { data: newUserRoles } = await admin
+      .from('user_project_roles')
+      .select('role, projects!inner(slug)')
+      .eq('user_id', new_user_id)
+      .eq('projects.slug', 'tracking');
+    const targetRoleSet = new Set((newUserRoles ?? []).map((r) => r.role));
+    if (field === 'officer_id' && !targetRoleSet.has('STAFF')) {
+      throw new AuthError('ผู้รับโอนต้องมีสิทธิ์เจ้าหน้าที่ (STAFF)', 400);
+    }
+    if (field === 'reviewer_id' && !targetRoleSet.has('REVIEWER')) {
+      throw new AuthError('ผู้รับโอนต้องมีสิทธิ์ผู้ตรวจสอบ (REVIEWER)', 400);
+    }
+
     const { data: oldUser } = await admin.from('users').select('display_name, email').eq('id', oldUserId).single();
 
     const label = field === 'officer_id' ? 'เจ้าหน้าที่' : 'ผู้ตรวจสอบ';

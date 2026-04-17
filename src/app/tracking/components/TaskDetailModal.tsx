@@ -42,7 +42,7 @@ interface ActionDef {
 interface StaffUser {
   id: string;
   display_name: string;
-  role: string;
+  roles: string[];
 }
 
 interface DocRefCheckResult {
@@ -177,6 +177,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [staffListLoading, setStaffListLoading] = useState(false);
   const [reassignLoading, setReassignLoading] = useState(false);
+  const [reassignError, setReassignError] = useState('');
   const [bossCancelReason, setBossCancelReason] = useState('');
   const [bossCancelLoading, setBossCancelLoading] = useState(false);
   const [bossCancelError, setBossCancelError] = useState('');
@@ -207,6 +208,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     setUploadError('');
     setDocRefCheck(null);
     setReassignField(null);
+    setReassignError('');
     setPreCheckResult(null);
     setPreCheckLoading(false);
     setBossCancelReason('');
@@ -388,6 +390,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
   async function openReassign(field: 'officer_id' | 'reviewer_id') {
     setReassignField(field);
+    setReassignError('');
     setStaffListLoading(true);
     try {
       const res = await fetch('/api/tasks/staff-list');
@@ -402,17 +405,21 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   async function handleReassign(newUserId: string) {
     if (!task || !reassignField) return;
     setReassignLoading(true);
+    setReassignError('');
     try {
       const res = await fetch(`/api/tasks/${task.id}/reassign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ field: reassignField, new_user_id: newUserId }),
       });
-      if (res.ok) {
-        setReassignField(null);
-        onUpdated();
-        fetchTask();
-      }
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) throw new Error(data.error || 'โอนงานไม่สำเร็จ');
+
+      setReassignField(null);
+      onUpdated();
+      fetchTask();
+    } catch (err) {
+      setReassignError(err instanceof Error ? err.message : 'โอนงานไม่สำเร็จ');
     } finally {
       setReassignLoading(false);
     }
@@ -434,8 +441,8 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   const isSupersededCompleted = !!task && task.status === 'COMPLETED' && !!task.superseded_by;
 
   const filteredStaffForReassign = reassignField === 'officer_id'
-    ? staffList.filter(u => u.role === 'STAFF')
-    : staffList.filter(u => u.role === 'REVIEWER');
+    ? staffList.filter(u => u.roles?.includes('STAFF'))
+    : staffList.filter(u => u.roles?.includes('REVIEWER'));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -506,24 +513,27 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           {staffListLoading ? (
                             <p className="text-xs text-slate-400">กำลังโหลด...</p>
                           ) : (
-                            <div className="border border-slate-200 rounded-lg overflow-hidden">
-                              <select
-                                className="w-full text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                                defaultValue=""
-                                onChange={e => { if (e.target.value) handleReassign(e.target.value); }}
-                                disabled={reassignLoading}
-                              >
-                                <option value="" disabled>เลือกผู้รับผิดชอบใหม่</option>
-                                {filteredStaffForReassign.map(u => (
-                                  <option key={u.id} value={u.id}>{u.display_name}</option>
-                                ))}
-                              </select>
-                              <button
-                                onClick={() => setReassignField(null)}
-                                className="w-full text-xs text-slate-500 hover:bg-slate-50 py-1 border-t border-slate-200"
-                              >
-                                ยกเลิก
-                              </button>
+                            <div className="space-y-2">
+                              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                <select
+                                  className="w-full text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                  defaultValue=""
+                                  onChange={e => { if (e.target.value) handleReassign(e.target.value); }}
+                                  disabled={reassignLoading}
+                                >
+                                  <option value="" disabled>เลือกผู้รับผิดชอบใหม่</option>
+                                  {filteredStaffForReassign.map(u => (
+                                    <option key={u.id} value={u.id}>{u.display_name}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => setReassignField(null)}
+                                  className="w-full text-xs text-slate-500 hover:bg-slate-50 py-1 border-t border-slate-200"
+                                >
+                                  ยกเลิก
+                                </button>
+                              </div>
+                              {reassignError && <p className="text-xs text-red-600">⚠️ {reassignError}</p>}
                             </div>
                           )}
                         </div>
@@ -549,24 +559,27 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           {staffListLoading ? (
                             <p className="text-xs text-slate-400">กำลังโหลด...</p>
                           ) : (
-                            <div className="border border-slate-200 rounded-lg overflow-hidden">
-                              <select
-                                className="w-full text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                                defaultValue=""
-                                onChange={e => { if (e.target.value) handleReassign(e.target.value); }}
-                                disabled={reassignLoading}
-                              >
-                                <option value="" disabled>เลือกผู้ตรวจสอบใหม่</option>
-                                {filteredStaffForReassign.map(u => (
-                                  <option key={u.id} value={u.id}>{u.display_name}</option>
-                                ))}
-                              </select>
-                              <button
-                                onClick={() => setReassignField(null)}
-                                className="w-full text-xs text-slate-500 hover:bg-slate-50 py-1 border-t border-slate-200"
-                              >
-                                ยกเลิก
-                              </button>
+                            <div className="space-y-2">
+                              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                <select
+                                  className="w-full text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                  defaultValue=""
+                                  onChange={e => { if (e.target.value) handleReassign(e.target.value); }}
+                                  disabled={reassignLoading}
+                                >
+                                  <option value="" disabled>เลือกผู้ตรวจสอบใหม่</option>
+                                  {filteredStaffForReassign.map(u => (
+                                    <option key={u.id} value={u.id}>{u.display_name}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => setReassignField(null)}
+                                  className="w-full text-xs text-slate-500 hover:bg-slate-50 py-1 border-t border-slate-200"
+                                >
+                                  ยกเลิก
+                                </button>
+                              </div>
+                              {reassignError && <p className="text-xs text-red-600">⚠️ {reassignError}</p>}
                             </div>
                           )}
                         </div>

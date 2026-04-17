@@ -89,6 +89,7 @@ interface StaffOption {
   id: string;
   display_name: string;
   email: string;
+  roles: string[];
 }
 
 export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: string; userRoles: AppRole[]; userId: string }) {
@@ -298,10 +299,11 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
     if (!task || !reassignTarget || !selectedStaffId) return;
     setReassignLoading(true);
     try {
+      const field = reassignTarget === 'officer' ? 'officer_id' : 'reviewer_id';
       const res = await fetch(`/api/tasks/${task.id}/reassign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: reassignTarget, user_id: selectedStaffId }),
+        body: JSON.stringify({ field, new_user_id: selectedStaffId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
@@ -318,6 +320,9 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
   }
 
   const isBossOwner = task && userRoles.includes('BOSS') && task.created_by === userId && !['COMPLETED', 'CANCELLED'].includes(task.status);
+  const filteredStaffForReassign = reassignTarget === 'officer'
+    ? staffList.filter((s) => s.roles?.includes('STAFF'))
+    : staffList.filter((s) => s.roles?.includes('REVIEWER'));
 
   if (loading) {
     return (
@@ -428,7 +433,7 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
                   <select value={selectedStaffId} onChange={e => setSelectedStaffId(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
                     <option value="">-- เลือกบุคลากร --</option>
-                    {staffList.map(s => (
+                    {filteredStaffForReassign.map(s => (
                       <option key={s.id} value={s.id}>{s.display_name} ({s.email})</option>
                     ))}
                   </select>
