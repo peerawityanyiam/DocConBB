@@ -49,15 +49,27 @@ export async function GET(request: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  await serviceClient.from('users').upsert(
-    {
+  // Check if user already exists by email (pre-created by admin)
+  const { data: existingUser } = await serviceClient
+    .from('users')
+    .select('id')
+    .ilike('email', user.email)
+    .single();
+
+  if (existingUser) {
+    // User pre-exists — update metadata only, never overwrite id
+    await serviceClient.from('users').update({
+      avatar_url: user.user_metadata?.avatar_url || null,
+    }).eq('id', existingUser.id);
+  } else {
+    // New user — insert with Supabase Auth id
+    await serviceClient.from('users').insert({
       id: user.id,
       email: user.email,
       display_name: user.user_metadata?.full_name || user.email.split('@')[0],
       avatar_url: user.user_metadata?.avatar_url || null,
-    },
-    { onConflict: 'email' }
-  );
+    });
+  }
 
   return NextResponse.redirect(`${origin}${next}`);
 }
