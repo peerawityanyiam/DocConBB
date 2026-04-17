@@ -1,13 +1,10 @@
-// 1. รับค่าโดเมนที่อนุญาต (คั่นด้วยลูกน้ำ) และแปลงเป็น Array
-const allowedDomainsString = process.env.ALLOWED_DOMAIN || 'medicine.psu.ac.th,gmail.com';
-const allowedDomainsList = allowedDomainsString.split(',').map(domain => domain.trim());
+const allowedDomainsList = (process.env.ALLOWED_DOMAIN || 'medicine.psu.ac.th')
+  .split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
 
 export const AUTH_CONFIG = {
-  // เปลี่ยนเป็นเก็บ Array ของโดเมนแทน
   allowedDomains: allowedDomainsList,
   oauthProvider: 'google' as const,
   oauthQueryParams: {
-    // ลบ hd: primaryDomain ออกไปเลย เพื่อเปิดรับ @gmail.com และโดเมนอื่นๆ
     prompt: 'select_account',
   },
   loginPath: '/login',
@@ -16,10 +13,10 @@ export const AUTH_CONFIG = {
   publicPaths: ['/login', '/callback'],
 };
 
-// 2. ปรับฟังก์ชันเช็คอีเมล ให้ตรวจสอบจาก Array ของโดเมน
 export function isAllowedEmail(email: string): boolean {
   if (!email || !email.includes('@')) return false;
-  
-  const emailDomain = email.split('@')[1].toLowerCase();
-  return AUTH_CONFIG.allowedDomains.includes(emailDomain);
+  const parts = email.toLowerCase().split('@');
+  if (parts.length !== 2) return false;
+  const domain = parts[1];
+  return allowedDomainsList.includes(domain);
 }
