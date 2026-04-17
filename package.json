@@ -10,7 +10,8 @@
     "lint": "eslint",
     "clean:next": "node scripts/clean-next.mjs",
     "preflight": "node scripts/preflight-check.mjs",
-    "check:prod": "npm run preflight && npm run lint"
+    "check:prod": "npm run preflight && npm run lint",
+    "qa:stats": "node scripts/qa-stats-check.mjs"
   },
   "dependencies": {
     "@serwist/next": "^9.5.7",
