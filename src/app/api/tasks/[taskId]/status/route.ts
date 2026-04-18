@@ -272,6 +272,39 @@ export async function PATCH(
       }
     }
 
+    // Auto-clean uploader-private draft files once task is finished/cancelled.
+    if (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') {
+      try {
+        const { data: privateDrafts } = await admin
+          .from('task_private_files')
+          .select('id, drive_file_id')
+          .eq('task_id', taskId)
+          .eq('is_deleted', false);
+
+        const privateDraftRows = (privateDrafts ?? []) as Array<{ id: string; drive_file_id: string }>;
+        if (privateDraftRows.length > 0) {
+          const nowDelete = new Date().toISOString();
+          const privateDraftIds = privateDraftRows.map((row) => row.id);
+          const privateDriveIds = privateDraftRows.map((row) => row.drive_file_id).filter(Boolean);
+
+          await admin
+            .from('task_private_files')
+            .update({
+              is_deleted: true,
+              deleted_at: nowDelete,
+              deleted_by: dbUser.id,
+            })
+            .in('id', privateDraftIds);
+
+          for (const driveId of privateDriveIds) {
+            await removeFileFromDrive(driveId);
+          }
+        }
+      } catch {
+        // Keep status transition working even if private-draft table migration is not applied yet.
+      }
+    }
+
     // ─── อัปเดต ─────────────────────────────────────────────────────────
     const { error: updateErr } = await admin
       .from('tasks')

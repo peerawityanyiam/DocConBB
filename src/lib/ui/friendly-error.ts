@@ -1,4 +1,4 @@
-const THAI_PATTERN = /[\u0E00-\u0E7F]/;
+﻿const THAI_PATTERN = /[\u0E00-\u0E7F]/;
 
 function extractRawMessage(error: unknown): string {
   if (typeof error === 'string') return error.trim();
@@ -38,6 +38,22 @@ export function toFriendlyErrorMessage(
 
   if (normalized.includes('file_too_large')) {
     return 'ขนาดไฟล์เกิน 4MB ต่อไฟล์';
+  }
+
+  if (normalized.includes('task_closed_private_upload')) {
+    return 'งานสิ้นสุดแล้ว ไม่สามารถฝากไฟล์เพิ่ม';
+  }
+
+  if (normalized.includes('draft_not_found')) {
+    return 'ไม่พบไฟล์ฝากที่ระบุ';
+  }
+
+  if (normalized.includes('draft_upload_failed')) {
+    return 'ฝากไฟล์ไม่สำเร็จ';
+  }
+
+  if (normalized.includes('draft_delete_failed')) {
+    return 'ลบไฟล์ฝากไม่สำเร็จ';
   }
 
   if (normalized.includes('forbidden_upload_state')) {
