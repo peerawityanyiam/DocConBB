@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { buildPdfFilesFromPreparedImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
@@ -282,9 +282,9 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
         body: JSON.stringify({ title: title.trim(), detail: detail.trim(), officer_id: officerId, reviewer_id: reviewerId }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
       createdTaskId = data.id ?? null;
       if (!createdTaskId) throw new Error('MISSING_TASK_ID');
-      if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
 
       // 2) Upload files if selected
       if (wordFile) {

@@ -148,10 +148,6 @@ export async function POST(request: NextRequest) {
     if (normalizedDetail.length > MAX_DETAIL_LEN) {
       return NextResponse.json({ error: `รายละเอียดงานยาวเกินไป (ไม่เกิน ${MAX_DETAIL_LEN} ตัวอักษร)` }, { status: 400 });
     }
-    if (normalizedOfficerId === normalizedReviewerId) {
-      return NextResponse.json({ error: 'ผู้รับผิดชอบและผู้ตรวจสอบต้องเป็นคนละคนกัน' }, { status: 400 });
-    }
-
     const admin = await createServiceRoleClient();
 
     const { data: creator } = await admin

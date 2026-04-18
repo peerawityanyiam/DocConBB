@@ -42,6 +42,8 @@ function formatFileSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const DRAFT_NOTICE_STORAGE_KEY = 'tracking:draft_upload_notice_seen_v1';
+
 export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDraftFilesProps) {
   const [files, setFiles] = useState<PrivateDraftFileItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +51,11 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showFirstUploadNotice, setShowFirstUploadNotice] = useState(false);
+  const [hasSeenUploadNotice, setHasSeenUploadNotice] = useState(false);
+  const [duplicateFile, setDuplicateFile] = useState<File | null>(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isClosedTask = task.status === 'COMPLETED' || task.status === 'CANCELLED';
   const isTaskOwner = task.created_by === userId || task.officer_id === userId || task.reviewer_id === userId;
@@ -74,24 +81,24 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
     void loadFiles();
   }, [loadFiles, task.id]);
 
-  const askReplaceIfDuplicate = useCallback((incomingName: string) => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setHasSeenUploadNotice(window.localStorage.getItem(DRAFT_NOTICE_STORAGE_KEY) === '1');
+  }, []);
+
+  const hasDuplicateName = useCallback((incomingName: string) => {
     const incoming = normalizeName(incomingName);
-    const duplicated = files.some((item) => (
+    return files.some((item) => (
       normalizeName(item.original_file_name) === incoming
       || normalizeName(item.drive_file_name) === incoming
     ));
-    if (!duplicated) return false;
-    return window.confirm(
-      'พบไฟล์ชื่อซ้ำในไฟล์ฝากส่วนตัวของงานนี้\nกด "ตกลง" เพื่อแทนที่ไฟล์เดิม\nกด "ยกเลิก" เพื่อบันทึกเป็นชื่อใหม่แบบ (2)'
-    );
   }, [files]);
 
-  async function uploadDraft(file: File) {
+  async function uploadDraft(file: File, replaceExisting: boolean) {
     setUploading(true);
     setError('');
     setSuccess('');
     try {
-      const replaceExisting = askReplaceIfDuplicate(file.name);
       const formData = new FormData();
       formData.append('file', file);
       formData.append('replace_existing', replaceExisting ? '1' : '0');
@@ -116,10 +123,60 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
     }
   }
 
+  function openFilePicker() {
+    fileInputRef.current?.click();
+  }
+
+  function handleUploadButtonClick() {
+    if (uploading || isClosedTask) return;
+    setError('');
+    setSuccess('');
+    if (!hasSeenUploadNotice) {
+      setShowFirstUploadNotice(true);
+      return;
+    }
+    openFilePicker();
+  }
+
+  function handleConfirmFirstNotice() {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(DRAFT_NOTICE_STORAGE_KEY, '1');
+    }
+    setHasSeenUploadNotice(true);
+    setShowFirstUploadNotice(false);
+    openFilePicker();
+  }
+
+  function closeDuplicateModal() {
+    setShowDuplicateModal(false);
+    setDuplicateFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleDuplicateChoice(mode: 'replace' | 'keep' | 'cancel') {
+    const targetFile = duplicateFile;
+    if (!targetFile) {
+      closeDuplicateModal();
+      return;
+    }
+    if (mode === 'cancel') {
+      closeDuplicateModal();
+      return;
+    }
+    setShowDuplicateModal(false);
+    await uploadDraft(targetFile, mode === 'replace');
+    setDuplicateFile(null);
+  }
+
   async function onSelectFile(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
     if (!selected) return;
-    await uploadDraft(selected);
+    if (hasDuplicateName(selected.name)) {
+      setDuplicateFile(selected);
+      setShowDuplicateModal(true);
+      return;
+    }
+    await uploadDraft(selected, false);
   }
 
   async function deleteDraft(draftId: string) {
@@ -146,82 +203,178 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
   if (!isTaskOwner) return null;
 
   return (
-    <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50/40 p-3 space-y-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-cyan-700">
-          🧳 ไฟล์ฝากส่วนตัว (เห็นเฉพาะคุณ)
-        </p>
-        <span className="text-[0.68rem] text-cyan-700/80">
-          ลบอัตโนมัติเมื่องานเสร็จ/ยกเลิก
-        </span>
+    <>
+      <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50/50 p-2.5">
+        <button
+          type="button"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-amber-100/70 transition-colors"
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+              📥 พื้นที่ฝากไฟล์ส่วนตัว
+              <span className="text-[0.68rem] font-semibold px-2 py-0.5 rounded-full bg-white border border-amber-300 text-amber-800">
+                ไม่ใช่การส่งงาน
+              </span>
+            </p>
+            <p className="text-[0.68rem] text-amber-800 mt-0.5">
+              เห็นเฉพาะคุณ • ลบอัตโนมัติเมื่องานเสร็จ/ยกเลิก
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-2">
+            <span className="text-[0.65rem] px-1.5 py-0.5 rounded-md bg-white border border-amber-300 text-amber-700">
+              {files.length} ไฟล์
+            </span>
+            <span className="text-amber-700 text-sm">{isExpanded ? '▲' : '▼'}</span>
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="mt-2.5 space-y-2.5 px-1">
+            {!isClosedTask && (
+              <div className="space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".docx,.pdf,image/*"
+                  onChange={(event) => void onSelectFile(event)}
+                  disabled={uploading}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={handleUploadButtonClick}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {uploading ? 'กำลังอัปโหลด...' : 'เลือกไฟล์ฝาก (Word / PDF / รูปภาพ)'}
+                </button>
+                <p className="text-[0.68rem] text-slate-600">
+                  พื้นที่นี้สำหรับเก็บไฟล์ระหว่างทำงานเท่านั้น และไม่ถือว่าเป็นการส่งงาน • จำกัดขนาดต่อไฟล์ 4MB
+                </p>
+              </div>
+            )}
+
+            {isClosedTask && (
+              <p className="text-[0.72rem] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2">
+                งานนี้สิ้นสุดแล้ว ระบบปิดการฝากไฟล์ใหม่
+              </p>
+            )}
+
+            {error && (
+              <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {error}</p>
+            )}
+            {success && (
+              <p className="text-xs text-green-700">{success}</p>
+            )}
+
+            <div className="rounded-md border border-cyan-100 bg-white">
+              {loading ? (
+                <p className="text-xs text-slate-500 px-3 py-3">กำลังโหลดไฟล์ฝาก...</p>
+              ) : files.length === 0 ? (
+                <p className="text-xs text-slate-500 px-3 py-3">ยังไม่มีไฟล์ฝากในงานนี้</p>
+              ) : (
+                <ul className="divide-y divide-cyan-100">
+                  {files.map((item) => (
+                    <li key={item.id} className="px-3 py-2.5 flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={`https://drive.google.com/file/d/${item.drive_file_id}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-700 hover:text-blue-800 hover:underline break-all"
+                        >
+                          {item.drive_file_name}
+                        </a>
+                        <div className="text-[0.68rem] text-slate-500 mt-0.5">
+                          {formatDateTime(item.created_at)} • {formatFileSize(item.file_size_bytes)}
+                        </div>
+                      </div>
+                      {!isClosedTask && (
+                        <button
+                          type="button"
+                          onClick={() => void deleteDraft(item.id)}
+                          disabled={deletingId === item.id || uploading}
+                          className="text-[0.68rem] px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {deletingId === item.id ? '...' : 'ลบ'}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {!isClosedTask && (
-        <div className="space-y-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".docx,.pdf,image/*"
-            onChange={(event) => void onSelectFile(event)}
-            disabled={uploading}
-            className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-100 file:text-cyan-800 hover:file:bg-cyan-200 cursor-pointer disabled:opacity-60"
-          />
-          <p className="text-[0.68rem] text-slate-600">
-            รองรับ Word / PDF / รูปภาพ • จำกัดขนาดต่อไฟล์ 4MB
-          </p>
+      {showFirstUploadNotice && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-amber-200 p-4">
+            <h4 className="text-sm font-bold text-amber-900">ก่อนฝากไฟล์</h4>
+            <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+              พื้นที่นี้ใช้สำหรับฝากไฟล์ระหว่างทำงานเท่านั้น
+              <br />
+              ไม่ถือว่าเป็นการส่งงาน
+              <br />
+              หากต้องการส่งงาน ให้ใช้ปุ่ม &ldquo;ส่งงาน&rdquo; ด้านล่างการ์ด
+            </p>
+            <div className="mt-4 flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowFirstUploadNotice(false)}
+                className="px-3 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmFirstNotice}
+                className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600"
+              >
+                เข้าใจแล้ว เลือกไฟล์ต่อ
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {isClosedTask && (
-        <p className="text-[0.72rem] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2">
-          งานนี้สิ้นสุดแล้ว ระบบปิดการฝากไฟล์ใหม่
-        </p>
+      {showDuplicateModal && duplicateFile && (
+        <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl border border-amber-200 p-4">
+            <h4 className="text-sm font-bold text-amber-900">พบชื่อไฟล์ซ้ำในพื้นที่ฝากไฟล์</h4>
+            <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+              ไฟล์ <span className="font-semibold break-all">{duplicateFile.name}</span> มีอยู่แล้ว
+              <br />
+              โปรดเลือกวิธีจัดการ และย้ำอีกครั้งว่าพื้นที่นี้เป็นการฝากไฟล์ ไม่ใช่การส่งงาน
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => void handleDuplicateChoice('replace')}
+                className="px-3 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600"
+              >
+                แทนที่ไฟล์เดิม
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDuplicateChoice('keep')}
+                className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600"
+              >
+                เก็บไว้ทั้งคู่
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDuplicateChoice('cancel')}
+                className="px-3 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      {error && (
-        <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {error}</p>
-      )}
-      {success && (
-        <p className="text-xs text-green-700">{success}</p>
-      )}
-
-      <div className="rounded-md border border-cyan-100 bg-white">
-        {loading ? (
-          <p className="text-xs text-slate-500 px-3 py-3">กำลังโหลดไฟล์ฝาก...</p>
-        ) : files.length === 0 ? (
-          <p className="text-xs text-slate-500 px-3 py-3">ยังไม่มีไฟล์ฝากในงานนี้</p>
-        ) : (
-          <ul className="divide-y divide-cyan-100">
-            {files.map((item) => (
-              <li key={item.id} className="px-3 py-2.5 flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={`https://drive.google.com/file/d/${item.drive_file_id}/view`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-700 hover:text-blue-800 hover:underline break-all"
-                  >
-                    {item.drive_file_name}
-                  </a>
-                  <div className="text-[0.68rem] text-slate-500 mt-0.5">
-                    {formatDateTime(item.created_at)} • {formatFileSize(item.file_size_bytes)}
-                  </div>
-                </div>
-                {!isClosedTask && (
-                  <button
-                    type="button"
-                    onClick={() => void deleteDraft(item.id)}
-                    disabled={deletingId === item.id || uploading}
-                    className="text-[0.68rem] px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    {deletingId === item.id ? '...' : 'ลบ'}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
+    </>
   );
 }
