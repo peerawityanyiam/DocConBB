@@ -61,6 +61,14 @@ export default function SessionIdleGuard() {
     }
   }, []);
 
+  const clearLogoutSignal = useCallback(() => {
+    try {
+      window.localStorage.removeItem(LOGOUT_SIGNAL_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
   const signalLogout = useCallback((at: number) => {
     try {
       window.localStorage.setItem(LOGOUT_SIGNAL_KEY, String(at));
@@ -121,10 +129,11 @@ export default function SessionIdleGuard() {
     signingOutRef.current = false;
 
     const initAt = readLastActivityAt();
-    lastActivityAtRef.current = initAt;
-    if (!window.localStorage.getItem(LAST_ACTIVITY_KEY)) {
-      writeLastActivityAt(initAt);
-    }
+    const now = Date.now();
+    const isStaleActivity = now - initAt > IDLE_TIMEOUT_MS;
+    const startAt = isStaleActivity ? now : initAt;
+    writeLastActivityAt(startAt);
+    clearLogoutSignal();
 
     if (typeof BroadcastChannel !== 'undefined') {
       channelRef.current = new BroadcastChannel(CHANNEL_NAME);
@@ -207,7 +216,7 @@ export default function SessionIdleGuard() {
         channelRef.current = null;
       }
     };
-  }, [isPublicPath, markActivity, readLastActivityAt, signOutForIdle, writeLastActivityAt]);
+  }, [clearLogoutSignal, isPublicPath, markActivity, readLastActivityAt, signOutForIdle, writeLastActivityAt]);
 
   if (isPublicPath || !warningVisible) return null;
 

@@ -33,6 +33,13 @@ function LoginContent() {
 
     const supabase = createClient();
     try {
+      try {
+        window.localStorage.removeItem('bbdc:idle_logout_signal');
+        window.localStorage.setItem('bbdc:last_activity_at', String(Date.now()));
+      } catch {
+        // ignore storage errors
+      }
+
       // Shared-device safety: clear existing app session before starting OAuth
       await supabase.auth.signOut();
       await supabase.auth.signInWithOAuth({
