@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import StatusBadge from './StatusBadge';
@@ -17,7 +17,7 @@ import {
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
-/* â”€â”€ Border colors per role context â”€â”€ */
+/* ── Border colors per role context ── */
 const ROLE_BORDER_COLOR: Record<string, string> = {
   STAFF: '#f59e0b',
   DOCCON: '#0d9488',
@@ -35,7 +35,7 @@ interface ActionCardProps {
   onOpenHistory: (taskId: string) => void;
 }
 
-/* â”€â”€ Helpers â”€â”€ */
+/* ── Helpers ── */
 function formatDateThai(iso: string) {
   return new Date(iso).toLocaleDateString('th-TH', {
     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -47,13 +47,13 @@ function formatDaysValue(days: number) {
   return days.toFixed(1);
 }
 
-/* â”€â”€ Pipeline visualization (for DocCon tracking tab) â”€â”€ */
+/* ── Pipeline visualization (for DocCon tracking tab) ── */
 const PIPELINE_STAGES: { key: string; label: string }[] = [
-  { key: 'ASSIGNED', label: 'à¹€à¸ˆà¹‰à¸²à¸«à¸™à¹‰à¸²à¸—à¸µà¹ˆ' },
-  { key: 'SUBMITTED_TO_DOCCON', label: 'à¸•à¸£à¸§à¸ˆà¸£à¸¹à¸›à¹à¸šà¸š' },
-  { key: 'PENDING_REVIEW', label: 'à¸•à¸£à¸§à¸ˆà¹€à¸™à¸·à¹‰à¸­à¸«à¸²' },
+  { key: 'ASSIGNED', label: 'เจ้าหน้าที่' },
+  { key: 'SUBMITTED_TO_DOCCON', label: 'ตรวจรูปแบบ' },
+  { key: 'PENDING_REVIEW', label: 'ตรวจเนื้อหา' },
   { key: 'WAITING_BOSS_APPROVAL', label: 'Boss' },
-  { key: 'WAITING_SUPER_BOSS_APPROVAL', label: 'à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™' },
+  { key: 'WAITING_SUPER_BOSS_APPROVAL', label: 'หัวหน้างาน' },
 ];
 
 const STATUS_STAGE_INDEX: Record<TaskStatus, number> = {
@@ -131,7 +131,7 @@ function PipelineViz({ status }: { status: TaskStatus }) {
             {i > 0 && <div className={`h-0.5 ${lineColor} flex-1`} style={{ minWidth: 8, marginBottom: 16 }} />}
             <div className={`flex flex-col items-center shrink-0 gap-1 ${opacity}`}>
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border-2 ${dotClass}`}>
-                {isDone ? 'âœ“' : i + 1}
+                {isDone ? '✓' : i + 1}
               </div>
               <span className={`text-[0.6rem] ${labelClass} text-center whitespace-nowrap`}>
                 {stage.label}
@@ -144,8 +144,8 @@ function PipelineViz({ status }: { status: TaskStatus }) {
   );
 }
 
-/* â”€â”€ Rejection / Cancel Modal â”€â”€ */
-function RejectModal({ title, onConfirm, onCancel, loading, confirmLabel = 'à¸•à¸µà¸à¸¥à¸±à¸š', confirmStyle = 'danger', requireComment = false }: {
+/* ── Rejection / Cancel Modal ── */
+function RejectModal({ title, onConfirm, onCancel, loading, confirmLabel = 'ตีกลับ', confirmStyle = 'danger', requireComment = false }: {
   title: string;
   onConfirm: (comment: string) => void;
   onCancel: () => void;
@@ -164,26 +164,26 @@ function RejectModal({ title, onConfirm, onCancel, loading, confirmLabel = 'à¸
         <textarea
           value={comment}
           onChange={e => setComment(e.target.value)}
-          placeholder="à¸£à¸°à¸šà¸¸à¹€à¸«à¸•à¸¸à¸œà¸¥..."
+          placeholder="ระบุเหตุผล..."
           rows={3}
           className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 resize-none"
         />
         {requireComment && isCommentEmpty && (
-          <p className="text-xs text-red-600 mt-1">à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¹€à¸«à¸•à¸¸à¸œà¸¥à¸à¹ˆà¸­à¸™à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£</p>
+          <p className="text-xs text-red-600 mt-1">กรุณาระบุเหตุผลก่อนดำเนินการ</p>
         )}
         <div className="flex gap-2 mt-4">
           <button
             onClick={onCancel}
             className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50"
           >
-            à¸¢à¸à¹€à¸¥à¸´à¸
+            ยกเลิก
           </button>
           <button
             onClick={() => onConfirm(comment)}
             disabled={loading || isCommentEmpty}
             className={`flex-1 py-2.5 rounded-lg ${bgColor} text-white text-sm font-bold disabled:opacity-50`}
           >
-            {loading ? 'à¸à¸³à¸¥à¸±à¸‡à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£...' : confirmLabel}
+            {loading ? 'กำลังดำเนินการ...' : confirmLabel}
           </button>
         </div>
       </div>
@@ -191,7 +191,7 @@ function RejectModal({ title, onConfirm, onCancel, loading, confirmLabel = 'à¸
   );
 }
 
-/* â”€â”€ DocRef Check Result â”€â”€ */
+/* ── DocRef Check Result ── */
 interface DocRefCheckResult {
   exists: boolean;
   file_name?: string;
@@ -240,7 +240,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     : '';
   const isOwnedStaffCard = activeRole === 'STAFF' && task.officer_id === userId;
 
-  // File selection state â€” just tracks what user selected, NOT auto-uploaded
+  // File selection state — just tracks what user selected, NOT auto-uploaded
   const [selectedWordFile, setSelectedWordFile] = useState<File | null>(null);
   const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
   const [imageQueue, setImageQueue] = useState<ImageQueueItem[]>([]);
@@ -298,7 +298,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
-  /* â”€â”€ uploadFileAsync: returns uploaded file metadata â”€â”€ */
+  /* ── uploadFileAsync: returns uploaded file metadata ── */
   function buildUploadFormData(file: File, batchMeta?: UploadBatchMeta) {
     const formData = new FormData();
     formData.append('file', file);
@@ -347,11 +347,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     return new Promise((resolve, reject) => {
       const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
       if (!['.docx', '.pdf'].includes(ext)) {
-        reject(new Error('à¸£à¸­à¸‡à¸£à¸±à¸šà¹€à¸‰à¸žà¸²à¸°à¹„à¸Ÿà¸¥à¹Œ .docx à¹à¸¥à¸° .pdf à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™'));
+        reject(new Error('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น'));
         return;
       }
       if (file.size > MAX_UPLOAD_FILE_SIZE) {
-        reject(new Error(`à¹„à¸Ÿà¸¥à¹Œà¸¡à¸µà¸‚à¸™à¸²à¸”à¹€à¸à¸´à¸™ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`));
+        reject(new Error(`ไฟล์มีขนาดเกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`));
         return;
       }
       setUploadProgress(0);
@@ -413,10 +413,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
       }
       attempt += 1;
     }
-    throw lastError instanceof Error ? lastError : new Error('à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
+    throw lastError instanceof Error ? lastError : new Error('อัปโหลดไฟล์ไม่สำเร็จ');
   }, [uploadFileOnceAsync]);
 
-  /* â”€â”€ callStatusApi: calls the status PATCH endpoint â”€â”€ */
+  /* ── callStatusApi: calls the status PATCH endpoint ── */
   async function callStatusApi(actionKey: string, comment?: string): Promise<void> {
     const body: Record<string, string> = { action: actionKey };
     if (comment?.trim()) body.comment = comment.trim();
@@ -432,10 +432,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     } catch {
       // ignore
     }
-    if (!res.ok) throw new Error(toFriendlyErrorMessage(data.error ?? `HTTP_${res.status}`, 'à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆ'));
+    if (!res.ok) throw new Error(toFriendlyErrorMessage(data.error ?? `HTTP_${res.status}`, 'ดำเนินการไม่สำเร็จ กรุณาลองใหม่'));
   }
 
-  /* â”€â”€ uploadThenExecute: optionally upload selected file, then execute action â”€â”€ */
+  /* ── uploadThenExecute: optionally upload selected file, then execute action ── */
   async function rollbackUploadedPdfBatch(batchId: string): Promise<void> {
     try {
       await fetch(`/api/tasks/${task.id}/files?upload_batch_id=${encodeURIComponent(batchId)}`, {
@@ -507,14 +507,14 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
       clearSelectedUploadFiles();
       onUpdated();
     } catch (err) {
-      const uploadMsg = toUploadFailureMessage(err, 'à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œà¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ');
-      const actionMsg = toFriendlyErrorMessage(err, 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸” à¸à¸£à¸¸à¸“à¸²à¸¥à¸­à¸‡à¹ƒà¸«à¸¡à¹ˆ');
+      const uploadMsg = toUploadFailureMessage(err, 'อัปโหลดไฟล์ไม่สำเร็จ');
+      const actionMsg = toFriendlyErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่');
       if (!uploadFinished && hasSelectedUpload) {
         for (const batchId of rollbackBatchIds) {
           await rollbackUploadedPdfBatch(batchId);
         }
         await rollbackUploadedPdfFiles(Array.from(rollbackSinglePdfIds));
-        // upload failed â€” clear selection so user can pick again
+        // upload failed — clear selection so user can pick again
         clearSelectedUploadFiles();
         setUploadError(uploadMsg);
       } else {
@@ -531,29 +531,29 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     }
   }
 
-  /* â”€â”€ STAFF: always requires a new file â”€â”€ */
+  /* ── STAFF: always requires a new file ── */
   async function handleStaffSubmit() {
     if (!selectedWordFile) {
-      setActionError('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ Word (.docx) à¸à¹ˆà¸­à¸™à¸ªà¹ˆà¸‡à¸‡à¸²à¸™');
+      setActionError('กรุณาเลือกไฟล์ Word (.docx) ก่อนส่งงาน');
       return;
     }
     await uploadThenExecute('submit');
   }
 
-  /* â”€â”€ DocCon approve â€” require doc_ref (unless sent back from Boss where it's already set) â”€â”€ */
+  /* ── DocCon approve — require doc_ref (unless sent back from Boss where it's already set) ── */
   async function handleDocConApprove() {
     if (!docRef.trim() && !task.doc_ref) {
-      setActionError('à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¸£à¸«à¸±à¸ªà¹€à¸­à¸à¸ªà¸²à¸£à¸à¹ˆà¸­à¸™');
+      setActionError('กรุณาระบุรหัสเอกสารก่อน');
       return;
     }
     if (docconSentBackFromBoss && !hasDocxSelected) {
-      setActionError('à¸à¸£à¸¸à¸“à¸²à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Word (.docx) à¸à¹ˆà¸­à¸™à¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¹„à¸›à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™à¸«à¸£à¸·à¸­à¸œà¸¹à¹‰à¸ªà¸±à¹ˆà¸‡à¸‡à¸²à¸™');
+      setActionError('กรุณาอัปโหลดไฟล์ Word (.docx) ก่อนส่งกลับไปหัวหน้างานหรือผู้สั่งงาน');
       return;
     }
     await uploadThenExecute('doccon_approve');
   }
 
-  /* â”€â”€ Reject/cancel modal triggers â”€â”€ */
+  /* ── Reject/cancel modal triggers ── */
   function handleDocConRejectClick() { setRejectActionKey('doccon_reject'); setShowRejectModal(true); }
   function handleReviewerRejectClick() { setRejectActionKey('reviewer_reject'); setShowRejectModal(true); }
   function handleBossRejectClick() { setRejectActionKey('boss_reject'); setShowRejectModal(true); }
@@ -561,13 +561,13 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   function handleSuperBossRejectClick() { setRejectActionKey('super_boss_reject'); setShowRejectModal(true); }
   function handleSuperBossSendToDocCon() { setRejectActionKey('super_boss_send_to_doccon'); setShowRejectModal(true); }
 
-  /* â”€â”€ Rejection/cancel confirm â€” uploads file (if any) then executes action â”€â”€ */
+  /* ── Rejection/cancel confirm — uploads file (if any) then executes action ── */
   function handleRejectConfirm(comment: string) {
     setShowRejectModal(false);
     uploadThenExecute(rejectActionKey, comment);
   }
 
-  /* â”€â”€ File input change: ONLY updates state, never auto-uploads â”€â”€ */
+  /* ── File input change: ONLY updates state, never auto-uploads ── */
   function onWordFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     if (!file) {
@@ -583,15 +583,15 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
       e.target.value = '';
       clearSelectedUploadFiles();
       setUploadError(docconSentBackFromBoss
-        ? 'à¸‡à¸²à¸™à¸—à¸µà¹ˆà¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¸ˆà¸²à¸à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™ à¸•à¹‰à¸­à¸‡à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œ Word (.docx) à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™'
-        : 'à¸£à¸­à¸‡à¸£à¸±à¸šà¹€à¸‰à¸žà¸²à¸°à¹„à¸Ÿà¸¥à¹Œ Word (.docx) à¸«à¸£à¸·à¸­ PDF (.pdf)');
+        ? 'งานที่ส่งกลับจากหัวหน้างาน ต้องแนบไฟล์ Word (.docx) เท่านั้น'
+        : 'รองรับเฉพาะไฟล์ Word (.docx) หรือ PDF (.pdf)');
       return;
     }
 
     if (file.size > MAX_UPLOAD_FILE_SIZE) {
       e.target.value = '';
       clearSelectedUploadFiles();
-      setUploadError(`à¹„à¸Ÿà¸¥à¹Œà¸¡à¸µà¸‚à¸™à¸²à¸”à¹ƒà¸«à¸à¹ˆà¹€à¸à¸´à¸™ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¹ƒà¸«à¸¡à¹ˆ`);
+      setUploadError(`ไฟล์มีขนาดใหญ่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} กรุณาเลือกไฟล์ใหม่`);
       return;
     }
 
@@ -620,7 +620,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
       }
       const nonImageFile = images.find((file) => !file.type.startsWith('image/'));
       if (nonImageFile) {
-        throw new Error(`à¹„à¸Ÿà¸¥à¹Œ ${nonImageFile.name} à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆà¸£à¸¹à¸›à¸ à¸²à¸ž`);
+        throw new Error(`ไฟล์ ${nonImageFile.name} ไม่ใช่รูปภาพ`);
       }
       if (sourceTotalBytes > MAX_IMAGE_BATCH_TOTAL_BYTES) {
         throw new Error('image_total_too_large');
@@ -645,7 +645,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
       setSelectedImageFiles([]);
       setSelectedImageCount(null);
       setImageQueue([]);
-      setUploadError(toUploadFailureMessage(err, 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸•à¸£à¸µà¸¢à¸¡à¸£à¸¹à¸›à¹€à¸žà¸·à¹ˆà¸­à¸ªà¹ˆà¸‡à¹„à¸”à¹‰'));
+      setUploadError(toUploadFailureMessage(err, 'ไม่สามารถเตรียมรูปเพื่อส่งได้'));
     } finally {
       setIsConvertingImages(false);
       e.target.value = '';
@@ -659,12 +659,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   const hasDocxSelected = !!selectedWordFile && selectedWordFile.name.toLowerCase().endsWith('.docx');
   const selectedFileDisplayName = selectedWordFile
     ? selectedWordFile.name
-    : (selectedImageCount ? `à¸ à¸²à¸ž ${selectedImageCount} à¸£à¸¹à¸›` : '');
+    : (selectedImageCount ? `ภาพ ${selectedImageCount} รูป` : '');
   const imagePickerStatusText = isConvertingImages
-    ? 'à¸à¸³à¸¥à¸±à¸‡à¹€à¸•à¸£à¸µà¸¢à¸¡à¸£à¸¹à¸›...'
+    ? 'กำลังเตรียมรูป...'
     : (selectedImageCount
-      ? `à¹€à¸¥à¸·à¸­à¸à¸£à¸¹à¸›à¹à¸¥à¹‰à¸§ ${selectedImageCount} à¸£à¸¹à¸›`
-      : 'à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œ...');
+      ? `เลือกรูปแล้ว ${selectedImageCount} รูป`
+      : 'ยังไม่ได้เลือกไฟล์...');
   const requiresRejectReason = [
     'doccon_reject',
     'reviewer_reject',
@@ -674,10 +674,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     'super_boss_send_to_doccon',
   ].includes(rejectActionKey);
 
-  /* â”€â”€ Is this a pipeline-only card (DocCon tracking sub-tab)? â”€â”€ */
+  /* ── Is this a pipeline-only card (DocCon tracking sub-tab)? ── */
   const isPipelineView = activeRole === 'DOCCON' && activeSubTab === 'tracking';
 
-  /* â”€â”€ Compute file links â”€â”€ */
+  /* ── Compute file links ── */
   const hasWordFile = !!task.drive_file_id;
   const wordFileUrl = hasWordFile ? `https://drive.google.com/file/d/${task.drive_file_id}/view` : null;
   const currentRefFiles = (() => {
@@ -713,15 +713,15 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   })();
   const hasRefFile = currentRefFiles.length > 0;
 
-  /* â”€â”€ Derived state for staff submit button (Bug 3: always require new file) â”€â”€ */
+  /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
   const staffCanSubmit = selectedWordFile !== null;
 
-  /* â”€â”€ Bug 4: Derive who sent back for rejected statuses â”€â”€ */
+  /* ── Bug 4: Derive who sent back for rejected statuses ── */
   const lastHistoryEntry = task.status_history?.slice().reverse().find(h => h.status === task.status);
   const sentBackByName = lastHistoryEntry?.changedByName;
 
-  /* â”€â”€ Bug 5: DocCon context â€” is this a "sent back from Boss/SuperBoss"? â”€â”€ */
+  /* ── Bug 5: DocCon context — is this a "sent back from Boss/SuperBoss"? ── */
   const docconSentBackFromBoss = task.status === 'SUBMITTED_TO_DOCCON' && (() => {
     const history = task.status_history ?? [];
     for (let i = history.length - 1; i >= 0; i--) {
@@ -734,28 +734,28 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
 
   const isBlocked = actionLoading || uploadProgress !== null || isConvertingImages;
   const busyReason = isConvertingImages
-    ? 'à¸à¸³à¸¥à¸±à¸‡à¹€à¸•à¸£à¸µà¸¢à¸¡à¸£à¸¹à¸› à¸à¸£à¸¸à¸“à¸²à¸£à¸­à¹ƒà¸«à¹‰à¸„à¸£à¸šà¸à¹ˆà¸­à¸™'
-    : (actionLoading || uploadProgress !== null ? 'à¸£à¸°à¸šà¸šà¸à¸³à¸¥à¸±à¸‡à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¸«à¸£à¸·à¸­à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸à¸£à¸¸à¸“à¸²à¸£à¸­à¸ªà¸±à¸à¸„à¸£à¸¹à¹ˆ' : '');
+    ? 'กำลังเตรียมรูป กรุณารอให้ครบก่อน'
+    : (actionLoading || uploadProgress !== null ? 'ระบบกำลังอัปโหลดหรือบันทึกข้อมูล กรุณารอสักครู่' : '');
   const staffSubmitDisabledReason = isBlocked
     ? busyReason
-    : (!staffCanSubmit ? 'à¸•à¹‰à¸­à¸‡à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œ Word (.docx) à¸à¹ˆà¸­à¸™à¸ªà¹ˆà¸‡à¸‡à¸²à¸™' : '');
+    : (!staffCanSubmit ? 'ต้องแนบไฟล์ Word (.docx) ก่อนส่งงาน' : '');
   const docConApproveDisabledReason = docconSentBackFromBoss
     ? (isBlocked
       ? busyReason
-      : (!hasDocxSelected ? 'à¸‡à¸²à¸™à¸—à¸µà¹ˆà¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¸ˆà¸²à¸à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™ à¸•à¹‰à¸­à¸‡à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œ Word (.docx) à¸à¹ˆà¸­à¸™à¸ªà¹ˆà¸‡à¸•à¹ˆà¸­à¸à¸¥à¸±à¸š' : ''))
+      : (!hasDocxSelected ? 'งานที่ส่งกลับจากหัวหน้างาน ต้องแนบไฟล์ Word (.docx) ก่อนส่งต่อกลับ' : ''))
     : (isBlocked
       ? busyReason
-      : ((!docRef.trim() && !task.doc_ref) ? 'à¸•à¹‰à¸­à¸‡à¸£à¸°à¸šà¸¸à¸£à¸«à¸±à¸ªà¹€à¸­à¸à¸ªà¸²à¸£à¸à¹ˆà¸­à¸™à¸à¸”à¸œà¹ˆà¸²à¸™à¸£à¸¹à¸›à¹à¸šà¸š' : ''));
+      : ((!docRef.trim() && !task.doc_ref) ? 'ต้องระบุรหัสเอกสารก่อนกดผ่านรูปแบบ' : ''));
   const genericApproveDisabledReason = isBlocked ? busyReason : '';
   const attachmentSummaryLabel = selectedWordFile || selectedImageFiles.length > 0
-    ? `à¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¸žà¸£à¹‰à¸­à¸¡à¸ªà¹ˆà¸‡: ${selectedFileDisplayName}`
-    : 'à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¹à¸™à¸š';
+    ? `ไฟล์ที่พร้อมส่ง: ${selectedFileDisplayName}`
+    : 'ยังไม่ได้เลือกไฟล์แนบ';
   const attachmentSummaryHint = selectedWordFile || selectedImageFiles.length > 0
     ? (selectedImageCount
-      ? 'à¸£à¸°à¸šà¸šà¸ˆà¸°à¸£à¸§à¸¡à¸£à¸¹à¸›à¸—à¸µà¹ˆà¹€à¸•à¸£à¸µà¸¢à¸¡à¸„à¸£à¸šà¹€à¸›à¹‡à¸™ PDF à¸•à¸­à¸™à¸à¸”à¸›à¸¸à¹ˆà¸¡à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£'
-      : 'à¸£à¸°à¸šà¸šà¸ˆà¸°à¸ªà¹ˆà¸‡à¹„à¸Ÿà¸¥à¹Œà¸™à¸µà¹‰à¹€à¸¡à¸·à¹ˆà¸­à¸à¸”à¸›à¸¸à¹ˆà¸¡à¸”à¸³à¹€à¸™à¸´à¸™à¸à¸²à¸£')
-    : `à¹€à¸¥à¸·à¸­à¸à¹„à¸Ÿà¸¥à¹Œà¸ˆà¸²à¸ Choose File à¸«à¸£à¸·à¸­à¸à¸”à¸›à¸¸à¹ˆà¸¡ "à¹à¸™à¸šà¸ à¸²à¸ž" (à¸‚à¹‰à¸­à¸ˆà¸³à¸à¸±à¸”à¸£à¸°à¸šà¸š: à¸•à¹ˆà¸­à¹„à¸Ÿà¸¥à¹Œ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} â€¢ à¸•à¹ˆà¸­à¸„à¸£à¸±à¹‰à¸‡ ${MAX_IMAGE_BATCH_COUNT} à¸£à¸¹à¸›/${MAX_IMAGE_BATCH_TOTAL_LABEL} â€¢ à¸ªà¸¹à¸‡à¸ªà¸¸à¸” ${MAX_IMAGE_PDF_PARTS} part)`;
-  const attachmentHintWithLimit = `à¸£à¸­à¸‡à¸£à¸±à¸š Word/PDF à¸«à¸£à¸·à¸­à¹à¸™à¸šà¸ à¸²à¸žà¹€à¸žà¸·à¹ˆà¸­à¸£à¸§à¸¡à¹€à¸›à¹‡à¸™ PDF (à¸‚à¹‰à¸­à¸ˆà¸³à¸à¸±à¸”à¸£à¸°à¸šà¸š: à¸•à¹ˆà¸­à¹„à¸Ÿà¸¥à¹Œ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} â€¢ à¸•à¹ˆà¸­à¸„à¸£à¸±à¹‰à¸‡ ${MAX_IMAGE_BATCH_COUNT} à¸£à¸¹à¸›/${MAX_IMAGE_BATCH_TOTAL_LABEL} â€¢ à¸ªà¸¹à¸‡à¸ªà¸¸à¸” ${MAX_IMAGE_PDF_PARTS} part)`;
+      ? 'ระบบจะรวมรูปที่เตรียมครบเป็น PDF ตอนกดปุ่มดำเนินการ'
+      : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
+    : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
+  const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
   const renderAttachmentSummary = (hint: string) => (
     <div className={`mt-2 rounded-md border px-2.5 py-2 text-[0.7rem] ${(selectedWordFile || selectedImageFiles.length > 0) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>
@@ -767,7 +767,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
       <div className="mt-2 space-y-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 max-h-32 overflow-y-auto">
         {imageQueue.map((item, index) => (
           <p key={`${item.name}-${index}`} className="text-[0.68rem] text-amber-800 break-all">
-            {`à¸£à¸¹à¸› ${index + 1} ${item.status === 'uploading' ? 'à¸à¸³à¸¥à¸±à¸‡à¹€à¸•à¸£à¸µà¸¢à¸¡' : item.status === 'done' ? 'à¹€à¸•à¸£à¸µà¸¢à¸¡à¹à¸¥à¹‰à¸§' : 'à¸£à¸­à¹€à¸•à¸£à¸µà¸¢à¸¡'}: ${item.name}`}
+            {`รูป ${index + 1} ${item.status === 'uploading' ? 'กำลังเตรียม' : item.status === 'done' ? 'เตรียมแล้ว' : 'รอเตรียม'}: ${item.name}`}
           </p>
         ))}
       </div>
@@ -795,7 +795,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               <button
                 onClick={() => onOpenHistory(task.id)}
                 className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                title="à¸›à¸£à¸°à¸§à¸±à¸•à¸´à¹à¸¥à¸°à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”"
+                title="ประวัติและรายละเอียด"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -808,7 +808,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* Detail gray box */}
           {task.detail && (
             <div className="bg-gray-50 border-l-[3px] border-gray-300 px-3 py-2 rounded-r-md mb-3 flex items-start gap-2">
-              <span className="text-gray-400 text-sm mt-0.5">â„¹ï¸</span>
+              <span className="text-gray-400 text-sm mt-0.5">ℹ️</span>
               <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{task.detail}</p>
             </div>
           )}
@@ -817,45 +817,45 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-3">
             {activeRole === 'STAFF' && (
               <>
-                <span>ðŸ“… à¸ªà¸±à¹ˆà¸‡à¸‡à¸²à¸™à¸§à¸±à¸™à¸—à¸µà¹ˆ {formatDateThai(task.created_at)}</span>
+                <span>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</span>
               </>
             )}
             {activeRole === 'DOCCON' && (
               <>
-                <span>ðŸ‘¤ à¸œà¸¹à¹‰à¸ªà¹ˆà¸‡: {task.officer?.display_name ?? 'â€”'}</span>
-                <span>ðŸ“… à¸ªà¹ˆà¸‡ {formatDateThai(task.updated_at)}</span>
+                <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
+                <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
                 {isPipelineView && currentStageStuck && (
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stageStuckDays > 7 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                    à¸„à¹‰à¸²à¸‡ {stageStuckDaysLabel} à¸§à¸±à¸™
+                    ค้าง {stageStuckDaysLabel} วัน
                   </span>
                 )}
               </>
             )}
             {activeRole === 'REVIEWER' && (
               <>
-                <span>ðŸ‘¤ à¸œà¸¹à¹‰à¸ªà¹ˆà¸‡: {task.officer?.display_name ?? 'â€”'}</span>
-                <span>ðŸ“… à¸ªà¹ˆà¸‡ {formatDateThai(task.updated_at)}</span>
+                <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
+                <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
               </>
             )}
             {activeRole === 'BOSS' && (
               <>
-                <span>ðŸ‘¤ à¹€à¸ˆà¹‰à¸²à¸«à¸™à¹‰à¸²à¸—à¸µà¹ˆ: {task.officer?.display_name ?? 'â€”'}</span>
-                <span>ðŸ“‹ à¸œà¸¹à¹‰à¸•à¸£à¸§à¸ˆ: {task.reviewer?.display_name ?? 'â€”'}</span>
-                <span>ðŸ“… {formatDateThai(task.updated_at)}</span>
+                <span>👤 เจ้าหน้าที่: {task.officer?.display_name ?? '—'}</span>
+                <span>📋 ผู้ตรวจ: {task.reviewer?.display_name ?? '—'}</span>
+                <span>📅 {formatDateThai(task.updated_at)}</span>
               </>
             )}
             {activeRole === 'SUPER_BOSS' && (
               <>
-                <span>ðŸ‘¤ à¸œà¸¹à¹‰à¸ªà¸£à¹‰à¸²à¸‡: {task.creator?.display_name ?? 'â€”'}</span>
-                <span>ðŸ“… {formatDateThai(task.updated_at)}</span>
+                <span>👤 ผู้สร้าง: {task.creator?.display_name ?? '—'}</span>
+                <span>📅 {formatDateThai(task.updated_at)}</span>
               </>
             )}
           </div>
 
           {currentStageStuck && (
             <div className="mb-3 text-xs text-gray-500">
-              â± {isOwnedStaffCard ? 'à¸„à¹‰à¸²à¸‡à¸—à¸µà¹ˆà¸„à¸¸à¸“à¹ƒà¸™à¸‚à¸±à¹‰à¸™' : 'à¸„à¹‰à¸²à¸‡à¸—à¸µà¹ˆà¸‚à¸±à¹‰à¸™'} <span className="font-semibold text-gray-700">{stageStuckLabel}</span> à¸¡à¸²{' '}
-              <span className="font-semibold text-gray-700">{stageStuckDaysLabel}</span> à¸§à¸±à¸™
+              ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-gray-700">{stageStuckLabel}</span> มา{' '}
+              <span className="font-semibold text-gray-700">{stageStuckDaysLabel}</span> วัน
             </div>
           )}
 
@@ -864,10 +864,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {REJECTED_STATUSES.has(task.status) && (
             <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-red-50 border-l-[3px] border-red-400 text-red-800 space-y-0.5">
               {sentBackByName && (
-                <p className="font-semibold">â†© à¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¹‚à¸”à¸¢: {sentBackByName}</p>
+                <p className="font-semibold">↩ ส่งกลับโดย: {sentBackByName}</p>
               )}
               {task.latest_comment && (
-                <p>ðŸ’¬ {task.latest_comment}</p>
+                <p>💬 {task.latest_comment}</p>
               )}
             </div>
           )}
@@ -879,8 +879,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             );
             return sentBackEntry ? (
               <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-amber-50 border-l-[3px] border-amber-400 text-amber-800">
-                â†© à¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¸•à¸£à¸§à¸ˆà¸£à¸¹à¸›à¹à¸šà¸šà¹‚à¸”à¸¢: <span className="font-semibold">{sentBackEntry.changedByName}</span>
-                {task.latest_comment && <p className="mt-0.5">ðŸ’¬ {task.latest_comment}</p>}
+                ↩ ส่งกลับตรวจรูปแบบโดย: <span className="font-semibold">{sentBackEntry.changedByName}</span>
+                {task.latest_comment && <p className="mt-0.5">💬 {task.latest_comment}</p>}
               </div>
             ) : null;
           })()}
@@ -888,7 +888,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* Pipeline visualization (DocCon tracking tab) */}
           {isPipelineView && <PipelineViz status={task.status} />}
 
-          {/* File links â€” word (blue) + pdf (orange) */}
+          {/* File links — word (blue) + pdf (orange) */}
           {!isPipelineView && (hasWordFile || hasRefFile) && (
             <div className="flex flex-col gap-2 mb-3">
               {hasWordFile && (
@@ -898,7 +898,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
                 >
-                  <span>ðŸ“„</span>
+                  <span>📄</span>
                   <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
                 </a>
               )}
@@ -912,7 +912,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                     >
-                      <span>ðŸ“‹</span>
+                      <span>📋</span>
                       <span className="min-w-0 break-all">
                         PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
                       </span>
@@ -923,9 +923,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             </div>
           )}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-          {/* â”€â”€  ROLE-SPECIFIC INLINE ACTIONS  â”€â”€  */}
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* ══════════════════════════════════════ */}
+          {/* ──  ROLE-SPECIFIC INLINE ACTIONS  ──  */}
+          {/* ══════════════════════════════════════ */}
 
           {!isPipelineView && (
             <PrivateDraftFiles
@@ -935,12 +935,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             />
           )}
 
-          {/* â”€â”€ STAFF: word upload + submit â”€â”€ */}
+          {/* ── STAFF: word upload + submit ── */}
           {activeRole === 'STAFF' && isStaffActionable(task, userId) && (
             <div className="mt-2 space-y-3">
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-                  ðŸ“„ {isRejectedStatus ? 'à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Word à¸—à¸µà¹ˆà¹à¸à¹‰à¹„à¸‚à¹à¸¥à¹‰à¸§' : 'à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹„à¸Ÿà¸¥à¹Œ Word (.docx)'}
+                  📄 {isRejectedStatus ? 'อัปโหลดไฟล์ Word ที่แก้ไขแล้ว' : 'อัปโหลดไฟล์ Word (.docx)'}
                   <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -953,18 +953,18 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 {selectedWordFile && (
                   <div className="mt-1.5 space-y-0.5">
                     <p className="text-xs text-green-700 flex items-center gap-1">
-                      âœ… à¹€à¸¥à¸·à¸­à¸à¹à¸¥à¹‰à¸§: <span className="font-medium">{selectedFileDisplayName}</span>
+                      ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
                     </p>
                   </div>
                 )}
-                {renderAttachmentSummary('à¸‚à¸±à¹‰à¸™à¸•à¸­à¸™à¸™à¸µà¹‰à¸•à¹‰à¸­à¸‡à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œ Word (.docx)')}
+                {renderAttachmentSummary('ขั้นตอนนี้ต้องแนบไฟล์ Word (.docx)')}
               </div>
 
               {/* Upload progress */}
               {uploadProgress !== null && (
                 <div className="px-1">
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-                    <span>à¸à¸³à¸¥à¸±à¸‡à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”...</span><span>{uploadProgress}%</span>
+                    <span>กำลังอัปโหลด...</span><span>{uploadProgress}%</span>
                   </div>
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div className="h-full bg-[#00c2a8] transition-all rounded-full" style={{ width: `${uploadProgress}%` }} />
@@ -972,8 +972,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 </div>
               )}
 
-              {uploadError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">âš ï¸ {uploadError}</p>}
-              {actionError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">âš ï¸ {actionError}</p>}
+              {uploadError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {uploadError}</p>}
+              {actionError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {actionError}</p>}
 
               <button
                 onClick={handleStaffSubmit}
@@ -981,54 +981,54 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 title={staffSubmitDisabledReason || undefined}
                 className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
               >
-                {actionLoading ? (uploadProgress !== null ? `à¸à¸³à¸¥à¸±à¸‡à¸­à¸±à¸›à¹‚à¸«à¸¥à¸” ${uploadProgress}%...` : 'à¸à¸³à¸¥à¸±à¸‡à¸ªà¹ˆà¸‡...') : 'âœˆ à¸ªà¹ˆà¸‡à¸‡à¸²à¸™'}
+                {actionLoading ? (uploadProgress !== null ? `กำลังอัปโหลด ${uploadProgress}%...` : 'กำลังส่ง...') : '✈ ส่งงาน'}
               </button>
               {(isBlocked || !staffCanSubmit) && staffSubmitDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700 px-1">â„¹ {staffSubmitDisabledReason}</p>
+                <p className="text-[0.68rem] text-amber-700 px-1">ℹ {staffSubmitDisabledReason}</p>
               )}
             </div>
           )}
 
-          {/* â”€â”€ DOCCON: à¸£à¸­à¸•à¸£à¸§à¸ˆ sub-tab â”€â”€ */}
+          {/* ── DOCCON: รอตรวจ sub-tab ── */}
           {activeRole === 'DOCCON' && activeSubTab === 'pending' && task.status === 'SUBMITTED_TO_DOCCON' && (
             <div className="mt-2 space-y-3">
-              {/* Doc ref input â€” required before approve (hidden when sent back from Boss) */}
+              {/* Doc ref input — required before approve (hidden when sent back from Boss) */}
               {!docconSentBackFromBoss && <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <label className="text-xs font-semibold text-gray-700 mb-1.5 block"># à¸£à¸«à¸±à¸ªà¹€à¸­à¸à¸ªà¸²à¸£: <span className="text-red-500">*</span></label>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block"># รหัสเอกสาร: <span className="text-red-500">*</span></label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={docRef}
                     onChange={e => setDocRef(e.target.value)}
-                    placeholder="à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¹€à¸­à¸à¸ªà¸²à¸£ à¹€à¸Šà¹ˆà¸™ TM-001"
+                    placeholder="กรอกรหัสเอกสาร เช่น TM-001"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400 bg-white"
                   />
                 </div>
-                {docRefChecking && <p className="text-xs text-gray-400 mt-1">à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š...</p>}
+                {docRefChecking && <p className="text-xs text-gray-400 mt-1">กำลังตรวจสอบ...</p>}
                 {docRefCheck?.exists && (
                   <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-md">
-                    <p className="text-xs text-amber-700 font-medium">âš ï¸ à¸£à¸«à¸±à¸ªà¸‹à¹‰à¸³ â€” à¸¡à¸µà¹€à¸­à¸à¸ªà¸²à¸£: {docRefCheck.file_name ?? '-' } {docRefCheck.date ? `(${formatDateThai(docRefCheck.date)})` : ''}</p>
-                    <p className="text-[0.65rem] text-amber-600 mt-0.5">à¹‚à¸›à¸£à¸”à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¹ƒà¸«à¹‰à¸¡à¸±à¹ˆà¸™à¹ƒà¸ˆà¸§à¹ˆà¸²à¹€à¸›à¹‡à¸™à¸à¸²à¸£à¹à¸à¹‰à¹„à¸‚à¹€à¸­à¸à¸ªà¸²à¸£à¸‰à¸šà¸±à¸šà¹€à¸”à¸´à¸¡à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ (à¸à¸”à¸œà¹ˆà¸²à¸™à¹„à¸”à¹‰à¸«à¸²à¸à¹ƒà¸Šà¹ˆ)</p>
+                    <p className="text-xs text-amber-700 font-medium">⚠️ รหัสซ้ำ — มีเอกสาร: {docRefCheck.file_name ?? '-' } {docRefCheck.date ? `(${formatDateThai(docRefCheck.date)})` : ''}</p>
+                    <p className="text-[0.65rem] text-amber-600 mt-0.5">โปรดตรวจสอบให้มั่นใจว่าเป็นการแก้ไขเอกสารฉบับเดิมหรือไม่ (กดผ่านได้หากใช่)</p>
                   </div>
                 )}
                 {docRefCheck && !docRefCheck.exists && docRef.trim() && (
-                  <p className="text-xs text-green-600 mt-1">âœ… à¸£à¸«à¸±à¸ªà¹„à¸¡à¹ˆà¸‹à¹‰à¸³</p>
+                  <p className="text-xs text-green-600 mt-1">✅ รหัสไม่ซ้ำ</p>
                 )}
                 {!docRef.trim() && !task.doc_ref && (
-                  <p className="text-xs text-red-500 mt-1">à¸à¸£à¸¸à¸“à¸²à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¹€à¸­à¸à¸ªà¸²à¸£à¸à¹ˆà¸­à¸™à¸à¸”à¸œà¹ˆà¸²à¸™à¸£à¸¹à¸›à¹à¸šà¸š</p>
+                  <p className="text-xs text-red-500 mt-1">กรุณากรอกรหัสเอกสารก่อนกดผ่านรูปแบบ</p>
                 )}
               </div>}
 
               {docconSentBackFromBoss && (
                 <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block"># à¸£à¸«à¸±à¸ªà¹€à¸­à¸à¸ªà¸²à¸£à¹€à¸”à¸´à¸¡</label>
+                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block"># รหัสเอกสารเดิม</label>
                   <div className="flex gap-2 items-center">
                     <input
                       type="text"
                       value={docRef}
                       readOnly={!isDocRefEditing}
                       onChange={e => setDocRef(e.target.value)}
-                      placeholder="à¸à¸£à¸­à¸à¸£à¸«à¸±à¸ªà¹€à¸­à¸à¸ªà¸²à¸£ à¹€à¸Šà¹ˆà¸™ TM-001"
+                      placeholder="กรอกรหัสเอกสาร เช่น TM-001"
                       className={`flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400 ${isDocRefEditing ? 'bg-white' : 'bg-gray-100 text-gray-600'}`}
                     />
                     <button
@@ -1036,19 +1036,19 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                       onClick={() => setIsDocRefEditing(v => !v)}
                       className="px-3 py-2 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100"
                     >
-                      {isDocRefEditing ? 'à¸›à¸´à¸”à¹à¸à¹‰à¹„à¸‚' : 'à¹à¸à¹‰à¹„à¸‚à¸£à¸«à¸±à¸ª'}
+                      {isDocRefEditing ? 'ปิดแก้ไข' : 'แก้ไขรหัส'}
                     </button>
                   </div>
-                  <p className="text-[0.65rem] text-gray-500 mt-1">à¸„à¹ˆà¸²à¹€à¸”à¸´à¸¡à¸–à¸¹à¸à¸¥à¹‡à¸­à¸à¹„à¸§à¹‰ à¸«à¸²à¸à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¹à¸à¹‰à¹ƒà¸«à¹‰à¸à¸”à¸›à¸¸à¹ˆà¸¡à¹à¸à¹‰à¹„à¸‚</p>
-                  {docRefChecking && <p className="text-xs text-gray-400 mt-1">à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š...</p>}
+                  <p className="text-[0.65rem] text-gray-500 mt-1">ค่าเดิมถูกล็อกไว้ หากต้องการแก้ให้กดปุ่มแก้ไข</p>
+                  {docRefChecking && <p className="text-xs text-gray-400 mt-1">กำลังตรวจสอบ...</p>}
                   {docRefCheck?.exists && (
                     <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-md">
-                      <p className="text-xs text-amber-700 font-medium">âš ï¸ à¸£à¸«à¸±à¸ªà¸‹à¹‰à¸³ â€” à¸¡à¸µà¹€à¸­à¸à¸ªà¸²à¸£: {docRefCheck.file_name ?? '-'} {docRefCheck.date ? `(${formatDateThai(docRefCheck.date)})` : ''}</p>
-                      <p className="text-[0.65rem] text-amber-600 mt-0.5">à¹‚à¸›à¸£à¸”à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¹ƒà¸«à¹‰à¸¡à¸±à¹ˆà¸™à¹ƒà¸ˆà¸§à¹ˆà¸²à¹€à¸›à¹‡à¸™à¸à¸²à¸£à¹à¸à¹‰à¹„à¸‚à¹€à¸­à¸à¸ªà¸²à¸£à¸‰à¸šà¸±à¸šà¹€à¸”à¸´à¸¡à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ (à¸à¸”à¸ªà¹ˆà¸‡à¸•à¹ˆà¸­à¸à¸¥à¸±à¸šà¹„à¸”à¹‰à¸«à¸²à¸à¹ƒà¸Šà¹ˆ)</p>
+                      <p className="text-xs text-amber-700 font-medium">⚠️ รหัสซ้ำ — มีเอกสาร: {docRefCheck.file_name ?? '-'} {docRefCheck.date ? `(${formatDateThai(docRefCheck.date)})` : ''}</p>
+                      <p className="text-[0.65rem] text-amber-600 mt-0.5">โปรดตรวจสอบให้มั่นใจว่าเป็นการแก้ไขเอกสารฉบับเดิมหรือไม่ (กดส่งต่อกลับได้หากใช่)</p>
                     </div>
                   )}
                   {docRefCheck && !docRefCheck.exists && docRef.trim() && (
-                    <p className="text-xs text-green-600 mt-1">âœ… à¸£à¸«à¸±à¸ªà¹„à¸¡à¹ˆà¸‹à¹‰à¸³</p>
+                    <p className="text-xs text-green-600 mt-1">✅ รหัสไม่ซ้ำ</p>
                   )}
                 </div>
               )}
@@ -1056,7 +1056,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               {/* Optional file attachment */}
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                  {docconSentBackFromBoss ? 'ðŸ“Ž à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œ Word à¸—à¸µà¹ˆà¹à¸à¹‰à¹„à¸‚ (à¸šà¸±à¸‡à¸„à¸±à¸š):' : 'ðŸ“Ž à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¸¡à¸µà¸£à¸­à¸¢à¹à¸à¹‰ (à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸š):'}
+                  {docconSentBackFromBoss ? '📎 แนบไฟล์ Word ที่แก้ไข (บังคับ):' : '📎 แนบไฟล์ที่มีรอยแก้ (ไม่บังคับ):'}
                 </label>
                 <input
                   ref={wordInputRef}
@@ -1082,19 +1082,19 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                         disabled={isBlocked}
                         className="inline-flex items-center px-4 py-2 rounded-lg bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        ðŸ–¼ï¸ à¹à¸™à¸šà¸ à¸²à¸ž
+                        🖼️ แนบภาพ
                       </button>
                       <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                     </div>
                   </>
                 )}
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
-                  <p className="text-xs text-green-700 mt-1.5">âœ… à¹€à¸¥à¸·à¸­à¸à¹à¸¥à¹‰à¸§: <span className="font-medium">{selectedFileDisplayName}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 {renderImageQueue()}
                 {renderAttachmentSummary(
                   docconSentBackFromBoss
-                    ? 'à¸à¸£à¸“à¸µà¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¸ˆà¸²à¸à¸«à¸±à¸§à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™ à¸•à¹‰à¸­à¸‡à¹à¸™à¸š Word (.docx)'
+                    ? 'กรณีส่งกลับจากหัวหน้างาน ต้องแนบ Word (.docx)'
                     : attachmentHintWithLimit
                 )}
                 {uploadProgress !== null && (
@@ -1103,10 +1103,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">âš ï¸ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
-              {/* Action buttons: sent-back from Boss â†’ only forward, no reject */}
+              {/* Action buttons: sent-back from Boss → only forward, no reject */}
               {docconSentBackFromBoss ? (
                 <button
                   onClick={handleDocConApprove}
@@ -1114,7 +1114,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={docConApproveDisabledReason || undefined}
                   className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : 'âœˆ à¸ªà¹ˆà¸‡à¸•à¹ˆà¸­à¸à¸¥à¸±à¸š'}
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✈ ส่งต่อกลับ'}
                 </button>
               ) : (
               <div className="flex flex-col sm:flex-row gap-2">
@@ -1124,7 +1124,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={docConApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : 'âœ“ à¸œà¹ˆà¸²à¸™à¸£à¸¹à¸›à¹à¸šà¸š'}
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านรูปแบบ'}
                 </button>
                 <button
                   onClick={handleDocConRejectClick}
@@ -1132,21 +1132,21 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={genericApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  â†© à¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¹à¸à¹‰à¹„à¸‚
+                  ↩ ส่งกลับแก้ไข
                 </button>
               </div>
               )}
               {docConApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">â„¹ {docConApproveDisabledReason}</p>
+                <p className="text-[0.68rem] text-amber-700">ℹ {docConApproveDisabledReason}</p>
               )}
             </div>
           )}
 
-          {/* â”€â”€ REVIEWER â”€â”€ */}
+          {/* ── REVIEWER ── */}
           {activeRole === 'REVIEWER' && task.status === 'PENDING_REVIEW' && task.reviewer_id === userId && (
             <div className="mt-2 space-y-3">
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">ðŸ“Ž à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œà¸—à¸µà¹ˆà¸¡à¸µà¸£à¸­à¸¢à¹à¸à¹‰/à¸„à¸­à¸¡à¹€à¸¡à¸™à¸•à¹Œ (à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸š):</label>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ที่มีรอยแก้/คอมเมนต์ (ไม่บังคับ):</label>
                 <input
                   ref={wordInputRef}
                   type="file"
@@ -1169,12 +1169,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                     disabled={isBlocked}
                     className="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-semibold hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    ðŸ–¼ï¸ à¹à¸™à¸šà¸ à¸²à¸ž
+                    🖼️ แนบภาพ
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
-                  <p className="text-xs text-green-700 mt-1.5">âœ… à¹€à¸¥à¸·à¸­à¸à¹à¸¥à¹‰à¸§: <span className="font-medium">{selectedFileDisplayName}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 {renderImageQueue()}
                 {renderAttachmentSummary(attachmentHintWithLimit)}
@@ -1184,7 +1184,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">âš ï¸ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
               <div className="flex flex-col sm:flex-row gap-2">
@@ -1194,7 +1194,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={genericApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : 'âœ“ à¸œà¹ˆà¸²à¸™à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š'}
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านการตรวจสอบ'}
                 </button>
                 <button
                   onClick={handleReviewerRejectClick}
@@ -1202,20 +1202,20 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={genericApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  â†© à¸ªà¹ˆà¸‡à¸à¸¥à¸±à¸šà¹à¸à¹‰à¹„à¸‚
+                  ↩ ส่งกลับแก้ไข
                 </button>
               </div>
               {genericApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">â„¹ {genericApproveDisabledReason}</p>
+                <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
               )}
             </div>
           )}
 
-          {/* â”€â”€ BOSS: pending tab actions â”€â”€ */}
+          {/* ── BOSS: pending tab actions ── */}
           {activeRole === 'BOSS' && task.status === 'WAITING_BOSS_APPROVAL' && task.created_by === userId && (
             <div className="mt-2 space-y-3">
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">ðŸ“Ž à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œ (à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸š):</label>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
                 <input
                   ref={wordInputRef}
                   type="file"
@@ -1238,12 +1238,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                     disabled={isBlocked}
                     className="inline-flex items-center px-4 py-2 rounded-lg bg-purple-50 text-purple-700 text-sm font-semibold hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    ðŸ–¼ï¸ à¹à¸™à¸šà¸ à¸²à¸ž
+                    🖼️ แนบภาพ
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
-                  <p className="text-xs text-green-700 mt-1.5">âœ… à¹€à¸¥à¸·à¸­à¸à¹à¸¥à¹‰à¸§: <span className="font-medium">{selectedFileDisplayName}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 {renderImageQueue()}
                 {renderAttachmentSummary(attachmentHintWithLimit)}
@@ -1253,7 +1253,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">âš ï¸ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
               <button
@@ -1262,7 +1262,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 title={genericApproveDisabledReason || undefined}
                 className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
               >
-                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : 'âœ“ à¸­à¸™à¸¸à¸¡à¸±à¸•à¸´'}
+                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติ'}
               </button>
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
@@ -1271,7 +1271,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={genericApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  â†© à¸•à¸µà¸à¸¥à¸±à¸šà¹€à¸ˆà¹‰à¸²à¸«à¸™à¹‰à¸²à¸—à¸µà¹ˆ
+                  ↩ ตีกลับเจ้าหน้าที่
                 </button>
                 <button
                   onClick={handleBossSendToDocCon}
@@ -1279,20 +1279,20 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={genericApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  â†© à¸ªà¹ˆà¸‡ DocCon à¸•à¸£à¸§à¸ˆà¹ƒà¸«à¸¡à¹ˆ
+                  ↩ ส่ง DocCon ตรวจใหม่
                 </button>
               </div>
               {genericApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">â„¹ {genericApproveDisabledReason}</p>
+                <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
               )}
             </div>
           )}
 
-          {/* â”€â”€ SUPER_BOSS â”€â”€ */}
+          {/* ── SUPER_BOSS ── */}
           {activeRole === 'SUPER_BOSS' && task.status === 'WAITING_SUPER_BOSS_APPROVAL' && (
             <div className="mt-2 space-y-3">
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">ðŸ“Ž à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œ (à¹„à¸¡à¹ˆà¸šà¸±à¸‡à¸„à¸±à¸š):</label>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
                 <input
                   ref={wordInputRef}
                   type="file"
@@ -1315,12 +1315,12 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                     disabled={isBlocked}
                     className="inline-flex items-center px-4 py-2 rounded-lg bg-pink-50 text-pink-700 text-sm font-semibold hover:bg-pink-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    ðŸ–¼ï¸ à¹à¸™à¸šà¸ à¸²à¸ž
+                    🖼️ แนบภาพ
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
-                  <p className="text-xs text-green-700 mt-1.5">âœ… à¹€à¸¥à¸·à¸­à¸à¹à¸¥à¹‰à¸§: <span className="font-medium">{selectedFileDisplayName}</span></p>
+                  <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
                 {renderImageQueue()}
                 {renderAttachmentSummary(attachmentHintWithLimit)}
@@ -1330,7 +1330,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
 
               {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">âš ï¸ {uploadError || actionError}</p>
+                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
               )}
 
               <button
@@ -1339,7 +1339,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 title={genericApproveDisabledReason || undefined}
                 className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
               >
-                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : 'âœ“ à¸­à¸™à¸¸à¸¡à¸±à¸•à¸´à¸‚à¸±à¹‰à¸™à¸ªà¸¸à¸”à¸—à¹‰à¸²à¸¢'}
+                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติขั้นสุดท้าย'}
               </button>
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
@@ -1348,7 +1348,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={genericApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  â†© à¸•à¸µà¸à¸¥à¸±à¸šà¹€à¸ˆà¹‰à¸²à¸«à¸™à¹‰à¸²à¸—à¸µà¹ˆ
+                  ↩ ตีกลับเจ้าหน้าที่
                 </button>
                 <button
                   onClick={handleSuperBossSendToDocCon}
@@ -1356,11 +1356,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   title={genericApproveDisabledReason || undefined}
                   className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  â†© à¸ªà¹ˆà¸‡ DocCon à¸•à¸£à¸§à¸ˆà¹ƒà¸«à¸¡à¹ˆ
+                  ↩ ส่ง DocCon ตรวจใหม่
                 </button>
               </div>
               {genericApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">â„¹ {genericApproveDisabledReason}</p>
+                <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
               )}
             </div>
           )}
@@ -1368,7 +1368,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* Shared action error display (outside role blocks) */}
           {actionError && !['STAFF', 'DOCCON', 'REVIEWER', 'BOSS', 'SUPER_BOSS'].some(r => r === activeRole) && (
             <div className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">
-              âš ï¸ {actionError}
+              ⚠️ {actionError}
             </div>
           )}
         </div>
@@ -1377,8 +1377,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
       {/* Rejection / Cancel modal */}
       {showRejectModal && (
         <RejectModal
-          title={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'à¸ªà¹ˆà¸‡ DocCon à¸•à¸£à¸§à¸ˆà¹ƒà¸«à¸¡à¹ˆ' : 'à¸•à¸µà¸à¸¥à¸±à¸šà¹€à¸­à¸à¸ªà¸²à¸£'}
-          confirmLabel={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'à¸ªà¹ˆà¸‡à¸•à¸£à¸§à¸ˆà¹ƒà¸«à¸¡à¹ˆ' : 'à¸•à¸µà¸à¸¥à¸±à¸š'}
+          title={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่ง DocCon ตรวจใหม่' : 'ตีกลับเอกสาร'}
+          confirmLabel={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'ส่งตรวจใหม่' : 'ตีกลับ'}
           confirmStyle={rejectActionKey === 'boss_send_to_doccon' || rejectActionKey === 'super_boss_send_to_doccon' ? 'warning' : 'danger'}
           requireComment={requiresRejectReason}
           onConfirm={handleRejectConfirm}
@@ -1390,7 +1390,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   );
 }
 
-/* â”€â”€ Helper: is staff actionable? â”€â”€ */
+/* ── Helper: is staff actionable? ── */
 function isStaffActionable(task: Task, userId: string): boolean {
   if (task.officer_id !== userId) return false;
   const actionable: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];

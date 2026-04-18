@@ -53,12 +53,10 @@ export async function PATCH(
 
     if (!action) return NextResponse.json({ error: 'ไม่ระบุ action' }, { status: 400 });
 
-    // ตรวจสิทธิ์ตาม action
     requireRole(user, ACTION_ROLES[action] ?? []);
 
     const admin = await createServiceRoleClient();
 
-    // หา DB user
     const { data: dbUser } = await admin
       .from('users')
       .select('id, display_name')
@@ -66,7 +64,6 @@ export async function PATCH(
       .single();
     if (!dbUser) throw new AuthError('ไม่พบข้อมูลผู้ใช้', 404);
 
-    // ดึง task ปัจจุบัน
     const { data: task, error: taskErr } = await admin
       .from('tasks')
       .select('*')
@@ -83,6 +80,7 @@ export async function PATCH(
       isPdf?: boolean;
       driveFileId?: string;
     }> | null) ?? [];
+
     const removeFileFromDrive = async (fileId: string) => {
       try {
         await deleteFilePermanent(fileId);
@@ -97,29 +95,28 @@ export async function PATCH(
       }
     };
 
-    // ─── คำนวณ status ใหม่ ──────────────────────────────────────────────
     switch (action) {
       case 'submit': {
         if (task.officer_id !== dbUser.id) throw new AuthError('ไม่ใช่ผู้รับผิดชอบงานนี้', 403);
         const submitFrom: TaskStatus[] = ['ASSIGNED', 'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED'];
         if (!submitFrom.includes(task.status)) throw new AuthError('ไม่สามารถส่งงานได้ในสถานะนี้', 400);
-        // ต้องมีไฟล์ word แนบก่อนส่ง
         if (!task.drive_file_id) throw new AuthError('กรุณาอัปโหลดไฟล์ Word ก่อนส่งงาน', 400);
-        // ตาม reference: SBOSS_REJ→WAIT_SBOSS, BOSS_REJ→WAIT_BOSS (ข้าม DocCon/Reviewer)
+
         if (task.status === 'SUPER_BOSS_REJECTED') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (task.status === 'BOSS_REJECTED') newStatus = 'WAITING_BOSS_APPROVAL';
         else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
         break;
       }
+
       case 'doccon_approve': {
-        if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "ส่งตรวจรูปแบบ"', 400);
-        // ต้องใส่รหัสเอกสาร (ยกเว้นมีอยู่แล้ว)
+        if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "รอ DocCon ตรวจ"', 400);
         if (!doc_ref && !task.doc_ref) throw new AuthError('กรุณาระบุรหัสเอกสาร (doc_ref) ก่อนอนุมัติ', 400);
-        // ค้นย้อนหลังใน status_history หา note sentBackToDocconBy:*
-        const history = (task.status_history as Array<{status?: string; note?: string; changedAt?: string}>) ?? [];
+
+        const history = (task.status_history as Array<{ status?: string; note?: string; changedAt?: string }>) ?? [];
         let sentBackBy = '';
         let sentBackAt = '';
-        for (let i = history.length - 1; i >= 0; i--) {
+
+        for (let i = history.length - 1; i >= 0; i -= 1) {
           const h = history[i];
           if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) {
             sentBackBy = h.note;
@@ -128,6 +125,7 @@ export async function PATCH(
           }
           if (h.status === 'SUBMITTED_TO_DOCCON') break;
         }
+
         if (sentBackBy) {
           const latestFile = fileHistory[fileHistory.length - 1];
           if (!latestFile || latestFile.isPdf) {
@@ -144,25 +142,30 @@ export async function PATCH(
             throw new AuthError('กรุณาอัปโหลดไฟล์ Word ใหม่หลังได้รับงานตีกลับ ก่อนส่งกลับไปอนุมัติ', 400);
           }
         }
+
         if (sentBackBy.includes('SUPER_BOSS')) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (sentBackBy.includes('BOSS')) newStatus = 'WAITING_BOSS_APPROVAL';
         else newStatus = 'PENDING_REVIEW';
+
         updates.doccon_checked = true;
         if (doc_ref) updates.doc_ref = doc_ref;
         break;
       }
+
       case 'doccon_reject': {
-        if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "ส่งตรวจรูปแบบ"', 400);
+        if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "รอ DocCon ตรวจ"', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'DOCCON_REJECTED';
         break;
       }
+
       case 'reviewer_approve': {
         if (task.reviewer_id !== dbUser.id) throw new AuthError('ไม่ใช่ผู้ตรวจสอบงานนี้', 403);
         if (task.status !== 'PENDING_REVIEW') throw new AuthError('สถานะต้องเป็น "รอตรวจสอบเนื้อหา"', 400);
         newStatus = 'WAITING_BOSS_APPROVAL';
         break;
       }
+
       case 'reviewer_reject': {
         if (task.reviewer_id !== dbUser.id) throw new AuthError('ไม่ใช่ผู้ตรวจสอบงานนี้', 403);
         if (task.status !== 'PENDING_REVIEW') throw new AuthError('สถานะต้องเป็น "รอตรวจสอบเนื้อหา"', 400);
@@ -170,51 +173,57 @@ export async function PATCH(
         newStatus = 'REVIEWER_REJECTED';
         break;
       }
+
       case 'boss_approve': {
-        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สร้างงานนี้', 403);
-        if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติหัวหน้า"', 400);
+        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สั่งงานของงานนี้', 403);
+        if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รอผู้สั่งงานอนุมัติ"', 400);
         newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         break;
       }
+
       case 'boss_reject': {
-        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สร้างงานนี้', 403);
-        if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติหัวหน้า"', 400);
+        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สั่งงานของงานนี้', 403);
+        if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รอผู้สั่งงานอนุมัติ"', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'BOSS_REJECTED';
         break;
       }
+
       case 'boss_send_to_doccon': {
-        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สร้างงานนี้', 403);
-        if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติหัวหน้า"', 400);
-        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการส่งตรวจใหม่', 400);
+        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สั่งงานของงานนี้', 403);
+        if (task.status !== 'WAITING_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รอผู้สั่งงานอนุมัติ"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการส่ง DocCon ตรวจใหม่', 400);
         newStatus = 'SUBMITTED_TO_DOCCON';
         break;
       }
+
       case 'super_boss_approve': {
-        if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติผู้บริหาร"', 400);
+        if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รอหัวหน้างานอนุมัติ"', 400);
         newStatus = 'COMPLETED';
         updates.completed_at = now;
         updates.is_archived = true;
-        // ตรวจสอบ supersession (doc_ref ซ้ำ)
         if (task.doc_ref) {
           await admin.from('tasks').update({ superseded_by: taskId }).eq('doc_ref', task.doc_ref).neq('id', taskId);
         }
         break;
       }
+
       case 'super_boss_reject': {
-        if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติผู้บริหาร"', 400);
+        if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รอหัวหน้างานอนุมัติ"', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'SUPER_BOSS_REJECTED';
         break;
       }
+
       case 'super_boss_send_to_doccon': {
-        if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รออนุมัติผู้บริหาร"', 400);
-        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการส่งตรวจใหม่', 400);
+        if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รอหัวหน้างานอนุมัติ"', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการส่ง DocCon ตรวจใหม่', 400);
         newStatus = 'SUBMITTED_TO_DOCCON';
         break;
       }
+
       case 'cancel': {
-        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สร้างงานนี้', 403);
+        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สั่งงานของงานนี้', 403);
         if (['COMPLETED', 'CANCELLED'].includes(task.status)) throw new AuthError('ไม่สามารถยกเลิกงานที่เสร็จแล้วได้', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการยกเลิก', 400);
         newStatus = 'CANCELLED';
@@ -222,11 +231,11 @@ export async function PATCH(
         updates.completed_at = now;
         break;
       }
+
       default:
         return NextResponse.json({ error: 'action ไม่ถูกต้อง' }, { status: 400 });
     }
 
-    // ─── สร้าง history entry ────────────────────────────────────────────
     const noteMap: Partial<Record<StatusAction, string>> = {
       boss_send_to_doccon: 'sentBackToDocconBy:BOSS',
       super_boss_send_to_doccon: 'sentBackToDocconBy:SUPER_BOSS',
@@ -245,7 +254,6 @@ export async function PATCH(
       ? [...(task.comment_history ?? []), { text: comment.trim(), by: normalizedUserEmail, byName: dbUser.display_name, at: now }]
       : task.comment_history;
 
-    // เมื่องานถูกส่งต่อ/อนุมัติแล้ว ให้ล้างไฟล์ PDF อ้างอิงที่ใช้ประกอบการแก้ไข
     const clearRefPdfOnForward = new Set<StatusAction>([
       'submit',
       'doccon_approve',
@@ -253,6 +261,7 @@ export async function PATCH(
       'boss_approve',
       'super_boss_approve',
     ]);
+
     if (clearRefPdfOnForward.has(action) && updates.ref_file_id === undefined) {
       const refPdfIds = new Set<string>();
       if (typeof task.ref_file_id === 'string' && task.ref_file_id) {
@@ -272,7 +281,6 @@ export async function PATCH(
       }
     }
 
-    // Auto-clean uploader-private draft files once task is finished/cancelled.
     if (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') {
       try {
         const { data: privateDrafts } = await admin
@@ -301,11 +309,10 @@ export async function PATCH(
           }
         }
       } catch {
-        // Keep status transition working even if private-draft table migration is not applied yet.
+        // keep main status transition working even if migration is not applied yet
       }
     }
 
-    // ─── อัปเดต ─────────────────────────────────────────────────────────
     const { error: updateErr } = await admin
       .from('tasks')
       .update({

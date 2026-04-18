@@ -210,23 +210,8 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
           onClick={() => setIsExpanded((prev) => !prev)}
           className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-amber-100/70 transition-colors"
         >
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-              📥 พื้นที่ฝากไฟล์ส่วนตัว
-              <span className="text-[0.68rem] font-semibold px-2 py-0.5 rounded-full bg-white border border-amber-300 text-amber-800">
-                ไม่ใช่การส่งงาน
-              </span>
-            </p>
-            <p className="text-[0.68rem] text-amber-800 mt-0.5">
-              เห็นเฉพาะคุณ • ลบอัตโนมัติเมื่องานเสร็จ/ยกเลิก
-            </p>
-          </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <span className="text-[0.65rem] px-1.5 py-0.5 rounded-md bg-white border border-amber-300 text-amber-700">
-              {files.length} ไฟล์
-            </span>
-            <span className="text-amber-700 text-sm">{isExpanded ? '▲' : '▼'}</span>
-          </div>
+          <span className="text-sm font-bold text-amber-900">📥 ฝากไฟล์ส่วนตัว</span>
+          <span className="text-amber-700 text-sm">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
         {isExpanded && (
