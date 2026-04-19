@@ -9,6 +9,7 @@ type StatusAction =
   | 'submit'
   | 'doccon_approve'
   | 'doccon_reject'
+  | 'doccon_reopen_completed'
   | 'reviewer_approve'
   | 'reviewer_reject'
   | 'boss_approve'
@@ -17,12 +18,14 @@ type StatusAction =
   | 'super_boss_approve'
   | 'super_boss_reject'
   | 'super_boss_send_to_doccon'
+  | 'super_boss_reopen_completed'
   | 'cancel';
 
 const ACTION_ROLES: Record<StatusAction, AppRole[]> = {
   submit: ['STAFF'],
   doccon_approve: ['DOCCON'],
   doccon_reject: ['DOCCON'],
+  doccon_reopen_completed: ['DOCCON'],
   reviewer_approve: ['REVIEWER'],
   reviewer_reject: ['REVIEWER'],
   boss_approve: ['BOSS'],
@@ -31,6 +34,7 @@ const ACTION_ROLES: Record<StatusAction, AppRole[]> = {
   super_boss_approve: ['SUPER_BOSS'],
   super_boss_reject: ['SUPER_BOSS'],
   super_boss_send_to_doccon: ['SUPER_BOSS'],
+  super_boss_reopen_completed: ['SUPER_BOSS'],
   cancel: ['BOSS'],
 };
 
@@ -104,7 +108,14 @@ export async function PATCH(
 
         if (task.status === 'SUPER_BOSS_REJECTED') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (task.status === 'BOSS_REJECTED') newStatus = 'WAITING_BOSS_APPROVAL';
-        else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
+        else if (task.status === 'DOCCON_REJECTED') {
+          const statusHistory = (task.status_history as Array<{ status?: string; note?: string }> | null) ?? [];
+          const latestDocconRejected = [...statusHistory].reverse().find((entry) => entry.status === 'DOCCON_REJECTED');
+          const isReopenFromCompletedByDoccon = latestDocconRejected?.note?.includes('reopenFromCompletedBy:DOCCON') ?? false;
+          newStatus = isReopenFromCompletedByDoccon
+            ? 'WAITING_SUPER_BOSS_APPROVAL'
+            : (task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON');
+        } else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
         break;
       }
 
@@ -156,6 +167,17 @@ export async function PATCH(
         if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "รอ DocCon ตรวจ"', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการตีกลับ', 400);
         newStatus = 'DOCCON_REJECTED';
+        break;
+      }
+
+      case 'doccon_reopen_completed': {
+        if (task.status !== 'COMPLETED') throw new AuthError('อนุญาตให้ดึงกลับได้เฉพาะงานที่เสร็จแล้ว', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการดึงกลับมาแก้ไข', 400);
+        newStatus = 'DOCCON_REJECTED';
+        updates.is_archived = false;
+        updates.completed_at = null;
+        updates.drive_uploaded = false;
+        updates.sent_to_branch = false;
         break;
       }
 
@@ -222,6 +244,17 @@ export async function PATCH(
         break;
       }
 
+      case 'super_boss_reopen_completed': {
+        if (task.status !== 'COMPLETED') throw new AuthError('อนุญาตให้ดึงกลับได้เฉพาะงานที่เสร็จแล้ว', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการดึงกลับมาแก้ไข', 400);
+        newStatus = 'SUPER_BOSS_REJECTED';
+        updates.is_archived = false;
+        updates.completed_at = null;
+        updates.drive_uploaded = false;
+        updates.sent_to_branch = false;
+        break;
+      }
+
       case 'cancel': {
         if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สั่งงานของงานนี้', 403);
         if (['COMPLETED', 'CANCELLED'].includes(task.status)) throw new AuthError('ไม่สามารถยกเลิกงานที่เสร็จแล้วได้', 400);
@@ -239,19 +272,33 @@ export async function PATCH(
     const noteMap: Partial<Record<StatusAction, string>> = {
       boss_send_to_doccon: 'sentBackToDocconBy:BOSS',
       super_boss_send_to_doccon: 'sentBackToDocconBy:SUPER_BOSS',
+      doccon_reopen_completed: 'reopenFromCompletedBy:DOCCON',
+      super_boss_reopen_completed: 'reopenFromCompletedBy:SUPER_BOSS',
     };
+
+    const normalizedComment = comment?.trim() ?? '';
+    const reopenCommentMap: Partial<Record<StatusAction, string>> = {
+      doccon_reopen_completed: normalizedComment
+        ? `DocCon ดึงงานที่เสร็จแล้วกลับมาแก้ไข: ${normalizedComment}`
+        : 'DocCon ดึงงานที่เสร็จแล้วกลับมาแก้ไข',
+      super_boss_reopen_completed: normalizedComment
+        ? `หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข: ${normalizedComment}`
+        : 'หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข',
+    };
+    const commentEntryValue = reopenCommentMap[action] ?? normalizedComment;
+    const latestCommentValue = commentEntryValue || task.latest_comment;
 
     const statusEntry = {
       status: newStatus,
       changedAt: now,
       changedBy: normalizedUserEmail,
       changedByName: dbUser.display_name,
-      note: noteMap[action] ?? (comment ?? ''),
+      note: noteMap[action] ?? normalizedComment,
     };
 
     const newStatusHistory = [...(task.status_history ?? []), statusEntry];
-    const newCommentHistory = comment?.trim()
-      ? [...(task.comment_history ?? []), { text: comment.trim(), by: normalizedUserEmail, byName: dbUser.display_name, at: now }]
+    const newCommentHistory = commentEntryValue
+      ? [...(task.comment_history ?? []), { text: commentEntryValue, by: normalizedUserEmail, byName: dbUser.display_name, at: now }]
       : task.comment_history;
 
     const clearRefPdfOnForward = new Set<StatusAction>([
@@ -319,7 +366,7 @@ export async function PATCH(
         status: newStatus,
         status_history: newStatusHistory,
         comment_history: newCommentHistory,
-        latest_comment: comment?.trim() || task.latest_comment,
+        latest_comment: latestCommentValue,
         updated_at: now,
         ...updates,
       })

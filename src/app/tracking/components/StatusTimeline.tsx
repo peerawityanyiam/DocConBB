@@ -35,10 +35,19 @@ function formatDaysValue(days: number): string {
 }
 
 const NOTE_DISPLAY: Record<string, string> = {
-  'sentBackBy:BOSS': 'ส่งกลับตรวจรูปแบบโดยหัวหน้า',
-  'sentBackBy:SUPER_BOSS': 'ส่งกลับตรวจรูปแบบโดยผู้บริหาร',
+  'sentBackBy:BOSS': 'ส่งกลับตรวจรูปแบบโดยผู้สั่งงาน',
+  'sentBackBy:SUPER_BOSS': 'ส่งกลับตรวจรูปแบบโดยหัวหน้างาน',
+  'sentBackToDocconBy:BOSS': 'ส่งกลับให้ DocCon ตรวจใหม่โดยผู้สั่งงาน',
+  'sentBackToDocconBy:SUPER_BOSS': 'ส่งกลับให้ DocCon ตรวจใหม่โดยหัวหน้างาน',
+  'reopenFromCompletedBy:DOCCON': 'DocCon ดึงงานที่เสร็จแล้วกลับมาแก้ไข',
+  'reopenFromCompletedBy:SUPER_BOSS': 'หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข',
   'สร้างงานใหม่': 'สร้างงานใหม่',
 };
+
+function resolveSystemNote(note: string): string | null {
+  const marker = Object.keys(NOTE_DISPLAY).find((key) => note.startsWith(key));
+  return marker ? NOTE_DISPLAY[marker] : null;
+}
 
 const STATUS_ICON: Record<string, string> = {
   ASSIGNED: '📋',
@@ -80,6 +89,7 @@ export default function StatusTimeline({
       {reversed.map(({ entry, index }, idx) => {
         const statusLabel = STATUS_LABELS[entry.status as TaskStatus] ?? entry.status;
         const stuckDays = durationByIndex[index];
+        const systemNote = entry.note ? resolveSystemNote(entry.note) : null;
 
         return (
           <li key={`${entry.changedAt}-${index}`} className="ml-4">
@@ -103,12 +113,12 @@ export default function StatusTimeline({
                 <p className="text-[11px] text-slate-400 mt-1">ค้างขั้นนี้ {formatDaysValue(stuckDays)} วัน</p>
               )}
 
-              {entry.note && !entry.note.startsWith('sentBackBy:') && entry.note !== 'สร้างงานใหม่' && (
+              {entry.note && !systemNote && (
                 <p className="text-xs text-slate-600 mt-1 italic">&ldquo;{entry.note}&rdquo;</p>
               )}
 
-              {entry.note && (entry.note.startsWith('sentBackBy:') || entry.note === 'สร้างงานใหม่') && (
-                <p className="text-xs text-slate-500 mt-1">{NOTE_DISPLAY[entry.note] ?? entry.note}</p>
+              {systemNote && (
+                <p className="text-xs text-slate-500 mt-1">{systemNote}</p>
               )}
             </div>
           </li>

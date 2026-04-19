@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
           .eq('status', 'COMPLETED')
           .order('updated_at', { ascending: false });
 
-        if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_ADMIN')) {
+        if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_BOSS') && !userRolesSet.has('SUPER_ADMIN')) {
           completedQuery = completedQuery.or(
             `officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`,
           );

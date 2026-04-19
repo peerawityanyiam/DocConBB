@@ -79,7 +79,7 @@ export async function GET() {
       );
     }
 
-    if (roleSet.has('DOCCON') || roleSet.has('SUPER_ADMIN')) {
+    if (roleSet.has('DOCCON') || roleSet.has('SUPER_BOSS') || roleSet.has('SUPER_ADMIN')) {
       counts.completed = await countExact(
         admin
           .from('tasks')

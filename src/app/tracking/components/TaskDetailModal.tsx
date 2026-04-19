@@ -51,6 +51,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   const [bossCancelReason, setBossCancelReason] = useState('');
   const [bossCancelLoading, setBossCancelLoading] = useState(false);
   const [bossCancelError, setBossCancelError] = useState('');
+  const [reopenReason, setReopenReason] = useState('');
+  const [reopenLoadingAction, setReopenLoadingAction] = useState<'doccon_reopen_completed' | 'super_boss_reopen_completed' | null>(null);
+  const [reopenError, setReopenError] = useState('');
 
   const fetchTask = useCallback(async () => {
     if (!taskId) return;
@@ -71,6 +74,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     setBossCancelReason('');
     setBossCancelLoading(false);
     setBossCancelError('');
+    setReopenReason('');
+    setReopenLoadingAction(null);
+    setReopenError('');
     void fetchTask();
   }, [fetchTask]);
 
@@ -140,6 +146,37 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     }
   }
 
+  async function handleReopenCompleted(action: 'doccon_reopen_completed' | 'super_boss_reopen_completed') {
+    if (!task) return;
+    if (!reopenReason.trim()) {
+      setReopenError('กรุณาระบุเหตุผลการดึงงานกลับมาแก้ไข');
+      return;
+    }
+
+    setReopenLoadingAction(action);
+    setReopenError('');
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          comment: reopenReason.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) throw new Error(data.error ?? 'ดึงงานกลับมาแก้ไขไม่สำเร็จ');
+
+      setReopenReason('');
+      onUpdated();
+      await fetchTask();
+    } catch (err) {
+      setReopenError(err instanceof Error ? err.message : 'ดึงงานกลับมาแก้ไขไม่สำเร็จ');
+    } finally {
+      setReopenLoadingAction(null);
+    }
+  }
+
   if (!taskId) return null;
 
   const ageDays = task ? calcAgeDays(task.created_at) : 0;
@@ -150,6 +187,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     userRoles.includes('BOSS') &&
     task.created_by === userId &&
     !['COMPLETED', 'CANCELLED'].includes(task.status);
+  const canDocconReopenCompleted = !!task && task.status === 'COMPLETED' && userRoles.includes('DOCCON');
+  const canSuperBossReopenCompleted = !!task && task.status === 'COMPLETED' && userRoles.includes('SUPER_BOSS');
+  const canReopenCompleted = canDocconReopenCompleted || canSuperBossReopenCompleted;
 
   const filteredStaffForReassign = reassignField === 'officer_id'
     ? staffList.filter(u => u.roles?.includes('STAFF'))
@@ -369,6 +409,55 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           </a>
                         ) : (
                           <p className="text-sm font-medium text-orange-700 truncate">{task.ref_file_name}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {canReopenCompleted && (
+                    <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-amber-800">ดึงงานที่เสร็จแล้วกลับมาแก้ไข</p>
+                        <span className="text-[11px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                          ต้องระบุเหตุผล
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-700">
+                        ใช้เมื่อจำเป็นต้องแก้เอกสารหลังงานเสร็จแล้วเท่านั้น
+                      </p>
+                      <textarea
+                        value={reopenReason}
+                        onChange={(e) => {
+                          setReopenReason(e.target.value);
+                          if (reopenError) setReopenError('');
+                        }}
+                        placeholder="ระบุเหตุผลที่ต้องดึงงานกลับมาแก้ไข"
+                        rows={2}
+                        className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 resize-none"
+                      />
+                      {reopenError && <p className="text-xs text-red-600">⚠️ {reopenError}</p>}
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {canDocconReopenCompleted && (
+                          <button
+                            onClick={() => void handleReopenCompleted('doccon_reopen_completed')}
+                            disabled={reopenLoadingAction !== null || !reopenReason.trim()}
+                            className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {reopenLoadingAction === 'doccon_reopen_completed'
+                              ? 'กำลังดึงกลับ...'
+                              : 'DocCon ดึงกลับ (ให้หัวหน้าอนุมัติใหม่)'}
+                          </button>
+                        )}
+                        {canSuperBossReopenCompleted && (
+                          <button
+                            onClick={() => void handleReopenCompleted('super_boss_reopen_completed')}
+                            disabled={reopenLoadingAction !== null || !reopenReason.trim()}
+                            className="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {reopenLoadingAction === 'super_boss_reopen_completed'
+                              ? 'กำลังดึงกลับ...'
+                              : 'หัวหน้างานดึงกลับมาแก้ไข'}
+                          </button>
                         )}
                       </div>
                     </div>
