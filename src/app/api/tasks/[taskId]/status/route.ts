@@ -251,9 +251,6 @@ export async function PATCH(
         newStatus = 'COMPLETED';
         updates.completed_at = now;
         updates.is_archived = true;
-        if (task.doc_ref) {
-          await admin.from('tasks').update({ superseded_by: taskId }).eq('doc_ref', task.doc_ref).neq('id', taskId);
-        }
         break;
       }
 
@@ -430,6 +427,16 @@ export async function PATCH(
       .eq('id', taskId);
 
     if (updateErr) throw updateErr;
+
+    if (action === 'super_boss_approve' && task.doc_ref) {
+      const { error: supersedeErr } = await admin
+        .from('tasks')
+        .update({ superseded_by: taskId })
+        .eq('doc_ref', task.doc_ref)
+        .neq('id', taskId);
+      if (supersedeErr) throw supersedeErr;
+    }
+
     return NextResponse.json({ ok: true, newStatus });
   } catch (err) {
     return handleAuthError(err);
