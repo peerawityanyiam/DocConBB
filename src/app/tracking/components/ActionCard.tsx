@@ -746,6 +746,16 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
   const isStaffActionableNow = activeRole === 'STAFF' && isStaffActionable(task, userId);
+  const isDocConActionableNow = activeRole === 'DOCCON' && activeSubTab === 'pending' && task.status === 'SUBMITTED_TO_DOCCON';
+  const isReviewerActionableNow = activeRole === 'REVIEWER' && task.status === 'PENDING_REVIEW' && task.reviewer_id === userId;
+  const isBossActionableNow = activeRole === 'BOSS' && task.status === 'WAITING_BOSS_APPROVAL' && task.created_by === userId;
+  const isSuperBossActionableNow = activeRole === 'SUPER_BOSS' && task.status === 'WAITING_SUPER_BOSS_APPROVAL';
+  const hasRoleActionZone =
+    isStaffActionableNow ||
+    isDocConActionableNow ||
+    isReviewerActionableNow ||
+    isBossActionableNow ||
+    isSuperBossActionableNow;
   const displayedStageLabel =
     isStaffActionableNow && isOwnedStaffCard
       ? STATUS_LABELS.ASSIGNED
@@ -904,7 +914,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {isPipelineView && <PipelineViz status={task.status} />}
 
           {/* File links — word (blue) + pdf (orange) */}
-          {!isPipelineView && !isStaffActionableNow && (hasWordFile || hasRefFile) && (
+          {!isPipelineView && !hasRoleActionZone && (hasWordFile || hasRefFile) && (
             <div className="flex flex-col gap-2 mb-3">
               {hasWordFile && (
                 <a
@@ -1038,6 +1048,42 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── DOCCON: รอตรวจ sub-tab ── */}
           {activeRole === 'DOCCON' && activeSubTab === 'pending' && task.status === 'SUBMITTED_TO_DOCCON' && (
             <div className="mt-2 space-y-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                  <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับตรวจรูปแบบ/อ้างอิง</p>
+                  {(hasWordFile || hasRefFile) ? (
+                    <div className="space-y-1.5">
+                      {hasWordFile && (
+                        <a
+                          href={wordFileUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
+                        >
+                          <span>📄</span>
+                          <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
+                        </a>
+                      )}
+                      {hasRefFile && currentRefFiles.map((file, index) => (
+                        <a
+                          key={`${file.driveFileId}-${index}`}
+                          href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                        >
+                          <span>📋</span>
+                          <span className="min-w-0 break-all">
+                            PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[0.7rem] text-slate-500">ยังไม่มีไฟล์สำหรับตรวจรูปแบบ/อ้างอิง</p>
+                  )}
+                </div>
+
               {/* Doc ref input — required before approve (hidden when sent back from Boss) */}
               {!docconSentBackFromBoss && <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block"># รหัสเอกสาร: <span className="text-red-500">*</span></label>
@@ -1100,7 +1146,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               )}
 
               {/* Optional file attachment */}
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการตรวจรูปแบบ</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
                   {docconSentBackFromBoss ? '📎 แนบไฟล์ Word ที่แก้ไข (บังคับ):' : '📎 แนบไฟล์ที่มีรอยแก้ (ไม่บังคับ):'}
                 </label>
@@ -1147,6 +1194,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-teal-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
               </div>
+              </div>
 
               {(uploadError || actionError) && (
                 <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
@@ -1191,7 +1239,44 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── REVIEWER ── */}
           {activeRole === 'REVIEWER' && task.status === 'PENDING_REVIEW' && task.reviewer_id === userId && (
             <div className="mt-2 space-y-3">
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                  <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับตรวจเนื้อหา/อ้างอิง</p>
+                  {(hasWordFile || hasRefFile) ? (
+                    <div className="space-y-1.5">
+                      {hasWordFile && (
+                        <a
+                          href={wordFileUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
+                        >
+                          <span>📄</span>
+                          <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
+                        </a>
+                      )}
+                      {hasRefFile && currentRefFiles.map((file, index) => (
+                        <a
+                          key={`${file.driveFileId}-${index}`}
+                          href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                        >
+                          <span>📋</span>
+                          <span className="min-w-0 break-all">
+                            PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[0.7rem] text-slate-500">ยังไม่มีไฟล์สำหรับตรวจเนื้อหา/อ้างอิง</p>
+                  )}
+                </div>
+
+                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการตรวจเนื้อหา</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ที่มีรอยแก้/คอมเมนต์ (ไม่บังคับ):</label>
                 <input
                   ref={wordInputRef}
@@ -1228,6 +1313,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
               </div>
+              </div>
 
               {(uploadError || actionError) && (
                 <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
@@ -1260,7 +1346,44 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── BOSS: pending tab actions ── */}
           {activeRole === 'BOSS' && task.status === 'WAITING_BOSS_APPROVAL' && task.created_by === userId && (
             <div className="mt-2 space-y-3">
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                  <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับพิจารณาอนุมัติ/อ้างอิง</p>
+                  {(hasWordFile || hasRefFile) ? (
+                    <div className="space-y-1.5">
+                      {hasWordFile && (
+                        <a
+                          href={wordFileUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
+                        >
+                          <span>📄</span>
+                          <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
+                        </a>
+                      )}
+                      {hasRefFile && currentRefFiles.map((file, index) => (
+                        <a
+                          key={`${file.driveFileId}-${index}`}
+                          href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                        >
+                          <span>📋</span>
+                          <span className="min-w-0 break-all">
+                            PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[0.7rem] text-slate-500">ยังไม่มีไฟล์สำหรับพิจารณาอนุมัติ/อ้างอิง</p>
+                  )}
+                </div>
+
+                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการพิจารณา</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
                 <input
                   ref={wordInputRef}
@@ -1296,6 +1419,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-purple-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
+              </div>
               </div>
 
               {(uploadError || actionError) && (
@@ -1337,7 +1461,44 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── SUPER_BOSS ── */}
           {activeRole === 'SUPER_BOSS' && task.status === 'WAITING_SUPER_BOSS_APPROVAL' && (
             <div className="mt-2 space-y-3">
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                  <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับอนุมัติขั้นสุดท้าย/อ้างอิง</p>
+                  {(hasWordFile || hasRefFile) ? (
+                    <div className="space-y-1.5">
+                      {hasWordFile && (
+                        <a
+                          href={wordFileUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
+                        >
+                          <span>📄</span>
+                          <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
+                        </a>
+                      )}
+                      {hasRefFile && currentRefFiles.map((file, index) => (
+                        <a
+                          key={`${file.driveFileId}-${index}`}
+                          href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                        >
+                          <span>📋</span>
+                          <span className="min-w-0 break-all">
+                            PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[0.7rem] text-slate-500">ยังไม่มีไฟล์สำหรับอนุมัติขั้นสุดท้าย/อ้างอิง</p>
+                  )}
+                </div>
+
+                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการอนุมัติขั้นสุดท้าย</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
                 <input
                   ref={wordInputRef}
@@ -1373,6 +1534,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 {uploadProgress !== null && (
                   <div className="mt-2"><div className="h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-pink-500 transition-all rounded-full" style={{ width: `${uploadProgress}%` }} /></div></div>
                 )}
+              </div>
               </div>
 
               {(uploadError || actionError) && (
