@@ -4,6 +4,7 @@ import { getAuthUser, requireRole, AuthError, handleAuthError } from '@/lib/auth
 import type { AppRole } from '@/lib/auth/guards';
 import type { TaskStatus } from '@/lib/constants/status';
 import { deleteFilePermanent, trashFile } from '@/lib/google-drive/files';
+import { getRequestIdFromHeaders } from '@/lib/ops/observability';
 
 type StatusAction =
   | 'submit'
@@ -60,17 +61,23 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const requestId = getRequestIdFromHeaders(request.headers);
+  let taskId = '';
+  let action: StatusAction | undefined;
   try {
     const user = await getAuthUser('tracking');
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const normalizedUserEmail = user.email.trim().toLowerCase();
 
-    const { taskId } = await params;
-    const { action, comment, doc_ref } = await request.json() as {
+    const resolvedParams = await params;
+    taskId = resolvedParams.taskId;
+    const body = await request.json() as {
       action: StatusAction;
       comment?: string;
       doc_ref?: string;
     };
+    action = body.action;
+    const { comment, doc_ref } = body;
 
     if (!action) return NextResponse.json({ error: 'ไม่ระบุ action' }, { status: 400 });
 
@@ -441,6 +448,10 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true, newStatus });
   } catch (err) {
-    return handleAuthError(err);
+    return handleAuthError(err, {
+      scope: 'tasks.status',
+      requestId,
+      meta: { taskId, action },
+    });
   }
 }

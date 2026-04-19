@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, AuthError, handleAuthError } from '@/lib/auth/guards';
+import { getRequestIdFromHeaders } from '@/lib/ops/observability';
 
 // PATCH /api/tasks/[taskId]/reassign — โอนงาน (BOSS only)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const requestId = getRequestIdFromHeaders(request.headers);
+  let taskId = '';
   try {
     const user = await getAuthUser('tracking');
     requireRole(user, ['BOSS']);
 
-    const { taskId } = await params;
+    const resolvedParams = await params;
+    taskId = resolvedParams.taskId;
     const { field, new_user_id } = await request.json() as {
       field: 'officer_id' | 'reviewer_id';
       new_user_id: string;
@@ -106,6 +110,10 @@ export async function PATCH(
     if (updateErr) throw updateErr;
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return handleAuthError(err);
+    return handleAuthError(err, {
+      scope: 'tasks.reassign',
+      requestId,
+      meta: { taskId },
+    });
   }
 }

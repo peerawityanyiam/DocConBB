@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
+import { getRequestIdFromHeaders } from '@/lib/ops/observability';
 
 // POST /api/tasks/[taskId]/comment — เพิ่มความคิดเห็น
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const requestId = getRequestIdFromHeaders(request.headers);
+  let taskId = '';
   try {
     const user = await getAuthUser('tracking');
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { taskId } = await params;
+    const resolvedParams = await params;
+    taskId = resolvedParams.taskId;
     const { text } = await request.json();
 
     if (!text?.trim()) return NextResponse.json({ error: 'กรุณากรอกข้อความ' }, { status: 400 });
@@ -54,6 +58,10 @@ export async function POST(
     if (error) throw error;
     return NextResponse.json({ ok: true, entry: newEntry });
   } catch (err) {
-    return handleAuthError(err);
+    return handleAuthError(err, {
+      scope: 'tasks.comment',
+      requestId,
+      meta: { taskId },
+    });
   }
 }

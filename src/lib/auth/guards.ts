@@ -1,5 +1,13 @@
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { reportError } from '@/lib/ops/report-error';
+import { generateRequestId } from '@/lib/ops/observability';
+
+export interface ErrorContext {
+  scope: string;
+  requestId?: string;
+  meta?: Record<string, unknown>;
+}
 
 export type AppRole = 'STAFF' | 'DOCCON' | 'REVIEWER' | 'BOSS' | 'SUPER_BOSS' | 'SUPER_ADMIN';
 
@@ -69,16 +77,18 @@ export class AuthError extends Error {
   }
 }
 
-export function handleAuthError(error: unknown): NextResponse {
+export function handleAuthError(error: unknown, context?: ErrorContext): NextResponse {
   if (error instanceof AuthError) {
     return NextResponse.json(
       { error: error.message },
       { status: error.statusCode }
     );
   }
-  console.error('Unexpected error:', error);
+  const scope = context?.scope ?? 'api.unknown';
+  const requestId = context?.requestId ?? generateRequestId();
+  reportError(scope, requestId, error, context?.meta);
   return NextResponse.json(
-    { error: 'เกิดข้อผิดพลาดภายใน' },
+    { error: 'เกิดข้อผิดพลาดภายใน', requestId },
     { status: 500 }
   );
 }
