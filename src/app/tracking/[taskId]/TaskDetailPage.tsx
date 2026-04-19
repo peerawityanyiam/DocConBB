@@ -55,7 +55,7 @@ function getActions(task: Task, roles: AppRole[], userId: string): ActionDef[] {
   if (s === 'COMPLETED') {
     if (roles.includes('DOCCON')) {
       actions.push({
-        label: 'DocCon ดึงกลับ (ให้หัวหน้าอนุมัติใหม่)',
+        label: 'ดึงงานกลับ (doccon)',
         action: 'doccon_reopen_completed',
         style: 'warning',
         needsComment: true,
@@ -63,7 +63,7 @@ function getActions(task: Task, roles: AppRole[], userId: string): ActionDef[] {
     }
     if (roles.includes('BOSS') && task.created_by === userId) {
       actions.push({
-        label: 'ผู้สั่งงานดึงกลับ (ให้หัวหน้าอนุมัติใหม่)',
+        label: 'ดึงงานกลับ (ผู้สั่งงาน)',
         action: 'boss_reopen_completed',
         style: 'warning',
         needsComment: true,
@@ -71,7 +71,7 @@ function getActions(task: Task, roles: AppRole[], userId: string): ActionDef[] {
     }
     if (roles.includes('SUPER_BOSS')) {
       actions.push({
-        label: 'หัวหน้างานดึงกลับมาแก้ไข',
+        label: 'ดึงงานกลับ (หัวหน้างาน)',
         action: 'super_boss_reopen_completed',
         style: 'warning',
         needsComment: true,

@@ -454,7 +454,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           >
                             {reopenLoadingAction === 'doccon_reopen_completed'
                               ? 'กำลังดึงกลับ...'
-                              : 'DocCon ดึงกลับ (ให้หัวหน้าอนุมัติใหม่)'}
+                              : 'ดึงงานกลับ (doccon)'}
                           </button>
                         )}
                         {canBossReopenCompleted && (
@@ -465,7 +465,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           >
                             {reopenLoadingAction === 'boss_reopen_completed'
                               ? 'กำลังดึงกลับ...'
-                              : 'ผู้สั่งงานดึงกลับ (ให้หัวหน้าอนุมัติใหม่)'}
+                              : 'ดึงงานกลับ (ผู้สั่งงาน)'}
                           </button>
                         )}
                         {canSuperBossReopenCompleted && (
@@ -476,7 +476,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           >
                             {reopenLoadingAction === 'super_boss_reopen_completed'
                               ? 'กำลังดึงกลับ...'
-                              : 'หัวหน้างานดึงกลับมาแก้ไข'}
+                              : 'ดึงงานกลับ (หัวหน้างาน)'}
                           </button>
                         )}
                       </div>

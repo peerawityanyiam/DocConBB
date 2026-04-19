@@ -132,18 +132,11 @@ export async function PATCH(
         if (!doc_ref && !task.doc_ref) throw new AuthError('กรุณาระบุรหัสเอกสาร (doc_ref) ก่อนอนุมัติ', 400);
 
         const history = (task.status_history as Array<{ status?: string; note?: string; changedAt?: string }>) ?? [];
-        let sentBackBy = '';
-        let sentBackAt = '';
-
-        for (let i = history.length - 1; i >= 0; i -= 1) {
-          const h = history[i];
-          if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) {
-            sentBackBy = h.note;
-            sentBackAt = h.changedAt ?? '';
-            break;
-          }
-          if (h.status === 'SUBMITTED_TO_DOCCON') break;
-        }
+        const latestSubmitted = [...history].reverse().find((entry) => entry.status === 'SUBMITTED_TO_DOCCON');
+        const latestSubmitNote = latestSubmitted?.note ?? '';
+        const sentBackBy = latestSubmitNote.startsWith('sentBackToDocconBy:') ? latestSubmitNote : '';
+        const sentBackAt = latestSubmitted?.changedAt ?? '';
+        const isReopenFromCompletedByDoccon = latestSubmitNote.startsWith('reopenFromCompletedBy:DOCCON');
 
         if (sentBackBy) {
           const latestFile = fileHistory[fileHistory.length - 1];
@@ -162,7 +155,8 @@ export async function PATCH(
           }
         }
 
-        if (sentBackBy.includes('SUPER_BOSS')) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
+        if (isReopenFromCompletedByDoccon) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
+        else if (sentBackBy.includes('SUPER_BOSS')) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (sentBackBy.includes('BOSS')) newStatus = 'WAITING_BOSS_APPROVAL';
         else newStatus = 'PENDING_REVIEW';
 
@@ -181,7 +175,7 @@ export async function PATCH(
       case 'doccon_reopen_completed': {
         if (task.status !== 'COMPLETED') throw new AuthError('อนุญาตให้ดึงกลับได้เฉพาะงานที่เสร็จแล้ว', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการดึงกลับมาแก้ไข', 400);
-        newStatus = 'DOCCON_REJECTED';
+        newStatus = 'SUBMITTED_TO_DOCCON';
         updates.is_archived = false;
         updates.completed_at = null;
         updates.drive_uploaded = false;
@@ -231,7 +225,7 @@ export async function PATCH(
         if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สั่งงานของงานนี้', 403);
         if (task.status !== 'COMPLETED') throw new AuthError('อนุญาตให้ดึงกลับได้เฉพาะงานที่เสร็จแล้ว', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการดึงกลับมาแก้ไข', 400);
-        newStatus = 'BOSS_REJECTED';
+        newStatus = 'WAITING_BOSS_APPROVAL';
         updates.is_archived = false;
         updates.completed_at = null;
         updates.drive_uploaded = false;
@@ -267,7 +261,7 @@ export async function PATCH(
       case 'super_boss_reopen_completed': {
         if (task.status !== 'COMPLETED') throw new AuthError('อนุญาตให้ดึงกลับได้เฉพาะงานที่เสร็จแล้ว', 400);
         if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการดึงกลับมาแก้ไข', 400);
-        newStatus = 'SUPER_BOSS_REJECTED';
+        newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         updates.is_archived = false;
         updates.completed_at = null;
         updates.drive_uploaded = false;
