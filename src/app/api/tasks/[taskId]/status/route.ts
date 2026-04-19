@@ -322,7 +322,23 @@ export async function PATCH(
       'super_boss_reopen_completed',
     ]);
     const commentEntryValue = reopenCommentMap[action] ?? normalizedComment;
-    const latestCommentValue = commentEntryValue || task.latest_comment;
+    const keepLatestCommentActions = new Set<StatusAction>([
+      'doccon_reject',
+      'reviewer_reject',
+      'boss_reject',
+      'super_boss_reject',
+      'boss_send_to_doccon',
+      'super_boss_send_to_doccon',
+      'doccon_reopen_completed',
+      'boss_reopen_completed',
+      'super_boss_reopen_completed',
+      'cancel',
+    ]);
+    const latestCommentValue = commentEntryValue
+      ? commentEntryValue
+      : keepLatestCommentActions.has(action)
+        ? (task.latest_comment ?? null)
+        : null;
     const noteBase = noteMap[action];
     const noteWithReason =
       noteBase && reopenActionsWithReason.has(action)
