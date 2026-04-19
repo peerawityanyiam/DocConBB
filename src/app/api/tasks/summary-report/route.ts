@@ -136,17 +136,21 @@ export async function GET() {
           : null,
     }));
 
-    const pipelineAverages = PIPELINE_STAGE_ORDER
-      .map((status) => {
-        const stat = stageTimeMap[status];
-        if (!stat || stat.count === 0) return null;
+    const pipelineAverages = PIPELINE_STAGE_ORDER.map((status) => {
+      const stat = stageTimeMap[status];
+      if (!stat || stat.count === 0) {
         return {
           status,
-          avgDays: Math.round((stat.totalMs / stat.count / (1000 * 60 * 60 * 24)) * 10) / 10,
-          count: stat.count,
+          avgDays: 0,
+          count: 0,
         };
-      })
-      .filter((value): value is { status: PipelineStageStatus; avgDays: number; count: number } => value !== null);
+      }
+      return {
+        status,
+        avgDays: Math.round((stat.totalMs / stat.count / (1000 * 60 * 60 * 24)) * 10) / 10,
+        count: stat.count,
+      };
+    });
 
     return NextResponse.json({
       officers,
