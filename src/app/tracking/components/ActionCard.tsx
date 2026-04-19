@@ -793,7 +793,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   const sentBackDisplayName = REJECTED_STATUSES.has(task.status)
     ? (sentBackByName ?? null)
     : (docconSentBackFromBoss ? (sentBackToDocconEntry?.changedByName ?? null) : null);
-  const sentBackPrefix = docconSentBackFromBoss ? '↩ ส่งกลับตรวจรูปแบบโดย:' : '↩ ส่งกลับโดย:';
 
   const isBlocked = actionLoading || uploadProgress !== null || isConvertingImages;
   const busyReason = isConvertingImages
