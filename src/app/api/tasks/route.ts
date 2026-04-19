@@ -2,10 +2,21 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
 
-const TASK_SELECT = 'id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, drive_uploaded, sent_to_branch, status_history, file_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by, superseded_by';
+const TASK_SELECT =
+  'id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, drive_uploaded, sent_to_branch, status_history, file_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by, superseded_by';
+const TASK_SELECT_LEGACY =
+  'id, task_code, title, detail, status, doc_ref, doccon_checked, drive_file_id, drive_file_name, ref_file_id, ref_file_name, drive_uploaded, sent_to_branch, status_history, file_history, created_at, updated_at, completed_at, is_archived, latest_comment, officer_id, reviewer_id, created_by';
 const ALLOWED_QUERY_ROLES = new Set(['STAFF', 'REVIEWER', 'BOSS', 'DOCCON', 'SUPER_BOSS', 'completed']);
 const MAX_TITLE_LEN = 300;
 const MAX_DETAIL_LEN = 5000;
+
+type TaskRow = {
+  officer_id: string | null;
+  reviewer_id: string | null;
+  created_by: string | null;
+  superseded_by?: string | null;
+  [key: string]: unknown;
+};
 
 // GET /api/tasks?role=BOSS
 export async function GET(request: NextRequest) {
@@ -22,79 +33,88 @@ export async function GET(request: NextRequest) {
     const admin = await createServiceRoleClient();
     const dbUserId = user.id;
 
-    let query = admin
-      .from('tasks')
-      .select(TASK_SELECT)
-      .order('updated_at', { ascending: false });
+    const buildTasksQuery = (selectClause: string) => {
+      let query = admin
+        .from('tasks')
+        .select(selectClause)
+        .order('updated_at', { ascending: false });
 
-    switch (role) {
-      case 'STAFF':
-        if (scope === 'completed') {
-          query = query.eq('officer_id', dbUserId).eq('status', 'COMPLETED');
-        } else {
+      switch (role) {
+        case 'STAFF':
+          if (scope === 'completed') {
+            query = query.eq('officer_id', dbUserId).eq('status', 'COMPLETED');
+          } else {
+            query = query
+              .eq('officer_id', dbUserId)
+              .eq('is_archived', false)
+              .neq('status', 'COMPLETED')
+              .neq('status', 'CANCELLED');
+          }
+          break;
+        case 'REVIEWER':
+          if (scope === 'completed') {
+            query = query.eq('reviewer_id', dbUserId).eq('status', 'COMPLETED');
+          } else {
+            query = query
+              .eq('reviewer_id', dbUserId)
+              .eq('is_archived', false)
+              .neq('status', 'COMPLETED')
+              .neq('status', 'CANCELLED');
+          }
+          break;
+        case 'BOSS':
+          if (scope === 'completed') {
+            query = query.eq('created_by', dbUserId).eq('status', 'COMPLETED');
+          } else {
+            query = query
+              .eq('created_by', dbUserId)
+              .eq('is_archived', false)
+              .neq('status', 'COMPLETED')
+              .neq('status', 'CANCELLED');
+          }
+          break;
+        case 'DOCCON':
+          query = query.eq('is_archived', false);
+          break;
+        case 'SUPER_BOSS':
+          query = query.eq('is_archived', false);
+          break;
+        case 'completed': {
+          const userRolesSet = new Set(user.roles);
+
+          let completedQuery = admin
+            .from('tasks')
+            .select(selectClause)
+            .eq('status', 'COMPLETED')
+            .order('updated_at', { ascending: false });
+
+          if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_BOSS') && !userRolesSet.has('SUPER_ADMIN')) {
+            completedQuery = completedQuery.or(
+              `officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`,
+            );
+          }
+
+          query = completedQuery;
+          break;
+        }
+        default:
           query = query
-            .eq('officer_id', dbUserId)
-            .eq('is_archived', false)
-            .neq('status', 'COMPLETED')
-            .neq('status', 'CANCELLED');
-        }
-        break;
-      case 'REVIEWER':
-        if (scope === 'completed') {
-          query = query.eq('reviewer_id', dbUserId).eq('status', 'COMPLETED');
-        } else {
-          query = query
-            .eq('reviewer_id', dbUserId)
-            .eq('is_archived', false)
-            .neq('status', 'COMPLETED')
-            .neq('status', 'CANCELLED');
-        }
-        break;
-      case 'BOSS':
-        if (scope === 'completed') {
-          query = query.eq('created_by', dbUserId).eq('status', 'COMPLETED');
-        } else {
-          query = query
-            .eq('created_by', dbUserId)
-            .eq('is_archived', false)
-            .neq('status', 'COMPLETED')
-            .neq('status', 'CANCELLED');
-        }
-        break;
-      case 'DOCCON':
-        query = query.eq('is_archived', false);
-        break;
-      case 'SUPER_BOSS':
-        query = query.eq('is_archived', false);
-        break;
-      case 'completed': {
-        const userRolesSet = new Set(user.roles);
-
-        let completedQuery = admin
-          .from('tasks')
-          .select(TASK_SELECT)
-          .eq('status', 'COMPLETED')
-          .order('updated_at', { ascending: false });
-
-        if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_BOSS') && !userRolesSet.has('SUPER_ADMIN')) {
-          completedQuery = completedQuery.or(
-            `officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`,
-          );
-        }
-
-        query = completedQuery;
-        break;
+            .or(`officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`)
+            .eq('is_archived', false);
       }
-      default:
-        query = query
-          .or(`officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`)
-          .eq('is_archived', false);
-    }
 
-    const { data: tasks, error } = await query;
+      return query;
+    };
+
+    let { data: tasks, error } = await buildTasksQuery(TASK_SELECT);
+    if (error && /superseded_by/i.test(error.message ?? '')) {
+      const fallback = await buildTasksQuery(TASK_SELECT_LEGACY);
+      tasks = fallback.data;
+      error = fallback.error;
+    }
     if (error) throw error;
 
-    const taskRows = tasks ?? [];
+    const taskRows: TaskRow[] = Array.isArray(tasks) ? (tasks as unknown as TaskRow[]) : [];
     const userIds = [
       ...new Set(
         [
@@ -114,9 +134,10 @@ export async function GET(request: NextRequest) {
 
     const result = taskRows.map((t) => ({
       ...t,
-      officer: usersMap[t.officer_id] ?? null,
-      reviewer: usersMap[t.reviewer_id] ?? null,
-      creator: usersMap[t.created_by] ?? null,
+      superseded_by: t.superseded_by ?? null,
+      officer: t.officer_id ? (usersMap[t.officer_id] ?? null) : null,
+      reviewer: t.reviewer_id ? (usersMap[t.reviewer_id] ?? null) : null,
+      creator: t.created_by ? (usersMap[t.created_by] ?? null) : null,
     }));
 
     return NextResponse.json(result);
