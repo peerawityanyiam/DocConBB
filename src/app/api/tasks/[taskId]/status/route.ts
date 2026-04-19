@@ -40,6 +40,21 @@ const ACTION_ROLES: Record<StatusAction, AppRole[]> = {
   cancel: ['BOSS'],
 };
 
+type ReopenRole = 'DOCCON' | 'BOSS' | 'SUPER_BOSS';
+
+function getLatestReopenRole(
+  history: Array<{ note?: string }> | null | undefined,
+): ReopenRole | null {
+  if (!history?.length) return null;
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const note = history[i]?.note ?? '';
+    if (note.startsWith('reopenFromCompletedBy:DOCCON')) return 'DOCCON';
+    if (note.startsWith('reopenFromCompletedBy:BOSS')) return 'BOSS';
+    if (note.startsWith('reopenFromCompletedBy:SUPER_BOSS')) return 'SUPER_BOSS';
+  }
+  return null;
+}
+
 // PATCH /api/tasks/[taskId]/status
 export async function PATCH(
   request: NextRequest,
@@ -86,6 +101,12 @@ export async function PATCH(
       isPdf?: boolean;
       driveFileId?: string;
     }> | null) ?? [];
+    const statusHistory = (task.status_history as Array<{
+      status?: string;
+      note?: string;
+      changedAt?: string;
+    }> | null) ?? [];
+    const latestReopenRole = getLatestReopenRole(statusHistory);
 
     const removeFileFromDrive = async (fileId: string) => {
       try {
@@ -111,17 +132,11 @@ export async function PATCH(
         if (task.status === 'SUPER_BOSS_REJECTED') {
           newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         } else if (task.status === 'BOSS_REJECTED') {
-          const statusHistory = (task.status_history as Array<{ status?: string; note?: string }> | null) ?? [];
-          const latestBossRejected = [...statusHistory].reverse().find((entry) => entry.status === 'BOSS_REJECTED');
-          const isReopenFromCompletedByBoss = latestBossRejected?.note?.includes('reopenFromCompletedBy:BOSS') ?? false;
-          newStatus = isReopenFromCompletedByBoss ? 'WAITING_SUPER_BOSS_APPROVAL' : 'WAITING_BOSS_APPROVAL';
+          newStatus = 'WAITING_BOSS_APPROVAL';
         }
         else if (task.status === 'DOCCON_REJECTED') {
-          const statusHistory = (task.status_history as Array<{ status?: string; note?: string }> | null) ?? [];
-          const latestDocconRejected = [...statusHistory].reverse().find((entry) => entry.status === 'DOCCON_REJECTED');
-          const isReopenFromCompletedByDoccon = latestDocconRejected?.note?.includes('reopenFromCompletedBy:DOCCON') ?? false;
-          newStatus = isReopenFromCompletedByDoccon
-            ? 'WAITING_SUPER_BOSS_APPROVAL'
+          newStatus = latestReopenRole === 'DOCCON'
+            ? 'SUBMITTED_TO_DOCCON'
             : (task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON');
         } else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
         break;
@@ -131,12 +146,10 @@ export async function PATCH(
         if (task.status !== 'SUBMITTED_TO_DOCCON') throw new AuthError('สถานะต้องเป็น "รอ DocCon ตรวจ"', 400);
         if (!doc_ref && !task.doc_ref) throw new AuthError('กรุณาระบุรหัสเอกสาร (doc_ref) ก่อนอนุมัติ', 400);
 
-        const history = (task.status_history as Array<{ status?: string; note?: string; changedAt?: string }>) ?? [];
-        const latestSubmitted = [...history].reverse().find((entry) => entry.status === 'SUBMITTED_TO_DOCCON');
+        const latestSubmitted = [...statusHistory].reverse().find((entry) => entry.status === 'SUBMITTED_TO_DOCCON');
         const latestSubmitNote = latestSubmitted?.note ?? '';
         const sentBackBy = latestSubmitNote.startsWith('sentBackToDocconBy:') ? latestSubmitNote : '';
         const sentBackAt = latestSubmitted?.changedAt ?? '';
-        const isReopenFromCompletedByDoccon = latestSubmitNote.startsWith('reopenFromCompletedBy:DOCCON');
 
         if (sentBackBy) {
           const latestFile = fileHistory[fileHistory.length - 1];
@@ -155,7 +168,7 @@ export async function PATCH(
           }
         }
 
-        if (isReopenFromCompletedByDoccon) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
+        if (latestReopenRole === 'DOCCON') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (sentBackBy.includes('SUPER_BOSS')) newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
         else if (sentBackBy.includes('BOSS')) newStatus = 'WAITING_BOSS_APPROVAL';
         else newStatus = 'PENDING_REVIEW';
