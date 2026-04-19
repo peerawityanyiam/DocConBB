@@ -746,7 +746,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
   const isStaffActionableNow = activeRole === 'STAFF' && isStaffActionable(task, userId);
-  const displayedStaffStageLabel =
+  const displayedStageLabel =
     isStaffActionableNow && isOwnedStaffCard
       ? STATUS_LABELS.ASSIGNED
       : stageStuckLabel;
@@ -769,16 +769,21 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     return null;
   })();
 
-  /* ── Bug 5: DocCon context — is this a "sent back from Boss/SuperBoss"? ── */
-  const docconSentBackFromBoss = task.status === 'SUBMITTED_TO_DOCCON' && (() => {
+  /* ── Bug 5: DocCon context — sent back to DocCon from Boss/SuperBoss ── */
+  const sentBackToDocconEntry = task.status === 'SUBMITTED_TO_DOCCON' ? (() => {
     const history = task.status_history ?? [];
     for (let i = history.length - 1; i >= 0; i--) {
       const h = history[i];
-      if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) return true;
-      if (h.status === 'SUBMITTED_TO_DOCCON') return false;
+      if (h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')) return h;
+      if (h.status === 'SUBMITTED_TO_DOCCON') return null;
     }
-    return false;
-  })();
+    return null;
+  })() : null;
+  const docconSentBackFromBoss = !!sentBackToDocconEntry;
+  const sentBackDisplayName = REJECTED_STATUSES.has(task.status)
+    ? (sentBackByName ?? null)
+    : (docconSentBackFromBoss ? (sentBackToDocconEntry?.changedByName ?? null) : null);
+  const sentBackPrefix = docconSentBackFromBoss ? '↩ ส่งกลับตรวจรูปแบบโดย:' : '↩ ส่งกลับโดย:';
 
   const isBlocked = actionLoading || uploadProgress !== null || isConvertingImages;
   const busyReason = isConvertingImages
@@ -853,8 +858,14 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             </div>
           </div>
 
-          {(!isPipelineView && isStaffActionableNow) ? (
+          {!isPipelineView && (
             <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
+              {task.detail && (
+                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-slate-700 whitespace-pre-line">
+                  ℹ️ {task.detail}
+                </div>
+              )}
+
               {latestReopenInfo && (
                 <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-amber-700">
                   #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
@@ -866,109 +877,19 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 <p>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</p>
                 {currentStageStuck && (
                   <p>
-                    ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{displayedStaffStageLabel}</span> มา{' '}
+                    ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{displayedStageLabel}</span> มา{' '}
                     <span className="font-semibold text-slate-800">{stageStuckDaysLabel}</span> วัน
                   </p>
                 )}
               </div>
 
-              {(sentBackByName || task.latest_comment) && (
+              {(sentBackDisplayName || task.latest_comment) && (
                 <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 space-y-1 text-red-700">
-                  {sentBackByName && <p>↩ ส่งกลับโดย: <span className="font-semibold">{sentBackByName}</span></p>}
+                  {sentBackDisplayName && <p>{sentBackPrefix} <span className="font-semibold">{sentBackDisplayName}</span></p>}
                   {task.latest_comment && <p>💬 {task.latest_comment}</p>}
                 </div>
               )}
             </div>
-          ) : (
-            <>
-              {/* Detail gray box */}
-              {(task.detail || latestReopenInfo) && (
-                <div className="bg-gray-50 border-l-[3px] border-gray-300 px-3 py-2 rounded-r-md mb-3 flex items-start gap-2">
-                  <span className="text-gray-400 text-sm mt-0.5">ℹ️</span>
-                  <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
-                    {task.detail && <p>{task.detail}</p>}
-                    {latestReopenInfo && (
-                      <p className={`${task.detail ? 'mt-1.5' : ''} text-amber-700`}>
-                        #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
-                        {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Meta row */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-3">
-                {activeRole === 'STAFF' && (
-                  <>
-                    <span>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</span>
-                  </>
-                )}
-                {activeRole === 'DOCCON' && (
-                  <>
-                    <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
-                    <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
-                    {isPipelineView && currentStageStuck && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stageStuckDays > 7 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                        ค้าง {stageStuckDaysLabel} วัน
-                      </span>
-                    )}
-                  </>
-                )}
-                {activeRole === 'REVIEWER' && (
-                  <>
-                    <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
-                    <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
-                  </>
-                )}
-                {activeRole === 'BOSS' && (
-                  <>
-                    <span>👤 เจ้าหน้าที่: {task.officer?.display_name ?? '—'}</span>
-                    <span>📋 ผู้ตรวจ: {task.reviewer?.display_name ?? '—'}</span>
-                    <span>📅 {formatDateThai(task.updated_at)}</span>
-                  </>
-                )}
-                {activeRole === 'SUPER_BOSS' && (
-                  <>
-                    <span>👤 ผู้สร้าง: {task.creator?.display_name ?? '—'}</span>
-                    <span>📅 {formatDateThai(task.updated_at)}</span>
-                  </>
-                )}
-              </div>
-
-              {currentStageStuck && (
-                <div className="mb-3 text-xs text-gray-500">
-                  ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-gray-700">{stageStuckLabel}</span> มา{' '}
-                  <span className="font-semibold text-gray-700">{stageStuckDaysLabel}</span> วัน
-                </div>
-              )}
-
-              {/* Latest comment (rejection reason) + who sent back */}
-              {/* Rejected: show who sent back + comment */}
-              {REJECTED_STATUSES.has(task.status) && (
-                <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-red-50 border-l-[3px] border-red-400 text-red-800 space-y-0.5">
-                  {sentBackByName && (
-                    <p className="font-semibold">↩ ส่งกลับโดย: {sentBackByName}</p>
-                  )}
-                  {task.latest_comment && (
-                    <p>💬 {task.latest_comment}</p>
-                  )}
-                </div>
-              )}
-
-              {/* SUBMITTED_TO_DOCCON: show who sent it back (Boss/SuperBoss context) */}
-              {docconSentBackFromBoss && (() => {
-                const sentBackEntry = task.status_history?.slice().reverse().find(
-                  h => h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')
-                );
-                return sentBackEntry ? (
-                  <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-amber-50 border-l-[3px] border-amber-400 text-amber-800">
-                    ↩ ส่งกลับตรวจรูปแบบโดย: <span className="font-semibold">{sentBackEntry.changedByName}</span>
-                    {task.latest_comment && <p className="mt-0.5">💬 {task.latest_comment}</p>}
-                  </div>
-                ) : null;
-              })()}
-            </>
           )}
 
           {!isPipelineView && (

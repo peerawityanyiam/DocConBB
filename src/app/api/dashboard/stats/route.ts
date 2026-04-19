@@ -16,11 +16,9 @@ export async function GET() {
     const canSeeAllTasks =
       roleSet.has('DOCCON') || roleSet.has('SUPER_BOSS') || roleSet.has('SUPER_ADMIN');
 
-    // Keep summary aligned with tracking list/cards: ignore archived tasks.
     let query = admin
       .from('tasks')
-      .select('status, created_by')
-      .eq('is_archived', false);
+      .select('status, created_by');
     if (!canSeeAllTasks) {
       query = query.eq('created_by', user.id);
     }

@@ -18,13 +18,21 @@ export async function GET() {
   try {
     const user = await getAuthUser('tracking');
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    requireRole(user, ['BOSS', 'SUPER_BOSS', 'DOCCON']);
+    requireRole(user, ['BOSS', 'SUPER_BOSS', 'DOCCON', 'SUPER_ADMIN']);
 
     const admin = await createServiceRoleClient();
+    const roleSet = new Set(user.roles);
+    const canSeeAllTasks =
+      roleSet.has('DOCCON') || roleSet.has('SUPER_BOSS') || roleSet.has('SUPER_ADMIN');
 
-    const { data: tasks, error } = await admin
+    let query = admin
       .from('tasks')
       .select('id, status, officer_id, created_at, completed_at, updated_at, status_history');
+    if (!canSeeAllTasks) {
+      query = query.eq('created_by', user.id);
+    }
+
+    const { data: tasks, error } = await query;
 
     if (error) throw error;
 
