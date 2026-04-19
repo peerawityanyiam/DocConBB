@@ -746,6 +746,10 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
   const isStaffActionableNow = activeRole === 'STAFF' && isStaffActionable(task, userId);
+  const displayedStaffStageLabel =
+    isStaffActionableNow && isOwnedStaffCard
+      ? STATUS_LABELS.ASSIGNED
+      : stageStuckLabel;
   const staffCanSubmit = selectedWordFile !== null;
 
   /* ── Bug 4: Derive who sent back for rejected statuses ── */
@@ -862,7 +866,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 <p>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</p>
                 {currentStageStuck && (
                   <p>
-                    ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{stageStuckLabel}</span> มา{' '}
+                    ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{displayedStaffStageLabel}</span> มา{' '}
                     <span className="font-semibold text-slate-800">{stageStuckDaysLabel}</span> วัน
                   </p>
                 )}
