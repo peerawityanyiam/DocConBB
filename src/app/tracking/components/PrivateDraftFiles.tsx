@@ -12,6 +12,7 @@ interface PrivateDraftFilesProps {
 
 interface PrivateDraftFileItem {
   id: string;
+  uploader_id?: string;
   drive_file_id: string;
   drive_file_name: string;
   original_file_name: string;
@@ -68,13 +69,14 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
       const res = await fetch(`/api/tasks/${task.id}/draft-files`, { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP_${res.status}`);
-      setFiles(Array.isArray(data.files) ? data.files : []);
+      const incoming = Array.isArray(data.files) ? (data.files as PrivateDraftFileItem[]) : [];
+      setFiles(incoming.filter((item) => !item.uploader_id || item.uploader_id === userId));
     } catch (err) {
       setError(toFriendlyErrorMessage(err, 'โหลดรายการไฟล์ฝากไม่สำเร็จ'));
     } finally {
       setLoading(false);
     }
-  }, [isTaskOwner, task.id]);
+  }, [isTaskOwner, task.id, userId]);
 
   useEffect(() => {
     setSuccess('');

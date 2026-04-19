@@ -51,6 +51,18 @@ type DraftFileRow = {
   created_at: string;
 };
 
+type DraftFileResponseItem = Pick<
+  DraftFileRow,
+  | 'id'
+  | 'drive_file_id'
+  | 'drive_file_name'
+  | 'original_file_name'
+  | 'file_type'
+  | 'file_size_bytes'
+  | 'created_at'
+  | 'uploader_id'
+>;
+
 function errorResponse(status: number, error: string, message: string, extra?: Record<string, unknown>) {
   return NextResponse.json({ error, message, ...(extra ?? {}) }, { status });
 }
@@ -108,7 +120,7 @@ function getExtension(fileName: string) {
 
 function canAccessTask(task: TaskLite, userId: string, roles: string[]) {
   const roleSet = new Set(roles.map((role) => role.toUpperCase()));
-  if (roleSet.has('SUPER_ADMIN') || roleSet.has('DOCCON') || roleSet.has('SUPER_BOSS')) return true;
+  if (roleSet.has('SUPER_ADMIN')) return true;
   if (task.created_by === userId) return true;
   if (task.officer_id === userId) return true;
   if (task.reviewer_id === userId) return true;
@@ -163,8 +175,20 @@ export async function GET(
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
     if (error) throw error;
+    const files = ((data ?? []) as DraftFileRow[])
+      .filter((row) => row.uploader_id === user.id)
+      .map<DraftFileResponseItem>((row) => ({
+        id: row.id,
+        drive_file_id: row.drive_file_id,
+        drive_file_name: row.drive_file_name,
+        original_file_name: row.original_file_name,
+        file_type: row.file_type,
+        file_size_bytes: row.file_size_bytes,
+        created_at: row.created_at,
+        uploader_id: row.uploader_id,
+      }));
 
-    return NextResponse.json({ files: data ?? [] });
+    return NextResponse.json({ files });
   } catch (err) {
     if (err instanceof AuthError) return handleAuthError(err);
     return errorResponse(500, 'draft_list_failed', err instanceof Error ? err.message : 'Failed to list draft files.');
@@ -336,4 +360,3 @@ export async function DELETE(
     return errorResponse(500, 'draft_delete_failed', err instanceof Error ? err.message : 'Failed to delete draft file.');
   }
 }
-
