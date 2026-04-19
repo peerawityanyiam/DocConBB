@@ -43,8 +43,38 @@ function formatDateThai(iso: string) {
   });
 }
 
+function formatDateTimeThai(iso: string) {
+  return new Date(iso).toLocaleString('th-TH', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Bangkok',
+  });
+}
+
 function formatDaysValue(days: number) {
   return days.toFixed(1);
+}
+
+const REOPEN_ROLE_LABEL_BY_NOTE_PREFIX: Record<string, string> = {
+  'reopenFromCompletedBy:DOCCON': 'DocCon',
+  'reopenFromCompletedBy:BOSS': 'ผู้สั่งงาน',
+  'reopenFromCompletedBy:SUPER_BOSS': 'หัวหน้างาน',
+};
+
+function parseReopenNote(note?: string): { roleLabel: string; reason?: string } | null {
+  if (!note) return null;
+  const prefix = Object.keys(REOPEN_ROLE_LABEL_BY_NOTE_PREFIX).find((key) => note.startsWith(key));
+  if (!prefix) return null;
+  const reasonPrefix = '|reason:';
+  const reasonIndex = note.indexOf(reasonPrefix);
+  const reason = reasonIndex >= 0 ? note.slice(reasonIndex + reasonPrefix.length).trim() : '';
+  return {
+    roleLabel: REOPEN_ROLE_LABEL_BY_NOTE_PREFIX[prefix],
+    reason: reason || undefined,
+  };
 }
 
 /* ── Pipeline visualization (for DocCon tracking tab) ── */
@@ -720,6 +750,19 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   /* ── Bug 4: Derive who sent back for rejected statuses ── */
   const lastHistoryEntry = task.status_history?.slice().reverse().find(h => h.status === task.status);
   const sentBackByName = lastHistoryEntry?.changedByName;
+  const latestReopenInfo = (() => {
+    const history = task.status_history?.slice().reverse() ?? [];
+    for (const entry of history) {
+      const parsed = parseReopenNote(entry.note);
+      if (parsed) {
+        return {
+          ...parsed,
+          changedAt: entry.changedAt,
+        };
+      }
+    }
+    return null;
+  })();
 
   /* ── Bug 5: DocCon context — is this a "sent back from Boss/SuperBoss"? ── */
   const docconSentBackFromBoss = task.status === 'SUBMITTED_TO_DOCCON' && (() => {
@@ -806,10 +849,18 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           </div>
 
           {/* Detail gray box */}
-          {task.detail && (
+          {(task.detail || latestReopenInfo) && (
             <div className="bg-gray-50 border-l-[3px] border-gray-300 px-3 py-2 rounded-r-md mb-3 flex items-start gap-2">
               <span className="text-gray-400 text-sm mt-0.5">ℹ️</span>
-              <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{task.detail}</p>
+              <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                {task.detail && <p>{task.detail}</p>}
+                {latestReopenInfo && (
+                  <p className={`${task.detail ? 'mt-1.5' : ''} text-amber-700`}>
+                    #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
+                    {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 

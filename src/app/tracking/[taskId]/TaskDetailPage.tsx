@@ -94,6 +94,25 @@ function formatDT(iso: string) {
   return new Date(iso).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });
 }
 
+const REOPEN_ROLE_LABEL_BY_NOTE_PREFIX: Record<string, string> = {
+  'reopenFromCompletedBy:DOCCON': 'DocCon',
+  'reopenFromCompletedBy:BOSS': 'ผู้สั่งงาน',
+  'reopenFromCompletedBy:SUPER_BOSS': 'หัวหน้างาน',
+};
+
+function parseReopenNote(note?: string): { roleLabel: string; reason?: string } | null {
+  if (!note) return null;
+  const prefix = Object.keys(REOPEN_ROLE_LABEL_BY_NOTE_PREFIX).find((key) => note.startsWith(key));
+  if (!prefix) return null;
+  const reasonPrefix = '|reason:';
+  const reasonIndex = note.indexOf(reasonPrefix);
+  const reason = reasonIndex >= 0 ? note.slice(reasonIndex + reasonPrefix.length).trim() : '';
+  return {
+    roleLabel: REOPEN_ROLE_LABEL_BY_NOTE_PREFIX[prefix],
+    reason: reason || undefined,
+  };
+}
+
 function getAgeDays(createdAt: string): number {
   const created = new Date(createdAt);
   const now = new Date();
@@ -347,6 +366,20 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
   }
 
   const isBossOwner = task && userRoles.includes('BOSS') && task.created_by === userId && !['COMPLETED', 'CANCELLED'].includes(task.status);
+  const latestReopenInfo = (() => {
+    if (!task?.status_history?.length) return null;
+    const history = task.status_history.slice().reverse();
+    for (const entry of history) {
+      const parsed = parseReopenNote(entry.note);
+      if (parsed) {
+        return {
+          ...parsed,
+          changedAt: entry.changedAt,
+        };
+      }
+    }
+    return null;
+  })();
   const filteredStaffForReassign = reassignTarget === 'officer'
     ? staffList.filter((s) => s.roles?.includes('STAFF'))
     : staffList.filter((s) => s.roles?.includes('REVIEWER'));
@@ -478,8 +511,19 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
               </div>
             )}
 
-            {task.detail && (
-              <div><p className="text-xs text-slate-400 mb-1">รายละเอียด</p><p className="text-sm bg-slate-50 rounded-lg p-3">{task.detail}</p></div>
+            {(task.detail || latestReopenInfo) && (
+              <div>
+                <p className="text-xs text-slate-400 mb-1">รายละเอียด</p>
+                <div className="text-sm bg-slate-50 rounded-lg p-3 space-y-1.5">
+                  {task.detail && <p>{task.detail}</p>}
+                  {latestReopenInfo && (
+                    <p className="text-amber-700">
+                      #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDT(latestReopenInfo.changedAt)})
+                      {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
             {task.drive_file_name && (
               <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">

@@ -45,9 +45,16 @@ const NOTE_DISPLAY: Record<string, string> = {
   'สร้างงานใหม่': 'สร้างงานใหม่',
 };
 
-function resolveSystemNote(note: string): string | null {
+function resolveSystemNote(note: string): { text: string; reason?: string } | null {
   const marker = Object.keys(NOTE_DISPLAY).find((key) => note.startsWith(key));
-  return marker ? NOTE_DISPLAY[marker] : null;
+  if (!marker) return null;
+  const reasonPrefix = '|reason:';
+  const reasonIndex = note.indexOf(reasonPrefix);
+  const reason = reasonIndex >= 0 ? note.slice(reasonIndex + reasonPrefix.length).trim() : '';
+  return {
+    text: NOTE_DISPLAY[marker],
+    reason: reason || undefined,
+  };
 }
 
 const STATUS_ICON: Record<string, string> = {
@@ -119,7 +126,10 @@ export default function StatusTimeline({
               )}
 
               {systemNote && (
-                <p className="text-xs text-slate-500 mt-1">{systemNote}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {systemNote.text}
+                  {systemNote.reason ? ` เพราะ ${systemNote.reason}` : ''}
+                </p>
               )}
             </div>
           </li>

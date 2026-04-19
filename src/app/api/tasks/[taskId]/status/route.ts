@@ -303,15 +303,25 @@ export async function PATCH(
         ? `หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข: ${normalizedComment}`
         : 'หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข',
     };
+    const reopenActionsWithReason = new Set<StatusAction>([
+      'doccon_reopen_completed',
+      'boss_reopen_completed',
+      'super_boss_reopen_completed',
+    ]);
     const commentEntryValue = reopenCommentMap[action] ?? normalizedComment;
     const latestCommentValue = commentEntryValue || task.latest_comment;
+    const noteBase = noteMap[action];
+    const noteWithReason =
+      noteBase && reopenActionsWithReason.has(action)
+        ? `${noteBase}${normalizedComment ? `|reason:${normalizedComment}` : ''}`
+        : (noteBase ?? normalizedComment);
 
     const statusEntry = {
       status: newStatus,
       changedAt: now,
       changedBy: normalizedUserEmail,
       changedByName: dbUser.display_name,
-      note: noteMap[action] ?? normalizedComment,
+      note: noteWithReason,
     };
 
     const newStatusHistory = [...(task.status_history ?? []), statusEntry];
