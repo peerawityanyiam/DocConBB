@@ -206,21 +206,21 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
 
   return (
     <>
-      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2">
+      <div className="mt-3 rounded-lg border border-slate-200 bg-white p-1.5">
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-slate-100 transition-colors"
+          className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1 text-left hover:bg-slate-50 transition-colors"
         >
-          <span className="text-xs font-normal text-slate-700">📥 ฝากไฟล์ส่วนตัว</span>
+          <span className="text-xs font-normal text-slate-700">ฝากไฟล์ส่วนตัว</span>
           <span className="text-slate-500 text-xs">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
         {isExpanded && (
-          <div className="mt-2.5 space-y-2.5 px-1">
+          <div className="mt-2 space-y-2">
             {!isClosedTask && (
-              <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
-                <p className="text-[0.72rem] font-semibold text-slate-700">
+              <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/60 p-2.5">
+                <p className="text-[0.72rem] font-normal text-slate-700">
                   แนบไฟล์ฝาก (ไม่ใช่การส่งงาน)
                 </p>
                 <input
@@ -235,7 +235,7 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
                   type="button"
                   onClick={handleUploadButtonClick}
                   disabled={uploading}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                 >
                   {uploading ? 'กำลังอัปโหลด...' : 'เลือกไฟล์ฝาก (Word / PDF / รูปภาพ)'}
                 </button>
@@ -246,7 +246,7 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
             )}
 
             {isClosedTask && (
-              <p className="text-[0.72rem] text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-2">
+              <p className="text-[0.72rem] text-slate-700 bg-slate-50/70 border border-slate-200 rounded-md px-2.5 py-2">
                 งานนี้สิ้นสุดแล้ว ระบบปิดการฝากไฟล์ใหม่
               </p>
             )}
@@ -258,9 +258,9 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
               <p className="text-xs text-emerald-700">{success}</p>
             )}
 
-            <div className="rounded-lg border border-slate-200 bg-white">
-              <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 rounded-t-lg">
-                <p className="text-[0.72rem] font-semibold text-slate-700">
+            <div className="rounded-md border border-slate-200 bg-white">
+              <div className="px-3 py-2 border-b border-slate-200 bg-slate-50/70 rounded-t-md">
+                <p className="text-[0.72rem] font-medium text-slate-700">
                   ไฟล์ที่ฝากแล้ว
                 </p>
               </div>

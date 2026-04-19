@@ -840,7 +840,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   return (
     <>
       <div
-        className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+        className="bg-white rounded-xl border border-gray-200 overflow-hidden"
         style={{ borderLeft: `4px solid ${borderColor}` }}
       >
         {/* Card Body */}
@@ -869,24 +869,25 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           </div>
 
           {!isPipelineView && (
-            <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
-              {task.detail && (
-                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-slate-700 whitespace-pre-line">
-                  ℹ️ {task.detail}
+            <div className="mb-3 rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2 text-xs">
+              {(task.detail || latestReopenInfo) && (
+                <div className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 space-y-1 text-slate-700">
+                  {task.detail && (
+                    <p className="whitespace-pre-line leading-relaxed">{task.detail}</p>
+                  )}
+                  {latestReopenInfo && (
+                    <p className="leading-relaxed text-amber-700">
+                      #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
+                      {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
+                    </p>
+                  )}
                 </div>
               )}
 
-              {latestReopenInfo && (
-                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-amber-700">
-                  #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
-                  {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
-                </div>
-              )}
-
-              <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 space-y-1 text-slate-700">
-                <p>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</p>
+              <div className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 space-y-1 text-slate-700">
+                <p className="leading-relaxed">📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</p>
                 {currentStageStuck && (
-                  <p>
+                  <p className="leading-relaxed">
                     ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{displayedStageLabel}</span> มา{' '}
                     <span className="font-semibold text-slate-800">{stageStuckDaysLabel}</span> วัน
                   </p>
@@ -894,9 +895,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
 
               {(sentBackDisplayName || task.latest_comment) && (
-                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 space-y-1 text-red-700">
-                  {sentBackDisplayName && <p>{sentBackPrefix} <span className="font-semibold">{sentBackDisplayName}</span></p>}
-                  {task.latest_comment && <p>💬 {task.latest_comment}</p>}
+                <div className="rounded-md border border-slate-200 bg-red-50/60 px-2.5 py-2 space-y-1 text-red-700">
+                  {sentBackDisplayName && <p className="leading-relaxed">↩ ส่งกลับโดย: <span className="font-semibold">{sentBackDisplayName}</span></p>}
+                  {task.latest_comment && <p className="leading-relaxed">💬 {task.latest_comment}</p>}
                 </div>
               )}
             </div>
@@ -921,9 +922,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   href={wordFileUrl!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50/70 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
                 >
-                  <span>📄</span>
                   <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
                 </a>
               )}
@@ -935,9 +935,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                       href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50/70 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                     >
-                      <span>📋</span>
                       <span className="min-w-0 break-all">
                         PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
                       </span>
@@ -955,8 +954,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── STAFF: word upload + submit ── */}
           {isStaffActionableNow && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับแก้ไข/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
                     <div className="space-y-1.5">
@@ -967,7 +966,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
                         >
-                          <span>📄</span>
                           <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
                         </a>
                       )}
@@ -979,7 +977,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                         >
-                          <span>📋</span>
                           <span className="min-w-0 break-all">
                             PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
                           </span>
@@ -991,7 +988,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   )}
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3">
                   <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">อัปโหลดไฟล์ที่แก้ไขแล้ว</p>
                   <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
                     📄 {isRejectedStatus ? 'ไฟล์ Word ที่แก้ไขแล้ว' : 'ไฟล์ Word (.docx)'}
@@ -1015,7 +1012,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                 {uploadProgress !== null && (
                   <div className="px-1">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
@@ -1048,8 +1045,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── DOCCON: รอตรวจ sub-tab ── */}
           {activeRole === 'DOCCON' && activeSubTab === 'pending' && task.status === 'SUBMITTED_TO_DOCCON' && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับตรวจรูปแบบ/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
                     <div className="space-y-1.5">
@@ -1060,7 +1057,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
                         >
-                          <span>📄</span>
                           <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
                         </a>
                       )}
@@ -1072,7 +1068,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                         >
-                          <span>📋</span>
                           <span className="min-w-0 break-all">
                             PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
                           </span>
@@ -1146,7 +1141,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               )}
 
               {/* Optional file attachment */}
-              <div className="border border-slate-200 rounded-lg p-3 bg-white">
+              <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3">
                 <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการตรวจรูปแบบ</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
                   {docconSentBackFromBoss ? '📎 แนบไฟล์ Word ที่แก้ไข (บังคับ):' : '📎 แนบไฟล์ที่มีรอยแก้ (ไม่บังคับ):'}
@@ -1196,51 +1191,53 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
-              )}
+              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+                {(uploadError || actionError) && (
+                  <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
+                )}
 
-              {/* Action buttons: sent-back from Boss → only forward, no reject */}
-              {docconSentBackFromBoss ? (
-                <button
-                  onClick={handleDocConApprove}
-                  disabled={isBlocked || !hasDocxSelected}
-                  title={docConApproveDisabledReason || undefined}
-                  className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✈ ส่งต่อกลับ'}
-                </button>
-              ) : (
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  onClick={handleDocConApprove}
-                  disabled={isBlocked || (!docRef.trim() && !task.doc_ref)}
-                  title={docConApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านรูปแบบ'}
-                </button>
-                <button
-                  onClick={handleDocConRejectClick}
-                  disabled={isBlocked}
-                  title={genericApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
-                >
-                  ↩ ส่งกลับแก้ไข
-                </button>
+                {/* Action buttons: sent-back from Boss → only forward, no reject */}
+                {docconSentBackFromBoss ? (
+                  <button
+                    onClick={handleDocConApprove}
+                    disabled={isBlocked || !hasDocxSelected}
+                    title={docConApproveDisabledReason || undefined}
+                    className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✈ ส่งต่อกลับ'}
+                  </button>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={handleDocConApprove}
+                      disabled={isBlocked || (!docRef.trim() && !task.doc_ref)}
+                      title={docConApproveDisabledReason || undefined}
+                      className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                    >
+                      {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านรูปแบบ'}
+                    </button>
+                    <button
+                      onClick={handleDocConRejectClick}
+                      disabled={isBlocked}
+                      title={genericApproveDisabledReason || undefined}
+                      className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                    >
+                      ↩ ส่งกลับแก้ไข
+                    </button>
+                  </div>
+                )}
+                {docConApproveDisabledReason && (
+                  <p className="text-[0.68rem] text-amber-700">ℹ {docConApproveDisabledReason}</p>
+                )}
               </div>
-              )}
-              {docConApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">ℹ {docConApproveDisabledReason}</p>
-              )}
             </div>
           )}
 
           {/* ── REVIEWER ── */}
           {activeRole === 'REVIEWER' && task.status === 'PENDING_REVIEW' && task.reviewer_id === userId && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับตรวจเนื้อหา/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
                     <div className="space-y-1.5">
@@ -1251,7 +1248,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
                         >
-                          <span>📄</span>
                           <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
                         </a>
                       )}
@@ -1263,7 +1259,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                         >
-                          <span>📋</span>
                           <span className="min-w-0 break-all">
                             PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
                           </span>
@@ -1275,7 +1270,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   )}
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3">
                 <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการตรวจเนื้อหา</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ที่มีรอยแก้/คอมเมนต์ (ไม่บังคับ):</label>
                 <input
@@ -1315,39 +1310,41 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
-              )}
+              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+                {(uploadError || actionError) && (
+                  <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
+                )}
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  onClick={() => uploadThenExecute('reviewer_approve')}
-                  disabled={isBlocked}
-                  title={genericApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
-                >
-                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านการตรวจสอบ'}
-                </button>
-                <button
-                  onClick={handleReviewerRejectClick}
-                  disabled={isBlocked}
-                  title={genericApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
-                >
-                  ↩ ส่งกลับแก้ไข
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={() => uploadThenExecute('reviewer_approve')}
+                    disabled={isBlocked}
+                    title={genericApproveDisabledReason || undefined}
+                    className="flex-1 py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ ผ่านการตรวจสอบ'}
+                  </button>
+                  <button
+                    onClick={handleReviewerRejectClick}
+                    disabled={isBlocked}
+                    title={genericApproveDisabledReason || undefined}
+                    className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  >
+                    ↩ ส่งกลับแก้ไข
+                  </button>
+                </div>
+                {genericApproveDisabledReason && (
+                  <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
+                )}
               </div>
-              {genericApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
-              )}
             </div>
           )}
 
           {/* ── BOSS: pending tab actions ── */}
           {activeRole === 'BOSS' && task.status === 'WAITING_BOSS_APPROVAL' && task.created_by === userId && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับพิจารณาอนุมัติ/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
                     <div className="space-y-1.5">
@@ -1358,7 +1355,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
                         >
-                          <span>📄</span>
                           <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
                         </a>
                       )}
@@ -1370,7 +1366,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                         >
-                          <span>📋</span>
                           <span className="min-w-0 break-all">
                             PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
                           </span>
@@ -1382,7 +1377,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   )}
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3">
                 <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการพิจารณา</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
                 <input
@@ -1422,47 +1417,49 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
-              )}
+              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+                {(uploadError || actionError) && (
+                  <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
+                )}
 
-              <button
-                onClick={() => uploadThenExecute('boss_approve')}
-                disabled={isBlocked}
-                title={genericApproveDisabledReason || undefined}
-                className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
-              >
-                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติ'}
-              </button>
-              <div className="flex flex-col sm:flex-row gap-2">
                 <button
-                  onClick={handleBossRejectClick}
+                  onClick={() => uploadThenExecute('boss_approve')}
                   disabled={isBlocked}
                   title={genericApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  ↩ ตีกลับเจ้าหน้าที่
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติ'}
                 </button>
-                <button
-                  onClick={handleBossSendToDocCon}
-                  disabled={isBlocked}
-                  title={genericApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
-                >
-                  ↩ ส่ง DocCon ตรวจใหม่
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={handleBossRejectClick}
+                    disabled={isBlocked}
+                    title={genericApproveDisabledReason || undefined}
+                    className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  >
+                    ↩ ตีกลับเจ้าหน้าที่
+                  </button>
+                  <button
+                    onClick={handleBossSendToDocCon}
+                    disabled={isBlocked}
+                    title={genericApproveDisabledReason || undefined}
+                    className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  >
+                    ↩ ส่ง DocCon ตรวจใหม่
+                  </button>
+                </div>
+                {genericApproveDisabledReason && (
+                  <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
+                )}
               </div>
-              {genericApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
-              )}
             </div>
           )}
 
           {/* ── SUPER_BOSS ── */}
           {activeRole === 'SUPER_BOSS' && task.status === 'WAITING_SUPER_BOSS_APPROVAL' && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับอนุมัติขั้นสุดท้าย/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
                     <div className="space-y-1.5">
@@ -1473,7 +1470,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
                         >
-                          <span>📄</span>
                           <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
                         </a>
                       )}
@@ -1485,7 +1481,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
                         >
-                          <span>📋</span>
                           <span className="min-w-0 break-all">
                             PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
                           </span>
@@ -1497,7 +1492,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   )}
                 </div>
 
-                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3">
                 <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">แนบไฟล์ประกอบการอนุมัติขั้นสุดท้าย</p>
                 <label className="text-xs font-semibold text-gray-700 mb-1.5 block">📎 แนบไฟล์ (ไม่บังคับ):</label>
                 <input
@@ -1537,39 +1532,41 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              {(uploadError || actionError) && (
-                <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
-              )}
+              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+                {(uploadError || actionError) && (
+                  <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
+                )}
 
-              <button
-                onClick={() => uploadThenExecute('super_boss_approve')}
-                disabled={isBlocked}
-                title={genericApproveDisabledReason || undefined}
-                className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
-              >
-                {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติขั้นสุดท้าย'}
-              </button>
-              <div className="flex flex-col sm:flex-row gap-2">
                 <button
-                  onClick={handleSuperBossRejectClick}
+                  onClick={() => uploadThenExecute('super_boss_approve')}
                   disabled={isBlocked}
                   title={genericApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  ↩ ตีกลับเจ้าหน้าที่
+                  {actionLoading ? (uploadProgress !== null ? `${uploadProgress}%...` : '...') : '✓ อนุมัติขั้นสุดท้าย'}
                 </button>
-                <button
-                  onClick={handleSuperBossSendToDocCon}
-                  disabled={isBlocked}
-                  title={genericApproveDisabledReason || undefined}
-                  className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
-                >
-                  ↩ ส่ง DocCon ตรวจใหม่
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={handleSuperBossRejectClick}
+                    disabled={isBlocked}
+                    title={genericApproveDisabledReason || undefined}
+                    className="flex-1 py-3 rounded-lg bg-[#dc3545] hover:bg-[#c82333] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  >
+                    ↩ ตีกลับเจ้าหน้าที่
+                  </button>
+                  <button
+                    onClick={handleSuperBossSendToDocCon}
+                    disabled={isBlocked}
+                    title={genericApproveDisabledReason || undefined}
+                    className="flex-1 py-3 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                  >
+                    ↩ ส่ง DocCon ตรวจใหม่
+                  </button>
+                </div>
+                {genericApproveDisabledReason && (
+                  <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
+                )}
               </div>
-              {genericApproveDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700">ℹ {genericApproveDisabledReason}</p>
-              )}
             </div>
           )}
 
