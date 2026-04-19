@@ -206,20 +206,20 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
 
   return (
     <>
-      <div className="mt-3 rounded-lg border border-slate-200 bg-white p-1.5">
+      <div className="mt-3 rounded-lg border border-slate-200 bg-white overflow-hidden">
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1 text-left hover:bg-slate-50 transition-colors"
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50 transition-colors"
         >
           <span className="text-xs font-normal text-slate-700">ฝากไฟล์ส่วนตัว</span>
           <span className="text-slate-500 text-xs">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
         {isExpanded && (
-          <div className="mt-2 space-y-2">
+          <div className="border-t border-slate-200 divide-y divide-slate-200">
             {!isClosedTask && (
-              <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/60 p-2.5">
+              <div className="px-3 py-2.5 space-y-2 bg-slate-50/40">
                 <p className="text-[0.72rem] font-normal text-slate-700">
                   แนบไฟล์ฝาก (ไม่ใช่การส่งงาน)
                 </p>
@@ -246,32 +246,34 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
             )}
 
             {isClosedTask && (
-              <p className="text-[0.72rem] text-slate-700 bg-slate-50/70 border border-slate-200 rounded-md px-2.5 py-2">
-                งานนี้สิ้นสุดแล้ว ระบบปิดการฝากไฟล์ใหม่
-              </p>
-            )}
-
-            {error && (
-              <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {error}</p>
-            )}
-            {success && (
-              <p className="text-xs text-emerald-700">{success}</p>
-            )}
-
-            <div className="rounded-md border border-slate-200 bg-white">
-              <div className="px-3 py-2 border-b border-slate-200 bg-slate-50/70 rounded-t-md">
-                <p className="text-[0.72rem] font-medium text-slate-700">
-                  ไฟล์ที่ฝากแล้ว
-                </p>
+              <div className="px-3 py-2.5 bg-slate-50/40">
+                <p className="text-[0.72rem] text-slate-700">งานนี้สิ้นสุดแล้ว ระบบปิดการฝากไฟล์ใหม่</p>
               </div>
+            )}
+
+            {(error || success) && (
+              <div className="px-3 py-2 space-y-1">
+                {error && (
+                  <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {error}</p>
+                )}
+                {success && (
+                  <p className="text-xs text-emerald-700">{success}</p>
+                )}
+              </div>
+            )}
+
+            <div className="px-3 py-2.5">
+              <p className="text-[0.72rem] font-medium text-slate-700">
+                ไฟล์ที่ฝากแล้ว
+              </p>
               {loading ? (
-                <p className="text-xs text-slate-500 px-3 py-3">กำลังโหลดไฟล์ฝาก...</p>
+                <p className="text-xs text-slate-500 mt-2">กำลังโหลดไฟล์ฝาก...</p>
               ) : files.length === 0 ? (
-                <p className="text-xs text-slate-500 px-3 py-3">ยังไม่มีไฟล์ฝากในงานนี้</p>
+                <p className="text-xs text-slate-500 mt-2">ยังไม่มีไฟล์ฝากในงานนี้</p>
               ) : (
-                <ul className="divide-y divide-slate-100">
+                <ul className="mt-2 divide-y divide-slate-100">
                   {files.map((item) => (
-                    <li key={item.id} className="px-3 py-2.5 flex items-start gap-2">
+                    <li key={item.id} className="py-2.5 flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <a
                           href={`https://drive.google.com/file/d/${item.drive_file_id}/view`}
