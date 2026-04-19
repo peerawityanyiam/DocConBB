@@ -745,6 +745,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
 
   /* ── Derived state for staff submit button (Bug 3: always require new file) ── */
   const isRejectedStatus = REJECTED_STATUSES.has(task.status as TaskStatus);
+  const isStaffActionableNow = activeRole === 'STAFF' && isStaffActionable(task, userId);
   const staffCanSubmit = selectedWordFile !== null;
 
   /* ── Bug 4: Derive who sent back for rejected statuses ── */
@@ -848,66 +849,118 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             </div>
           </div>
 
-          {/* Detail gray box */}
-          {(task.detail || latestReopenInfo) && (
-            <div className="bg-gray-50 border-l-[3px] border-gray-300 px-3 py-2 rounded-r-md mb-3 flex items-start gap-2">
-              <span className="text-gray-400 text-sm mt-0.5">ℹ️</span>
-              <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
-                {task.detail && <p>{task.detail}</p>}
-                {latestReopenInfo && (
-                  <p className={`${task.detail ? 'mt-1.5' : ''} text-amber-700`}>
-                    #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
-                    {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
-                  </p>
+          {(!isPipelineView && isStaffActionableNow) ? (
+            <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-xs">
+              {latestReopenInfo && (
+                <p className="text-amber-700 font-medium">
+                  #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
+                  {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
+                </p>
+              )}
+              <p className="text-slate-600">📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</p>
+              {currentStageStuck && (
+                <p className="text-slate-600">
+                  ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-700">{stageStuckLabel}</span> มา{' '}
+                  <span className="font-semibold text-slate-700">{stageStuckDaysLabel}</span> วัน
+                </p>
+              )}
+              {sentBackByName && (
+                <p className="text-red-700 font-semibold">↩ ส่งกลับโดย: {sentBackByName}</p>
+              )}
+              {task.latest_comment && (
+                <p className="text-red-700">💬 {task.latest_comment}</p>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Detail gray box */}
+              {(task.detail || latestReopenInfo) && (
+                <div className="bg-gray-50 border-l-[3px] border-gray-300 px-3 py-2 rounded-r-md mb-3 flex items-start gap-2">
+                  <span className="text-gray-400 text-sm mt-0.5">ℹ️</span>
+                  <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                    {task.detail && <p>{task.detail}</p>}
+                    {latestReopenInfo && (
+                      <p className={`${task.detail ? 'mt-1.5' : ''} text-amber-700`}>
+                        #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
+                        {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Meta row */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-3">
+                {activeRole === 'STAFF' && (
+                  <>
+                    <span>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</span>
+                  </>
+                )}
+                {activeRole === 'DOCCON' && (
+                  <>
+                    <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
+                    <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
+                    {isPipelineView && currentStageStuck && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stageStuckDays > 7 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                        ค้าง {stageStuckDaysLabel} วัน
+                      </span>
+                    )}
+                  </>
+                )}
+                {activeRole === 'REVIEWER' && (
+                  <>
+                    <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
+                    <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
+                  </>
+                )}
+                {activeRole === 'BOSS' && (
+                  <>
+                    <span>👤 เจ้าหน้าที่: {task.officer?.display_name ?? '—'}</span>
+                    <span>📋 ผู้ตรวจ: {task.reviewer?.display_name ?? '—'}</span>
+                    <span>📅 {formatDateThai(task.updated_at)}</span>
+                  </>
+                )}
+                {activeRole === 'SUPER_BOSS' && (
+                  <>
+                    <span>👤 ผู้สร้าง: {task.creator?.display_name ?? '—'}</span>
+                    <span>📅 {formatDateThai(task.updated_at)}</span>
+                  </>
                 )}
               </div>
-            </div>
-          )}
 
-          {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-3">
-            {activeRole === 'STAFF' && (
-              <>
-                <span>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</span>
-              </>
-            )}
-            {activeRole === 'DOCCON' && (
-              <>
-                <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
-                <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
-                {isPipelineView && currentStageStuck && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stageStuckDays > 7 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                    ค้าง {stageStuckDaysLabel} วัน
-                  </span>
-                )}
-              </>
-            )}
-            {activeRole === 'REVIEWER' && (
-              <>
-                <span>👤 ผู้ส่ง: {task.officer?.display_name ?? '—'}</span>
-                <span>📅 ส่ง {formatDateThai(task.updated_at)}</span>
-              </>
-            )}
-            {activeRole === 'BOSS' && (
-              <>
-                <span>👤 เจ้าหน้าที่: {task.officer?.display_name ?? '—'}</span>
-                <span>📋 ผู้ตรวจ: {task.reviewer?.display_name ?? '—'}</span>
-                <span>📅 {formatDateThai(task.updated_at)}</span>
-              </>
-            )}
-            {activeRole === 'SUPER_BOSS' && (
-              <>
-                <span>👤 ผู้สร้าง: {task.creator?.display_name ?? '—'}</span>
-                <span>📅 {formatDateThai(task.updated_at)}</span>
-              </>
-            )}
-          </div>
+              {currentStageStuck && (
+                <div className="mb-3 text-xs text-gray-500">
+                  ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-gray-700">{stageStuckLabel}</span> มา{' '}
+                  <span className="font-semibold text-gray-700">{stageStuckDaysLabel}</span> วัน
+                </div>
+              )}
 
-          {currentStageStuck && (
-            <div className="mb-3 text-xs text-gray-500">
-              ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-gray-700">{stageStuckLabel}</span> มา{' '}
-              <span className="font-semibold text-gray-700">{stageStuckDaysLabel}</span> วัน
-            </div>
+              {/* Latest comment (rejection reason) + who sent back */}
+              {/* Rejected: show who sent back + comment */}
+              {REJECTED_STATUSES.has(task.status) && (
+                <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-red-50 border-l-[3px] border-red-400 text-red-800 space-y-0.5">
+                  {sentBackByName && (
+                    <p className="font-semibold">↩ ส่งกลับโดย: {sentBackByName}</p>
+                  )}
+                  {task.latest_comment && (
+                    <p>💬 {task.latest_comment}</p>
+                  )}
+                </div>
+              )}
+
+              {/* SUBMITTED_TO_DOCCON: show who sent it back (Boss/SuperBoss context) */}
+              {docconSentBackFromBoss && (() => {
+                const sentBackEntry = task.status_history?.slice().reverse().find(
+                  h => h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')
+                );
+                return sentBackEntry ? (
+                  <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-amber-50 border-l-[3px] border-amber-400 text-amber-800">
+                    ↩ ส่งกลับตรวจรูปแบบโดย: <span className="font-semibold">{sentBackEntry.changedByName}</span>
+                    {task.latest_comment && <p className="mt-0.5">💬 {task.latest_comment}</p>}
+                  </div>
+                ) : null;
+              })()}
+            </>
           )}
 
           {!isPipelineView && (
@@ -918,37 +971,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             />
           )}
 
-          {/* Latest comment (rejection reason) + who sent back */}
-          {/* Rejected: show who sent back + comment */}
-          {REJECTED_STATUSES.has(task.status) && (
-            <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-red-50 border-l-[3px] border-red-400 text-red-800 space-y-0.5">
-              {sentBackByName && (
-                <p className="font-semibold">↩ ส่งกลับโดย: {sentBackByName}</p>
-              )}
-              {task.latest_comment && (
-                <p>💬 {task.latest_comment}</p>
-              )}
-            </div>
-          )}
-
-          {/* SUBMITTED_TO_DOCCON: show who sent it back (Boss/SuperBoss context) */}
-          {docconSentBackFromBoss && (() => {
-            const sentBackEntry = task.status_history?.slice().reverse().find(
-              h => h.status === 'SUBMITTED_TO_DOCCON' && h.note?.startsWith('sentBackToDocconBy:')
-            );
-            return sentBackEntry ? (
-              <div className="mb-3 px-3 py-2 rounded-md text-xs leading-relaxed bg-amber-50 border-l-[3px] border-amber-400 text-amber-800">
-                ↩ ส่งกลับตรวจรูปแบบโดย: <span className="font-semibold">{sentBackEntry.changedByName}</span>
-                {task.latest_comment && <p className="mt-0.5">💬 {task.latest_comment}</p>}
-              </div>
-            ) : null;
-          })()}
-
           {/* Pipeline visualization (DocCon tracking tab) */}
           {isPipelineView && <PipelineViz status={task.status} />}
 
           {/* File links — word (blue) + pdf (orange) */}
-          {!isPipelineView && (hasWordFile || hasRefFile) && (
+          {!isPipelineView && !isStaffActionableNow && (hasWordFile || hasRefFile) && (
             <div className="flex flex-col gap-2 mb-3">
               {hasWordFile && (
                 <a
@@ -987,56 +1014,91 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ══════════════════════════════════════ */}
 
           {/* ── STAFF: word upload + submit ── */}
-          {activeRole === 'STAFF' && isStaffActionable(task, userId) && (
+          {isStaffActionableNow && (
             <div className="mt-2 space-y-3">
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-                  📄 {isRejectedStatus ? 'อัปโหลดไฟล์ Word ที่แก้ไขแล้ว' : 'อัปโหลดไฟล์ Word (.docx)'}
-                  <span className="text-red-500">*</span>
-                </label>
-                <input
-                  ref={wordInputRef}
-                  type="file"
-                  accept=".docx"
-                  onChange={onWordFileChange}
-                  className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                />
-                {selectedWordFile && (
-                  <div className="mt-1.5 space-y-0.5">
-                    <p className="text-xs text-green-700 flex items-center gap-1">
-                      ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
-                    </p>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                <p className="text-[0.72rem] font-semibold text-slate-700">แนบไฟล์งาน</p>
+
+                {(hasWordFile || hasRefFile) && (
+                  <div className="space-y-1.5">
+                    {hasWordFile && (
+                      <a
+                        href={wordFileUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
+                      >
+                        <span>📄</span>
+                        <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
+                      </a>
+                    )}
+                    {hasRefFile && currentRefFiles.map((file, index) => (
+                      <a
+                        key={`${file.driveFileId}-${index}`}
+                        href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                      >
+                        <span>📋</span>
+                        <span className="min-w-0 break-all">
+                          PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
+                        </span>
+                      </a>
+                    ))}
                   </div>
                 )}
-                {renderAttachmentSummary('ขั้นตอนนี้ต้องแนบไฟล์ Word (.docx)')}
+
+                <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                  <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                    📄 {isRejectedStatus ? 'อัปโหลดไฟล์ Word ที่แก้ไขแล้ว' : 'อัปโหลดไฟล์ Word (.docx)'}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    ref={wordInputRef}
+                    type="file"
+                    accept=".docx"
+                    onChange={onWordFileChange}
+                    className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  />
+                  {selectedWordFile && (
+                    <div className="mt-1.5 space-y-0.5">
+                      <p className="text-xs text-green-700 flex items-center gap-1">
+                        ✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span>
+                      </p>
+                    </div>
+                  )}
+                  {renderAttachmentSummary('ขั้นตอนนี้ต้องแนบไฟล์ Word (.docx)')}
+                </div>
               </div>
 
-              {/* Upload progress */}
-              {uploadProgress !== null && (
-                <div className="px-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-                    <span>กำลังอัปโหลด...</span><span>{uploadProgress}%</span>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                {uploadProgress !== null && (
+                  <div className="px-1">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                      <span>กำลังอัปโหลด...</span><span>{uploadProgress}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#00c2a8] transition-all rounded-full" style={{ width: `${uploadProgress}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#00c2a8] transition-all rounded-full" style={{ width: `${uploadProgress}%` }} />
-                  </div>
-                </div>
-              )}
+                )}
 
-              {uploadError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {uploadError}</p>}
-              {actionError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {actionError}</p>}
+                {uploadError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {uploadError}</p>}
+                {actionError && <p className="text-xs text-red-600 px-1 whitespace-pre-line">⚠️ {actionError}</p>}
 
-              <button
-                onClick={handleStaffSubmit}
-                disabled={isBlocked || !staffCanSubmit}
-                title={staffSubmitDisabledReason || undefined}
-                className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
-              >
-                {actionLoading ? (uploadProgress !== null ? `กำลังอัปโหลด ${uploadProgress}%...` : 'กำลังส่ง...') : '✈ ส่งงาน'}
-              </button>
-              {(isBlocked || !staffCanSubmit) && staffSubmitDisabledReason && (
-                <p className="text-[0.68rem] text-amber-700 px-1">ℹ {staffSubmitDisabledReason}</p>
-              )}
+                <button
+                  onClick={handleStaffSubmit}
+                  disabled={isBlocked || !staffCanSubmit}
+                  title={staffSubmitDisabledReason || undefined}
+                  className="w-full py-3 rounded-lg bg-[#00c2a8] hover:bg-[#009e88] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? (uploadProgress !== null ? `กำลังอัปโหลด ${uploadProgress}%...` : 'กำลังส่ง...') : '✈ ส่งงาน'}
+                </button>
+                {(isBlocked || !staffCanSubmit) && staffSubmitDisabledReason && (
+                  <p className="text-[0.68rem] text-amber-700 px-1">ℹ {staffSubmitDisabledReason}</p>
+                )}
+              </div>
             </div>
           )}
 
