@@ -40,6 +40,7 @@ const NOTE_DISPLAY: Record<string, string> = {
   'sentBackToDocconBy:BOSS': 'ส่งกลับให้ DocCon ตรวจใหม่โดยผู้สั่งงาน',
   'sentBackToDocconBy:SUPER_BOSS': 'ส่งกลับให้ DocCon ตรวจใหม่โดยหัวหน้างาน',
   'reopenFromCompletedBy:DOCCON': 'DocCon ดึงงานที่เสร็จแล้วกลับมาแก้ไข',
+  'reopenFromCompletedBy:BOSS': 'ผู้สั่งงานดึงงานที่เสร็จแล้วกลับมาแก้ไข',
   'reopenFromCompletedBy:SUPER_BOSS': 'หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข',
   'สร้างงานใหม่': 'สร้างงานใหม่',
 };

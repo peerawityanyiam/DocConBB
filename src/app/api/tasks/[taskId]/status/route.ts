@@ -15,6 +15,7 @@ type StatusAction =
   | 'boss_approve'
   | 'boss_reject'
   | 'boss_send_to_doccon'
+  | 'boss_reopen_completed'
   | 'super_boss_approve'
   | 'super_boss_reject'
   | 'super_boss_send_to_doccon'
@@ -31,6 +32,7 @@ const ACTION_ROLES: Record<StatusAction, AppRole[]> = {
   boss_approve: ['BOSS'],
   boss_reject: ['BOSS'],
   boss_send_to_doccon: ['BOSS'],
+  boss_reopen_completed: ['BOSS'],
   super_boss_approve: ['SUPER_BOSS'],
   super_boss_reject: ['SUPER_BOSS'],
   super_boss_send_to_doccon: ['SUPER_BOSS'],
@@ -106,8 +108,14 @@ export async function PATCH(
         if (!submitFrom.includes(task.status)) throw new AuthError('ไม่สามารถส่งงานได้ในสถานะนี้', 400);
         if (!task.drive_file_id) throw new AuthError('กรุณาอัปโหลดไฟล์ Word ก่อนส่งงาน', 400);
 
-        if (task.status === 'SUPER_BOSS_REJECTED') newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
-        else if (task.status === 'BOSS_REJECTED') newStatus = 'WAITING_BOSS_APPROVAL';
+        if (task.status === 'SUPER_BOSS_REJECTED') {
+          newStatus = 'WAITING_SUPER_BOSS_APPROVAL';
+        } else if (task.status === 'BOSS_REJECTED') {
+          const statusHistory = (task.status_history as Array<{ status?: string; note?: string }> | null) ?? [];
+          const latestBossRejected = [...statusHistory].reverse().find((entry) => entry.status === 'BOSS_REJECTED');
+          const isReopenFromCompletedByBoss = latestBossRejected?.note?.includes('reopenFromCompletedBy:BOSS') ?? false;
+          newStatus = isReopenFromCompletedByBoss ? 'WAITING_SUPER_BOSS_APPROVAL' : 'WAITING_BOSS_APPROVAL';
+        }
         else if (task.status === 'DOCCON_REJECTED') {
           const statusHistory = (task.status_history as Array<{ status?: string; note?: string }> | null) ?? [];
           const latestDocconRejected = [...statusHistory].reverse().find((entry) => entry.status === 'DOCCON_REJECTED');
@@ -219,6 +227,18 @@ export async function PATCH(
         break;
       }
 
+      case 'boss_reopen_completed': {
+        if (task.created_by !== dbUser.id) throw new AuthError('ไม่ใช่ผู้สั่งงานของงานนี้', 403);
+        if (task.status !== 'COMPLETED') throw new AuthError('อนุญาตให้ดึงกลับได้เฉพาะงานที่เสร็จแล้ว', 400);
+        if (!comment?.trim()) throw new AuthError('กรุณาระบุเหตุผลการดึงกลับมาแก้ไข', 400);
+        newStatus = 'BOSS_REJECTED';
+        updates.is_archived = false;
+        updates.completed_at = null;
+        updates.drive_uploaded = false;
+        updates.sent_to_branch = false;
+        break;
+      }
+
       case 'super_boss_approve': {
         if (task.status !== 'WAITING_SUPER_BOSS_APPROVAL') throw new AuthError('สถานะต้องเป็น "รอหัวหน้างานอนุมัติ"', 400);
         newStatus = 'COMPLETED';
@@ -273,6 +293,7 @@ export async function PATCH(
       boss_send_to_doccon: 'sentBackToDocconBy:BOSS',
       super_boss_send_to_doccon: 'sentBackToDocconBy:SUPER_BOSS',
       doccon_reopen_completed: 'reopenFromCompletedBy:DOCCON',
+      boss_reopen_completed: 'reopenFromCompletedBy:BOSS',
       super_boss_reopen_completed: 'reopenFromCompletedBy:SUPER_BOSS',
     };
 
@@ -281,6 +302,9 @@ export async function PATCH(
       doccon_reopen_completed: normalizedComment
         ? `DocCon ดึงงานที่เสร็จแล้วกลับมาแก้ไข: ${normalizedComment}`
         : 'DocCon ดึงงานที่เสร็จแล้วกลับมาแก้ไข',
+      boss_reopen_completed: normalizedComment
+        ? `ผู้สั่งงานดึงงานที่เสร็จแล้วกลับมาแก้ไข: ${normalizedComment}`
+        : 'ผู้สั่งงานดึงงานที่เสร็จแล้วกลับมาแก้ไข',
       super_boss_reopen_completed: normalizedComment
         ? `หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข: ${normalizedComment}`
         : 'หัวหน้างานดึงงานที่เสร็จแล้วกลับมาแก้ไข',

@@ -52,7 +52,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   const [bossCancelLoading, setBossCancelLoading] = useState(false);
   const [bossCancelError, setBossCancelError] = useState('');
   const [reopenReason, setReopenReason] = useState('');
-  const [reopenLoadingAction, setReopenLoadingAction] = useState<'doccon_reopen_completed' | 'super_boss_reopen_completed' | null>(null);
+  const [reopenLoadingAction, setReopenLoadingAction] = useState<
+    'doccon_reopen_completed' | 'boss_reopen_completed' | 'super_boss_reopen_completed' | null
+  >(null);
   const [reopenError, setReopenError] = useState('');
 
   const fetchTask = useCallback(async () => {
@@ -146,7 +148,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     }
   }
 
-  async function handleReopenCompleted(action: 'doccon_reopen_completed' | 'super_boss_reopen_completed') {
+  async function handleReopenCompleted(
+    action: 'doccon_reopen_completed' | 'boss_reopen_completed' | 'super_boss_reopen_completed'
+  ) {
     if (!task) return;
     if (!reopenReason.trim()) {
       setReopenError('กรุณาระบุเหตุผลการดึงงานกลับมาแก้ไข');
@@ -188,8 +192,13 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
     task.created_by === userId &&
     !['COMPLETED', 'CANCELLED'].includes(task.status);
   const canDocconReopenCompleted = !!task && task.status === 'COMPLETED' && userRoles.includes('DOCCON');
+  const canBossReopenCompleted =
+    !!task &&
+    task.status === 'COMPLETED' &&
+    userRoles.includes('BOSS') &&
+    task.created_by === userId;
   const canSuperBossReopenCompleted = !!task && task.status === 'COMPLETED' && userRoles.includes('SUPER_BOSS');
-  const canReopenCompleted = canDocconReopenCompleted || canSuperBossReopenCompleted;
+  const canReopenCompleted = canDocconReopenCompleted || canBossReopenCompleted || canSuperBossReopenCompleted;
 
   const filteredStaffForReassign = reassignField === 'officer_id'
     ? staffList.filter(u => u.roles?.includes('STAFF'))
@@ -446,6 +455,17 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                             {reopenLoadingAction === 'doccon_reopen_completed'
                               ? 'กำลังดึงกลับ...'
                               : 'DocCon ดึงกลับ (ให้หัวหน้าอนุมัติใหม่)'}
+                          </button>
+                        )}
+                        {canBossReopenCompleted && (
+                          <button
+                            onClick={() => void handleReopenCompleted('boss_reopen_completed')}
+                            disabled={reopenLoadingAction !== null || !reopenReason.trim()}
+                            className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {reopenLoadingAction === 'boss_reopen_completed'
+                              ? 'กำลังดึงกลับ...'
+                              : 'ผู้สั่งงานดึงกลับ (ให้หัวหน้าอนุมัติใหม่)'}
                           </button>
                         )}
                         {canSuperBossReopenCompleted && (

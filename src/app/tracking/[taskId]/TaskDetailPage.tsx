@@ -11,9 +11,10 @@ import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } 
 
 type ActionKey =
   | 'submit' | 'doccon_approve' | 'doccon_reject'
+  | 'doccon_reopen_completed'
   | 'reviewer_approve' | 'reviewer_reject'
-  | 'boss_approve' | 'boss_reject' | 'boss_send_to_doccon'
-  | 'super_boss_approve' | 'super_boss_reject' | 'super_boss_send_to_doccon'
+  | 'boss_approve' | 'boss_reject' | 'boss_send_to_doccon' | 'boss_reopen_completed'
+  | 'super_boss_approve' | 'super_boss_reject' | 'super_boss_send_to_doccon' | 'super_boss_reopen_completed'
   | 'cancel';
 
 interface ActionDef {
@@ -50,6 +51,32 @@ function getActions(task: Task, roles: AppRole[], userId: string): ActionDef[] {
     actions.push({ label: 'อนุมัติขั้นสุดท้าย', action: 'super_boss_approve', style: 'primary', confirmText: 'งานจะเสร็จสมบูรณ์' });
     actions.push({ label: 'ส่งตรวจรูปแบบใหม่', action: 'super_boss_send_to_doccon', style: 'warning', needsComment: true });
     actions.push({ label: 'ตีกลับ', action: 'super_boss_reject', style: 'danger', needsComment: true });
+  }
+  if (s === 'COMPLETED') {
+    if (roles.includes('DOCCON')) {
+      actions.push({
+        label: 'DocCon ดึงกลับ (ให้หัวหน้าอนุมัติใหม่)',
+        action: 'doccon_reopen_completed',
+        style: 'warning',
+        needsComment: true,
+      });
+    }
+    if (roles.includes('BOSS') && task.created_by === userId) {
+      actions.push({
+        label: 'ผู้สั่งงานดึงกลับ (ให้หัวหน้าอนุมัติใหม่)',
+        action: 'boss_reopen_completed',
+        style: 'warning',
+        needsComment: true,
+      });
+    }
+    if (roles.includes('SUPER_BOSS')) {
+      actions.push({
+        label: 'หัวหน้างานดึงกลับมาแก้ไข',
+        action: 'super_boss_reopen_completed',
+        style: 'warning',
+        needsComment: true,
+      });
+    }
   }
   if (roles.includes('BOSS') && task.created_by === userId && !['COMPLETED', 'CANCELLED'].includes(s))
     actions.push({ label: 'ยกเลิกงาน', action: 'cancel', style: 'danger', needsComment: true, confirmText: 'ไม่สามารถย้อนกลับได้' });
