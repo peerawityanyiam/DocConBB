@@ -206,14 +206,14 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
 
   return (
     <>
-      <div className="mt-3 rounded-lg border border-slate-300 bg-slate-100/70 p-2.5">
+      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2">
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-slate-200/60 transition-colors"
+          className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-slate-100 transition-colors"
         >
-          <span className="text-sm font-normal text-slate-700">📥 ฝากไฟล์ส่วนตัว</span>
-          <span className="text-slate-600 text-sm">{isExpanded ? '▲' : '▼'}</span>
+          <span className="text-xs font-normal text-slate-700">📥 ฝากไฟล์ส่วนตัว</span>
+          <span className="text-slate-500 text-xs">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
         {isExpanded && (
@@ -258,7 +258,7 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
               <p className="text-xs text-emerald-700">{success}</p>
             )}
 
-            <div className="rounded-lg border border-slate-300 bg-white">
+            <div className="rounded-lg border border-slate-200 bg-white">
               <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 rounded-t-lg">
                 <p className="text-[0.72rem] font-semibold text-slate-700">
                   ไฟล์ที่ฝากแล้ว

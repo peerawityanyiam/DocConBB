@@ -851,39 +851,27 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
 
           {(!isPipelineView && isStaffActionableNow) ? (
             <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
-              <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-700">
-                {latestReopenInfo && (
-                  <>
-                    <span className="text-amber-700">
-                      #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
-                      {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
-                    </span>
-                    <span className="text-slate-300">/</span>
-                  </>
-                )}
-                <span>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</span>
-              </div>
-
-              {(currentStageStuck || sentBackByName) && (
-                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-700">
-                  {currentStageStuck && (
-                    <>
-                      <span>
-                        ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{stageStuckLabel}</span> มา{' '}
-                        <span className="font-semibold text-slate-800">{stageStuckDaysLabel}</span> วัน
-                      </span>
-                      {sentBackByName && <span className="text-slate-300">/</span>}
-                    </>
-                  )}
-                  {sentBackByName && (
-                    <span className="text-red-700">↩ ส่งกลับโดย: <span className="font-semibold">{sentBackByName}</span></span>
-                  )}
+              {latestReopenInfo && (
+                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-amber-700">
+                  #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
+                  {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
                 </div>
               )}
 
-              {task.latest_comment && (
-                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-red-700">
-                  💬 {task.latest_comment}
+              <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 space-y-1 text-slate-700">
+                <p>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</p>
+                {currentStageStuck && (
+                  <p>
+                    ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{stageStuckLabel}</span> มา{' '}
+                    <span className="font-semibold text-slate-800">{stageStuckDaysLabel}</span> วัน
+                  </p>
+                )}
+              </div>
+
+              {(sentBackByName || task.latest_comment) && (
+                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 space-y-1 text-red-700">
+                  {sentBackByName && <p>↩ ส่งกลับโดย: <span className="font-semibold">{sentBackByName}</span></p>}
+                  {task.latest_comment && <p>💬 {task.latest_comment}</p>}
                 </div>
               )}
             </div>
