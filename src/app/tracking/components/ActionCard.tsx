@@ -820,7 +820,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
   const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
   const renderAttachmentSummary = (hint: string) => (
-    <div className={`mt-2 px-1 py-1 text-[0.7rem] ${(selectedWordFile || selectedImageFiles.length > 0) ? 'text-emerald-700' : 'text-slate-600'}`}>
+    <div className={`mt-2 rounded-md border px-2 py-1.5 text-[0.7rem] ${(selectedWordFile || selectedImageFiles.length > 0) ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700' : 'border-slate-300 bg-slate-50/70 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>
       <p className="mt-0.5 text-[0.65rem] opacity-90">{(selectedWordFile || selectedImageFiles.length > 0) ? attachmentSummaryHint : hint}</p>
     </div>
@@ -869,7 +869,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           </div>
 
           {!isPipelineView && (
-            <div className="mb-3 rounded-md border border-slate-200 bg-slate-50/60 text-xs divide-y divide-slate-200 overflow-hidden">
+            <div className="mb-3 rounded-md border border-slate-300 bg-slate-50/60 text-xs divide-y divide-slate-300 overflow-hidden">
               {(task.detail || latestReopenInfo) && (
                 <div className="px-2.5 py-2 space-y-1 text-slate-700">
                   {task.detail && (
@@ -928,7 +928,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 </a>
               )}
               {hasRefFile && (
-                <div className="overflow-hidden rounded-md divide-y divide-slate-200 bg-slate-50/40">
+                <div className="overflow-hidden rounded-md divide-y divide-slate-300 bg-slate-50/40">
                   {currentRefFiles.map((file, index) => (
                     <a
                       key={`${file.driveFileId}-${index}`}
@@ -954,11 +954,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── STAFF: word upload + submit ── */}
           {isStaffActionableNow && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden divide-y divide-slate-200">
+              <div className="rounded-lg border border-slate-300 bg-white overflow-hidden divide-y divide-slate-300">
                 <div className="p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับแก้ไข/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
-                    <div className="overflow-hidden rounded-md divide-y divide-slate-200 bg-slate-50/40">
+                    <div className="overflow-hidden rounded-md divide-y divide-slate-300 bg-slate-50/40">
                       {hasWordFile && (
                         <a
                           href={wordFileUrl!}
@@ -1012,7 +1012,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                 </div>
               </div>
 
-              <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+              <div className="rounded-md border border-slate-300 bg-slate-50/60 p-3 space-y-2">
                 {uploadProgress !== null && (
                   <div className="px-1">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
@@ -1045,11 +1045,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── DOCCON: รอตรวจ sub-tab ── */}
           {activeRole === 'DOCCON' && activeSubTab === 'pending' && task.status === 'SUBMITTED_TO_DOCCON' && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden divide-y divide-slate-200">
+              <div className="rounded-lg border border-slate-300 bg-white overflow-hidden divide-y divide-slate-300">
                 <div className="p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับตรวจรูปแบบ/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
-                    <div className="overflow-hidden rounded-md divide-y divide-slate-200 bg-slate-50/40">
+                    <div className="overflow-hidden rounded-md divide-y divide-slate-300 bg-slate-50/40">
                       {hasWordFile && (
                         <a
                           href={wordFileUrl!}
@@ -1191,7 +1191,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-md border border-slate-300 bg-white p-3 space-y-2">
                 {(uploadError || actionError) && (
                   <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
                 )}
@@ -1236,11 +1236,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── REVIEWER ── */}
           {activeRole === 'REVIEWER' && task.status === 'PENDING_REVIEW' && task.reviewer_id === userId && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden divide-y divide-slate-200">
+              <div className="rounded-lg border border-slate-300 bg-white overflow-hidden divide-y divide-slate-300">
                 <div className="p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับตรวจเนื้อหา/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
-                    <div className="overflow-hidden rounded-md divide-y divide-slate-200 bg-slate-50/40">
+                    <div className="overflow-hidden rounded-md divide-y divide-slate-300 bg-slate-50/40">
                       {hasWordFile && (
                         <a
                           href={wordFileUrl!}
@@ -1310,7 +1310,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-md border border-slate-300 bg-white p-3 space-y-2">
                 {(uploadError || actionError) && (
                   <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
                 )}
@@ -1343,11 +1343,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── BOSS: pending tab actions ── */}
           {activeRole === 'BOSS' && task.status === 'WAITING_BOSS_APPROVAL' && task.created_by === userId && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden divide-y divide-slate-200">
+              <div className="rounded-lg border border-slate-300 bg-white overflow-hidden divide-y divide-slate-300">
                 <div className="p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับพิจารณาอนุมัติ/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
-                    <div className="overflow-hidden rounded-md divide-y divide-slate-200 bg-slate-50/40">
+                    <div className="overflow-hidden rounded-md divide-y divide-slate-300 bg-slate-50/40">
                       {hasWordFile && (
                         <a
                           href={wordFileUrl!}
@@ -1417,7 +1417,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-md border border-slate-300 bg-white p-3 space-y-2">
                 {(uploadError || actionError) && (
                   <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
                 )}
@@ -1458,11 +1458,11 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ── SUPER_BOSS ── */}
           {activeRole === 'SUPER_BOSS' && task.status === 'WAITING_SUPER_BOSS_APPROVAL' && (
             <div className="mt-2 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden divide-y divide-slate-200">
+              <div className="rounded-lg border border-slate-300 bg-white overflow-hidden divide-y divide-slate-300">
                 <div className="p-3 space-y-2">
                   <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับอนุมัติขั้นสุดท้าย/อ้างอิง</p>
                   {(hasWordFile || hasRefFile) ? (
-                    <div className="overflow-hidden rounded-md divide-y divide-slate-200 bg-slate-50/40">
+                    <div className="overflow-hidden rounded-md divide-y divide-slate-300 bg-slate-50/40">
                       {hasWordFile && (
                         <a
                           href={wordFileUrl!}
@@ -1532,7 +1532,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
               </div>
               </div>
 
-              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+              <div className="rounded-md border border-slate-300 bg-white p-3 space-y-2">
                 {(uploadError || actionError) && (
                   <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {uploadError || actionError}</p>
                 )}

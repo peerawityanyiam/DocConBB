@@ -206,18 +206,18 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
 
   return (
     <>
-      <div className="mt-3 rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <div className="mt-3 rounded-lg border border-slate-300 bg-white overflow-hidden">
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
           className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50 transition-colors"
         >
-          <span className="text-xs font-normal text-slate-700">ฝากไฟล์ส่วนตัว</span>
+          <span className="text-[0.72rem] font-semibold text-slate-700">ฝากไฟล์ส่วนตัว</span>
           <span className="text-slate-500 text-xs">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
         {isExpanded && (
-          <div className="border-t border-slate-200 divide-y divide-slate-200">
+          <div className="border-t border-slate-300 divide-y divide-slate-300">
             {!isClosedTask && (
               <div className="px-3 py-2.5 space-y-2 bg-slate-50/40">
                 <p className="text-[0.72rem] font-normal text-slate-700">
@@ -271,9 +271,9 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
               ) : files.length === 0 ? (
                 <p className="text-xs text-slate-500 mt-2">ยังไม่มีไฟล์ฝากในงานนี้</p>
               ) : (
-                <ul className="mt-2 divide-y divide-slate-100">
+                <ul className="mt-2 space-y-2">
                   {files.map((item) => (
-                    <li key={item.id} className="py-2.5 flex items-start gap-2">
+                    <li key={item.id} className="rounded-md border border-slate-300 bg-white px-2.5 py-2.5 flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <a
                           href={`https://drive.google.com/file/d/${item.drive_file_id}/view`}
