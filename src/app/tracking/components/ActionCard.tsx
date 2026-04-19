@@ -910,6 +910,14 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             </div>
           )}
 
+          {!isPipelineView && (
+            <PrivateDraftFiles
+              task={task}
+              userId={userId}
+              onUpdated={onUpdated}
+            />
+          )}
+
           {/* Latest comment (rejection reason) + who sent back */}
           {/* Rejected: show who sent back + comment */}
           {REJECTED_STATUSES.has(task.status) && (
@@ -977,14 +985,6 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {/* ══════════════════════════════════════ */}
           {/* ──  ROLE-SPECIFIC INLINE ACTIONS  ──  */}
           {/* ══════════════════════════════════════ */}
-
-          {!isPipelineView && (
-            <PrivateDraftFiles
-              task={task}
-              userId={userId}
-              onUpdated={onUpdated}
-            />
-          )}
 
           {/* ── STAFF: word upload + submit ── */}
           {activeRole === 'STAFF' && isStaffActionable(task, userId) && (

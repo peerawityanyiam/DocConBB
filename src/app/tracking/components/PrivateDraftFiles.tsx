@@ -206,20 +206,23 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
 
   return (
     <>
-      <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50/50 p-2.5">
+      <div className="mt-3 rounded-lg border border-slate-300 bg-slate-100/70 p-2.5">
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-amber-100/70 transition-colors"
+          className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-slate-200/80 transition-colors"
         >
-          <span className="text-sm font-bold text-amber-900">📥 ฝากไฟล์ส่วนตัว</span>
-          <span className="text-amber-700 text-sm">{isExpanded ? '▲' : '▼'}</span>
+          <span className="text-sm font-semibold text-slate-800">📥 ฝากไฟล์ส่วนตัว</span>
+          <span className="text-slate-600 text-sm">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
         {isExpanded && (
           <div className="mt-2.5 space-y-2.5 px-1">
             {!isClosedTask && (
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-[0.72rem] font-semibold text-slate-700">
+                  แนบไฟล์ฝาก (ไม่ใช่การส่งงาน)
+                </p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -232,18 +235,18 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
                   type="button"
                   onClick={handleUploadButtonClick}
                   disabled={uploading}
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
                 >
                   {uploading ? 'กำลังอัปโหลด...' : 'เลือกไฟล์ฝาก (Word / PDF / รูปภาพ)'}
                 </button>
-                <p className="text-[0.68rem] text-slate-600">
+                <p className="text-[0.68rem] text-slate-500">
                   พื้นที่นี้สำหรับเก็บไฟล์ระหว่างทำงานเท่านั้น และไม่ถือว่าเป็นการส่งงาน • จำกัดขนาดต่อไฟล์ 4MB
                 </p>
               </div>
             )}
 
             {isClosedTask && (
-              <p className="text-[0.72rem] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2">
+              <p className="text-[0.72rem] text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-2">
                 งานนี้สิ้นสุดแล้ว ระบบปิดการฝากไฟล์ใหม่
               </p>
             )}
@@ -252,16 +255,21 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
               <p className="text-xs text-red-600 whitespace-pre-line">⚠️ {error}</p>
             )}
             {success && (
-              <p className="text-xs text-green-700">{success}</p>
+              <p className="text-xs text-emerald-700">{success}</p>
             )}
 
-            <div className="rounded-md border border-cyan-100 bg-white">
+            <div className="rounded-lg border border-slate-300 bg-white">
+              <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 rounded-t-lg">
+                <p className="text-[0.72rem] font-semibold text-slate-700">
+                  ไฟล์ที่ฝากแล้ว
+                </p>
+              </div>
               {loading ? (
                 <p className="text-xs text-slate-500 px-3 py-3">กำลังโหลดไฟล์ฝาก...</p>
               ) : files.length === 0 ? (
                 <p className="text-xs text-slate-500 px-3 py-3">ยังไม่มีไฟล์ฝากในงานนี้</p>
               ) : (
-                <ul className="divide-y divide-cyan-100">
+                <ul className="divide-y divide-slate-100">
                   {files.map((item) => (
                     <li key={item.id} className="px-3 py-2.5 flex items-start gap-2">
                       <div className="min-w-0 flex-1">
@@ -298,8 +306,8 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
 
       {showFirstUploadNotice && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-amber-200 p-4">
-            <h4 className="text-sm font-bold text-amber-900">ก่อนฝากไฟล์</h4>
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-slate-200 p-4">
+            <h4 className="text-sm font-bold text-slate-900">ก่อนฝากไฟล์</h4>
             <p className="mt-2 text-sm text-slate-700 leading-relaxed">
               พื้นที่นี้ใช้สำหรับฝากไฟล์ระหว่างทำงานเท่านั้น
               <br />
@@ -318,7 +326,7 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
               <button
                 type="button"
                 onClick={handleConfirmFirstNotice}
-                className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600"
+                className="px-3 py-2 rounded-lg bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800"
               >
                 เข้าใจแล้ว เลือกไฟล์ต่อ
               </button>
@@ -329,8 +337,8 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
 
       {showDuplicateModal && duplicateFile && (
         <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/45 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl border border-amber-200 p-4">
-            <h4 className="text-sm font-bold text-amber-900">พบชื่อไฟล์ซ้ำในพื้นที่ฝากไฟล์</h4>
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl border border-slate-200 p-4">
+            <h4 className="text-sm font-bold text-slate-900">พบชื่อไฟล์ซ้ำในพื้นที่ฝากไฟล์</h4>
             <p className="mt-2 text-sm text-slate-700 leading-relaxed">
               ไฟล์ <span className="font-semibold break-all">{duplicateFile.name}</span> มีอยู่แล้ว
               <br />
@@ -347,7 +355,7 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
               <button
                 type="button"
                 onClick={() => void handleDuplicateChoice('keep')}
-                className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600"
+                className="px-3 py-2 rounded-lg bg-slate-600 text-white text-sm font-semibold hover:bg-slate-700"
               >
                 เก็บไว้ทั้งคู่
               </button>
