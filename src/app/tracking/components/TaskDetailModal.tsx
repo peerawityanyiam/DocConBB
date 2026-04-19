@@ -33,8 +33,8 @@ function formatDateTime(iso: string) {
 
 const REOPEN_ROLE_LABEL_BY_NOTE_PREFIX: Record<string, string> = {
   'reopenFromCompletedBy:DOCCON': 'DocCon',
-  'reopenFromCompletedBy:BOSS': '??????????',
-  'reopenFromCompletedBy:SUPER_BOSS': '??????????',
+  'reopenFromCompletedBy:BOSS': 'ผู้สั่งงาน',
+  'reopenFromCompletedBy:SUPER_BOSS': 'หัวหน้างาน',
 };
 
 function parseReopenNote(note?: string): { roleLabel: string; reason?: string } | null {
@@ -104,7 +104,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   async function handleBossCancelFromDetail() {
     if (!task) return;
     if (!bossCancelReason.trim()) {
-      setBossCancelError('???????????????????????????');
+      setBossCancelError('กรุณาระบุเหตุผลการยกเลิกงาน');
       return;
     }
 
@@ -120,13 +120,13 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '??????????????');
+      if (!res.ok) throw new Error(data.error ?? 'เกิดข้อผิดพลาด');
 
       setBossCancelReason('');
       onUpdated();
       await fetchTask();
     } catch (err) {
-      setBossCancelError(err instanceof Error ? err.message : '??????????????');
+      setBossCancelError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally {
       setBossCancelLoading(false);
     }
@@ -155,13 +155,13 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
         body: JSON.stringify({ field: reassignField, new_user_id: newUserId }),
       });
       const data = await res.json().catch(() => ({} as { error?: string }));
-      if (!res.ok) throw new Error(data.error ?? '???????????????');
+      if (!res.ok) throw new Error(data.error ?? 'โอนงานไม่สำเร็จ');
 
       setReassignField(null);
       onUpdated();
       await fetchTask();
     } catch (err) {
-      setReassignError(err instanceof Error ? err.message : '???????????????');
+      setReassignError(err instanceof Error ? err.message : 'โอนงานไม่สำเร็จ');
     } finally {
       setReassignLoading(false);
     }
@@ -172,7 +172,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
   ) {
     if (!task) return;
     if (!reopenReason.trim()) {
-      setReopenError('???????????????????????????????????');
+      setReopenError('กรุณาระบุเหตุผลการดึงงานกลับมาแก้ไข');
       return;
     }
 
@@ -188,13 +188,13 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
         }),
       });
       const data = await res.json().catch(() => ({} as { error?: string }));
-      if (!res.ok) throw new Error(data.error ?? '??????????????????????????');
+      if (!res.ok) throw new Error(data.error ?? 'ดึงงานกลับมาแก้ไขไม่สำเร็จ');
 
       setReopenReason('');
       onUpdated();
       await fetchTask();
     } catch (err) {
-      setReopenError(err instanceof Error ? err.message : '??????????????????????????');
+      setReopenError(err instanceof Error ? err.message : 'ดึงงานกลับมาแก้ไขไม่สำเร็จ');
     } finally {
       setReopenLoadingAction(null);
     }
@@ -246,7 +246,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
               <>
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ageColor}`}>
-                    ? {ageDays} ???
+                    ⏱ {ageDays} วัน
                   </span>
                 </div>
                 <h2 className="text-lg font-semibold text-slate-800 leading-snug">{task.title}</h2>
@@ -268,7 +268,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
               onClick={() => setTab(t)}
               className={`py-2 px-4 text-[0.8rem] font-semibold border-b-2 -mb-px transition-colors ${tab === t ? 'border-[#00c2a8] text-[#00c2a8]' : 'border-transparent text-[#6b7f96] hover:text-[#374f6b] hover:border-[#e2e8f0]'}`}
             >
-              {t === 'detail' ? '??????????' : t === 'files' ? '???????????' : '????????????'}
+              {t === 'detail' ? 'รายละเอียด' : t === 'files' ? 'ประวัติไฟล์' : 'ประวัติสถานะ'}
             </button>
           ))}
         </div>
@@ -279,29 +279,29 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
               {[1, 2, 3].map(i => <div key={i} className="h-4 bg-slate-100 rounded animate-pulse" />)}
             </div>
           ) : !task ? (
-            <p className="text-slate-400 text-sm text-center py-8">??????????????</p>
+            <p className="text-slate-400 text-sm text-center py-8">ไม่พบข้อมูลงาน</p>
           ) : (
             <>
               {tab === 'detail' && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-slate-500 text-xs mb-0.5">????????????</p>
+                      <p className="text-slate-500 text-xs mb-0.5">ผู้รับผิดชอบ</p>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-800">{task.officer?.display_name ?? '�'}</p>
+                        <p className="font-medium text-slate-800">{task.officer?.display_name ?? '—'}</p>
                         {canReassign && (
                           <button
                             onClick={() => openReassign('officer_id')}
                             className="text-xs text-yellow-600 hover:text-yellow-700 border border-yellow-300 rounded px-1.5 py-0.5 hover:bg-yellow-50 transition-colors"
                           >
-                            ??????
+                            โอนงาน
                           </button>
                         )}
                       </div>
                       {reassignField === 'officer_id' && (
                         <div className="mt-2">
                           {staffListLoading ? (
-                            <p className="text-xs text-slate-400">?????????...</p>
+                            <p className="text-xs text-slate-400">กำลังโหลด...</p>
                           ) : (
                             <div className="space-y-2">
                               <div className="border border-slate-200 rounded-lg overflow-hidden">
@@ -311,7 +311,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                                   onChange={e => { if (e.target.value) void handleReassign(e.target.value); }}
                                   disabled={reassignLoading}
                                 >
-                                  <option value="" disabled>?????????????????????</option>
+                                  <option value="" disabled>เลือกผู้รับผิดชอบใหม่</option>
                                   {filteredStaffForReassign.map(u => (
                                     <option key={u.id} value={u.id}>{u.display_name}</option>
                                   ))}
@@ -320,10 +320,10 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                                   onClick={() => setReassignField(null)}
                                   className="w-full text-xs text-slate-500 hover:bg-slate-50 py-1 border-t border-slate-200"
                                 >
-                                  ??????
+                                  ยกเลิก
                                 </button>
                               </div>
-                              {reassignError && <p className="text-xs text-red-600">?? {reassignError}</p>}
+                              {reassignError && <p className="text-xs text-red-600">⚠️ {reassignError}</p>}
                             </div>
                           )}
                         </div>
@@ -331,22 +331,22 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                     </div>
 
                     <div>
-                      <p className="text-slate-500 text-xs mb-0.5">??????????</p>
+                      <p className="text-slate-500 text-xs mb-0.5">ผู้ตรวจสอบ</p>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-800">{task.reviewer?.display_name ?? '�'}</p>
+                        <p className="font-medium text-slate-800">{task.reviewer?.display_name ?? '—'}</p>
                         {canReassign && (
                           <button
                             onClick={() => openReassign('reviewer_id')}
                             className="text-xs text-yellow-600 hover:text-yellow-700 border border-yellow-300 rounded px-1.5 py-0.5 hover:bg-yellow-50 transition-colors"
                           >
-                            ??????
+                            โอนงาน
                           </button>
                         )}
                       </div>
                       {reassignField === 'reviewer_id' && (
                         <div className="mt-2">
                           {staffListLoading ? (
-                            <p className="text-xs text-slate-400">?????????...</p>
+                            <p className="text-xs text-slate-400">กำลังโหลด...</p>
                           ) : (
                             <div className="space-y-2">
                               <div className="border border-slate-200 rounded-lg overflow-hidden">
@@ -356,7 +356,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                                   onChange={e => { if (e.target.value) void handleReassign(e.target.value); }}
                                   disabled={reassignLoading}
                                 >
-                                  <option value="" disabled>???????????????????</option>
+                                  <option value="" disabled>เลือกผู้ตรวจสอบใหม่</option>
                                   {filteredStaffForReassign.map(u => (
                                     <option key={u.id} value={u.id}>{u.display_name}</option>
                                   ))}
@@ -365,10 +365,10 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                                   onClick={() => setReassignField(null)}
                                   className="w-full text-xs text-slate-500 hover:bg-slate-50 py-1 border-t border-slate-200"
                                 >
-                                  ??????
+                                  ยกเลิก
                                 </button>
                               </div>
-                              {reassignError && <p className="text-xs text-red-600">?? {reassignError}</p>}
+                              {reassignError && <p className="text-xs text-red-600">⚠️ {reassignError}</p>}
                             </div>
                           )}
                         </div>
@@ -376,24 +376,24 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                     </div>
 
                     <div>
-                      <p className="text-slate-500 text-xs mb-0.5">???????????</p>
-                      <p className="font-medium text-slate-800">{task.creator?.display_name ?? '�'}</p>
+                      <p className="text-slate-500 text-xs mb-0.5">ผู้สร้างงาน</p>
+                      <p className="font-medium text-slate-800">{task.creator?.display_name ?? '—'}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500 text-xs mb-0.5">????????????</p>
-                      <p className="font-medium text-slate-800">{task.doc_ref ?? '�'}</p>
+                      <p className="text-slate-500 text-xs mb-0.5">เลขที่เอกสาร</p>
+                      <p className="font-medium text-slate-800">{task.doc_ref ?? '—'}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500 text-xs mb-0.5">??????????</p>
+                      <p className="text-slate-500 text-xs mb-0.5">สร้างเมื่อ</p>
                       <p className="text-slate-700">{formatDateTime(task.created_at)}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500 text-xs mb-0.5">????????????</p>
+                      <p className="text-slate-500 text-xs mb-0.5">อัปเดตล่าสุด</p>
                       <p className="text-slate-700">{formatDateTime(task.updated_at)}</p>
                     </div>
                     {task.completed_at && (
                       <div className="col-span-2">
-                        <p className="text-slate-500 text-xs mb-0.5">?????????????????</p>
+                        <p className="text-slate-500 text-xs mb-0.5">เสร็จสมบูรณ์เมื่อ</p>
                         <p className="text-green-700 font-medium">{formatDateTime(task.completed_at)}</p>
                       </div>
                     )}
@@ -401,13 +401,13 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
                   {(task.detail || latestReopenInfo) && (
                     <div>
-                      <p className="text-slate-500 text-xs mb-1">??????????</p>
+                      <p className="text-slate-500 text-xs mb-1">รายละเอียด</p>
                       <div className="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 space-y-1.5">
                         {task.detail && <p>{task.detail}</p>}
                         {latestReopenInfo && (
                           <p className="text-amber-700">
-                            #{latestReopenInfo.roleLabel} ?????????????? ({formatDateTime(latestReopenInfo.changedAt)})
-                            {latestReopenInfo.reason ? ` ????? ${latestReopenInfo.reason}` : ''}
+                            #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTime(latestReopenInfo.changedAt)})
+                            {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
                           </p>
                         )}
                       </div>
@@ -416,15 +416,15 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
                   {isSupersededCompleted && (
                     <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
-                      ??????????????????????????????? ??????????????????? Word ????????????
+                      มีเอกสารใหม่ทับรหัสเดียวกันแล้ว จึงไม่อนุญาตให้โหลด Word จากรายการนี้
                     </div>
                   )}
 
                   {task.drive_file_name && (
                     <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <span className="text-blue-500">??</span>
+                      <span className="text-blue-500">📎</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-slate-500">???????</p>
+                        <p className="text-xs text-slate-500">ไฟล์แนบ</p>
                         {task.drive_file_id && !isSupersededCompleted ? (
                           <a
                             href={`https://drive.google.com/file/d/${task.drive_file_id}/view`}
@@ -435,7 +435,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                             {task.drive_file_name}
                           </a>
                         ) : isSupersededCompleted ? (
-                          <p className="text-sm font-medium text-slate-500 truncate">{task.drive_file_name} (????????????????)</p>
+                          <p className="text-sm font-medium text-slate-500 truncate">{task.drive_file_name} (ไม่อนุญาตให้โหลด)</p>
                         ) : (
                           <p className="text-sm font-medium text-blue-700 truncate">{task.drive_file_name}</p>
                         )}
@@ -445,9 +445,9 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
                   {task.ref_file_name && (
                     <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg p-3">
-                      <span className="text-orange-500">??</span>
+                      <span className="text-orange-500">📄</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-orange-600 font-medium">??????????? (PDF)</p>
+                        <p className="text-xs text-orange-600 font-medium">ไฟล์อ้างอิง (PDF)</p>
                         {task.ref_file_id ? (
                           <a
                             href={`https://drive.google.com/file/d/${task.ref_file_id}/view`}
@@ -467,13 +467,13 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                   {canReopenCompleted && (
                     <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2.5">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-amber-800">?????????????????????????????</p>
+                        <p className="text-sm font-semibold text-amber-800">ดึงงานที่เสร็จแล้วกลับมาแก้ไข</p>
                         <span className="text-[11px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                          ??????????????
+                          ต้องระบุเหตุผล
                         </span>
                       </div>
                       <p className="text-xs text-amber-700">
-                        ???????????????????????????????????????????????????
+                        ใช้เมื่อจำเป็นต้องแก้เอกสารหลังงานเสร็จแล้วเท่านั้น
                       </p>
                       <textarea
                         value={reopenReason}
@@ -481,11 +481,11 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                           setReopenReason(e.target.value);
                           if (reopenError) setReopenError('');
                         }}
-                        placeholder="??????????????????????????????????"
+                        placeholder="ระบุเหตุผลที่ต้องดึงงานกลับมาแก้ไข"
                         rows={2}
                         className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 resize-none"
                       />
-                      {reopenError && <p className="text-xs text-red-600">?? {reopenError}</p>}
+                      {reopenError && <p className="text-xs text-red-600">⚠️ {reopenError}</p>}
                       <div className="flex flex-wrap gap-2 justify-end">
                         {canDocconReopenCompleted && (
                           <button
@@ -494,8 +494,8 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                             className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {reopenLoadingAction === 'doccon_reopen_completed'
-                              ? '????????????...'
-                              : '?????????? (doccon)'}
+                              ? 'กำลังดึงกลับ...'
+                              : 'ดึงงานกลับ (doccon)'}
                           </button>
                         )}
                         {canBossReopenCompleted && (
@@ -505,8 +505,8 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                             className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {reopenLoadingAction === 'boss_reopen_completed'
-                              ? '????????????...'
-                              : '?????????? (??????????)'}
+                              ? 'กำลังดึงกลับ...'
+                              : 'ดึงงานกลับ (ผู้สั่งงาน)'}
                           </button>
                         )}
                         {canSuperBossReopenCompleted && (
@@ -516,8 +516,8 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                             className="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {reopenLoadingAction === 'super_boss_reopen_completed'
-                              ? '????????????...'
-                              : '?????????? (??????????)'}
+                              ? 'กำลังดึงกลับ...'
+                              : 'ดึงงานกลับ (หัวหน้างาน)'}
                           </button>
                         )}
                       </div>
@@ -526,25 +526,25 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
 
                   {canReassign && (
                     <div className="border border-red-200 bg-red-50 rounded-lg p-3 space-y-2">
-                      <p className="text-sm font-semibold text-red-700">????????? (??????????)</p>
+                      <p className="text-sm font-semibold text-red-700">ยกเลิกงาน (ผู้สั่งงาน)</p>
                       <textarea
                         value={bossCancelReason}
                         onChange={e => {
                           setBossCancelReason(e.target.value);
                           if (bossCancelError) setBossCancelError('');
                         }}
-                        placeholder="?????????? ???? ???????????? / ???????????"
+                        placeholder="ระบุเหตุผล เช่น สั่งงานผิดคน / สร้างงานซ้ำ"
                         rows={2}
                         className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 resize-none"
                       />
-                      {bossCancelError && <p className="text-xs text-red-600">?? {bossCancelError}</p>}
+                      {bossCancelError && <p className="text-xs text-red-600">⚠️ {bossCancelError}</p>}
                       <div className="flex justify-end">
                         <button
                           onClick={() => void handleBossCancelFromDetail()}
                           disabled={bossCancelLoading || !bossCancelReason.trim()}
                           className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {bossCancelLoading ? '???????????...' : '?? ?????????'}
+                          {bossCancelLoading ? 'กำลังยกเลิก...' : '🗑 ยกเลิกงาน'}
                         </button>
                       </div>
                     </div>
@@ -556,10 +556,10 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                 <div className="space-y-3">
                   {isSupersededCompleted ? (
                     <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
-                      ????????????????????????????????? ?????????????????????????
+                      ปิดลิงก์ดาวน์โหลดไฟล์จากการ์ดเก่า เนื่องจากมีเอกสารใหม่แล้ว
                     </div>
                   ) : (task.file_history ?? []).length === 0 ? (
-                    <p className="text-sm text-slate-400 italic text-center py-4">???????????????????</p>
+                    <p className="text-sm text-slate-400 italic text-center py-4">ยังไม่มีประวัติไฟล์</p>
                   ) : (
                     <div className="space-y-2">
                       {[...(task.file_history ?? [])].reverse().map((f, idx) => (
@@ -582,7 +582,7 @@ export default function TaskDetailModal({ taskId, userRoles, userId, onClose, on
                             </div>
                             <div className="flex items-center gap-2 text-xs text-slate-500">
                               <span>{f.uploadedByName}</span>
-                              <span>�</span>
+                              <span>·</span>
                               <span>{formatDateTime(f.uploadedAt)}</span>
                             </div>
                           </div>
