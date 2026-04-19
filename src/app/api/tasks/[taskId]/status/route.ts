@@ -135,9 +135,7 @@ export async function PATCH(
           newStatus = 'WAITING_BOSS_APPROVAL';
         }
         else if (task.status === 'DOCCON_REJECTED') {
-          newStatus = latestReopenRole === 'DOCCON'
-            ? 'SUBMITTED_TO_DOCCON'
-            : (task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON');
+          newStatus = 'SUBMITTED_TO_DOCCON';
         } else newStatus = task.doccon_checked ? 'PENDING_REVIEW' : 'SUBMITTED_TO_DOCCON';
         break;
       }
