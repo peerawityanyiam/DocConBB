@@ -850,25 +850,41 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           </div>
 
           {(!isPipelineView && isStaffActionableNow) ? (
-            <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-xs">
-              {latestReopenInfo && (
-                <p className="text-amber-700 font-medium">
-                  #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
-                  {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
-                </p>
+            <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
+              <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-700">
+                {latestReopenInfo && (
+                  <>
+                    <span className="text-amber-700">
+                      #{latestReopenInfo.roleLabel} ดึงกลับมาแก้ไข ({formatDateTimeThai(latestReopenInfo.changedAt)})
+                      {latestReopenInfo.reason ? ` เพราะ ${latestReopenInfo.reason}` : ''}
+                    </span>
+                    <span className="text-slate-300">/</span>
+                  </>
+                )}
+                <span>📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</span>
+              </div>
+
+              {(currentStageStuck || sentBackByName) && (
+                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-700">
+                  {currentStageStuck && (
+                    <>
+                      <span>
+                        ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-800">{stageStuckLabel}</span> มา{' '}
+                        <span className="font-semibold text-slate-800">{stageStuckDaysLabel}</span> วัน
+                      </span>
+                      {sentBackByName && <span className="text-slate-300">/</span>}
+                    </>
+                  )}
+                  {sentBackByName && (
+                    <span className="text-red-700">↩ ส่งกลับโดย: <span className="font-semibold">{sentBackByName}</span></span>
+                  )}
+                </div>
               )}
-              <p className="text-slate-600">📅 สั่งงานวันที่ {formatDateThai(task.created_at)}</p>
-              {currentStageStuck && (
-                <p className="text-slate-600">
-                  ⏱ {isOwnedStaffCard ? 'ค้างที่คุณในขั้น' : 'ค้างที่ขั้น'} <span className="font-semibold text-slate-700">{stageStuckLabel}</span> มา{' '}
-                  <span className="font-semibold text-slate-700">{stageStuckDaysLabel}</span> วัน
-                </p>
-              )}
-              {sentBackByName && (
-                <p className="text-red-700 font-semibold">↩ ส่งกลับโดย: {sentBackByName}</p>
-              )}
+
               {task.latest_comment && (
-                <p className="text-red-700">💬 {task.latest_comment}</p>
+                <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-red-700">
+                  💬 {task.latest_comment}
+                </div>
               )}
             </div>
           ) : (
@@ -1017,41 +1033,45 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
           {isStaffActionableNow && (
             <div className="mt-2 space-y-3">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2.5">
-                <p className="text-[0.72rem] font-semibold text-slate-700">แนบไฟล์งาน</p>
-
-                {(hasWordFile || hasRefFile) && (
-                  <div className="space-y-1.5">
-                    {hasWordFile && (
-                      <a
-                        href={wordFileUrl!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
-                      >
-                        <span>📄</span>
-                        <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
-                      </a>
-                    )}
-                    {hasRefFile && currentRefFiles.map((file, index) => (
-                      <a
-                        key={`${file.driveFileId}-${index}`}
-                        href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
-                      >
-                        <span>📋</span>
-                        <span className="min-w-0 break-all">
-                          PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                )}
+                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                  <p className="text-[0.72rem] font-semibold text-slate-700">ไฟล์สำหรับแก้ไข/อ้างอิง</p>
+                  {(hasWordFile || hasRefFile) ? (
+                    <div className="space-y-1.5">
+                      {hasWordFile && (
+                        <a
+                          href={wordFileUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-sm text-blue-800 min-w-0"
+                        >
+                          <span>📄</span>
+                          <span className="min-w-0 break-all">Word: <span className="font-medium">{task.drive_file_name ?? 'document.docx'}</span></span>
+                        </a>
+                      )}
+                      {hasRefFile && currentRefFiles.map((file, index) => (
+                        <a
+                          key={`${file.driveFileId}-${index}`}
+                          href={`https://drive.google.com/file/d/${file.driveFileId}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-sm text-amber-800 min-w-0"
+                        >
+                          <span>📋</span>
+                          <span className="min-w-0 break-all">
+                            PDF{currentRefFiles.length > 1 ? ` ${index + 1}` : ''}: <span className="font-medium">{file.fileName || 'document.pdf'}</span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[0.7rem] text-slate-500">ยังไม่มีไฟล์สำหรับแก้ไข/อ้างอิง</p>
+                  )}
+                </div>
 
                 <div className="border border-slate-200 rounded-lg p-3 bg-white">
+                  <p className="text-[0.72rem] font-semibold text-slate-700 mb-2">อัปโหลดไฟล์ที่แก้ไขแล้ว</p>
                   <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-                    📄 {isRejectedStatus ? 'อัปโหลดไฟล์ Word ที่แก้ไขแล้ว' : 'อัปโหลดไฟล์ Word (.docx)'}
+                    📄 {isRejectedStatus ? 'ไฟล์ Word ที่แก้ไขแล้ว' : 'ไฟล์ Word (.docx)'}
                     <span className="text-red-500">*</span>
                   </label>
                   <input

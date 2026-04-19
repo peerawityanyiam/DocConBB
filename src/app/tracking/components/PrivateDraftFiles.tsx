@@ -210,9 +210,9 @@ export default function PrivateDraftFiles({ task, userId, onUpdated }: PrivateDr
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-slate-200/80 transition-colors"
+          className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-slate-200/60 transition-colors"
         >
-          <span className="text-sm font-semibold text-slate-800">📥 ฝากไฟล์ส่วนตัว</span>
+          <span className="text-sm font-normal text-slate-700">📥 ฝากไฟล์ส่วนตัว</span>
           <span className="text-slate-600 text-sm">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
