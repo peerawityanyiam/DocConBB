@@ -361,25 +361,24 @@ export async function PATCH(
       'super_boss_approve',
     ]);
 
+    const driveIdsToRemove = new Set<string>();
+
     if (clearRefPdfOnForward.has(action) && updates.ref_file_id === undefined) {
-      const refPdfIds = new Set<string>();
       if (typeof task.ref_file_id === 'string' && task.ref_file_id) {
-        refPdfIds.add(task.ref_file_id);
+        driveIdsToRemove.add(task.ref_file_id);
       }
       for (const file of fileHistory) {
         if (file?.isPdf && typeof file.driveFileId === 'string' && file.driveFileId) {
-          refPdfIds.add(file.driveFileId);
+          driveIdsToRemove.add(file.driveFileId);
         }
       }
-      for (const refPdfId of refPdfIds) {
-        await removeFileFromDrive(refPdfId);
-      }
-      if (refPdfIds.size > 0 || task.ref_file_id) {
+      if (driveIdsToRemove.size > 0 || task.ref_file_id) {
         updates.ref_file_id = null;
         updates.ref_file_name = null;
       }
     }
 
+    let privateDraftRows: Array<{ id: string; drive_file_id: string }> = [];
     if (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') {
       try {
         const { data: privateDrafts } = await admin
@@ -387,28 +386,9 @@ export async function PATCH(
           .select('id, drive_file_id')
           .eq('task_id', taskId)
           .eq('is_deleted', false);
-
-        const privateDraftRows = (privateDrafts ?? []) as Array<{ id: string; drive_file_id: string }>;
-        if (privateDraftRows.length > 0) {
-          const nowDelete = new Date().toISOString();
-          const privateDraftIds = privateDraftRows.map((row) => row.id);
-          const privateDriveIds = privateDraftRows.map((row) => row.drive_file_id).filter(Boolean);
-
-          await admin
-            .from('task_private_files')
-            .update({
-              is_deleted: true,
-              deleted_at: nowDelete,
-              deleted_by: dbUser.id,
-            })
-            .in('id', privateDraftIds);
-
-          for (const driveId of privateDriveIds) {
-            await removeFileFromDrive(driveId);
-          }
-        }
+        privateDraftRows = (privateDrafts ?? []) as Array<{ id: string; drive_file_id: string }>;
       } catch {
-        // keep main status transition working even if migration is not applied yet
+        // table may not exist if migration is not applied yet
       }
     }
 
@@ -433,6 +413,30 @@ export async function PATCH(
         .eq('doc_ref', task.doc_ref)
         .neq('id', taskId);
       if (supersedeErr) throw supersedeErr;
+    }
+
+    if (privateDraftRows.length > 0) {
+      try {
+        const nowDelete = new Date().toISOString();
+        const privateDraftIds = privateDraftRows.map((row) => row.id);
+        await admin
+          .from('task_private_files')
+          .update({
+            is_deleted: true,
+            deleted_at: nowDelete,
+            deleted_by: dbUser.id,
+          })
+          .in('id', privateDraftIds);
+        for (const row of privateDraftRows) {
+          if (row.drive_file_id) driveIdsToRemove.add(row.drive_file_id);
+        }
+      } catch {
+        // best-effort soft-delete
+      }
+    }
+
+    for (const driveId of driveIdsToRemove) {
+      await removeFileFromDrive(driveId);
     }
 
     return NextResponse.json({ ok: true, newStatus });
