@@ -8,12 +8,14 @@ import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
 import { buildPdfFilesFromPreparedImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
-  MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
   MAX_IMAGE_BATCH_COUNT,
   MAX_IMAGE_BATCH_TOTAL_BYTES,
   MAX_IMAGE_BATCH_TOTAL_LABEL,
   MAX_IMAGE_PDF_PARTS,
+  MAX_RESUMABLE_UPLOAD_FILE_SIZE_BYTES,
+  MAX_RESUMABLE_UPLOAD_FILE_SIZE_LABEL,
 } from '@/lib/files/upload-limits';
+import { uploadFileResumable } from '@/lib/files/client-upload';
 import { getCurrentStageStuckInfo } from '@/lib/tasks/pipeline';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
@@ -103,7 +105,8 @@ const STATUS_STAGE_INDEX: Record<TaskStatus, number> = {
 const REJECTED_STATUSES = new Set<TaskStatus>([
   'DOCCON_REJECTED', 'REVIEWER_REJECTED', 'BOSS_REJECTED', 'SUPER_BOSS_REJECTED',
 ]);
-const MAX_UPLOAD_FILE_SIZE = MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES;
+const MAX_UPLOAD_FILE_SIZE = MAX_RESUMABLE_UPLOAD_FILE_SIZE_BYTES;
+const MAX_UPLOAD_FILE_SIZE_LABEL = MAX_RESUMABLE_UPLOAD_FILE_SIZE_LABEL;
 const MAX_UPLOAD_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 900;
 
@@ -373,17 +376,33 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     return parseUploadPayload(payload ?? {});
   }, [task.id]);
 
-  const uploadFileOnceAsync = useCallback((file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
-    return new Promise((resolve, reject) => {
-      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-      if (!['.docx', '.pdf'].includes(ext)) {
-        reject(new Error('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น'));
-        return;
+  const uploadFileOnceAsync = useCallback(async (file: File, batchMeta?: UploadBatchMeta): Promise<UploadedFileMeta> => {
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!['.docx', '.pdf'].includes(ext)) {
+      throw new Error('รองรับเฉพาะไฟล์ .docx และ .pdf เท่านั้น');
+    }
+    if (file.size > MAX_UPLOAD_FILE_SIZE) {
+      throw new Error(`ไฟล์มีขนาดเกิน ${MAX_UPLOAD_FILE_SIZE_LABEL}`);
+    }
+
+    // Files larger than the direct-POST limit go through the resumable flow
+    // (browser PUTs bytes straight to Drive, bypassing Vercel's body limit).
+    if (file.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
+      setUploadProgress(0);
+      try {
+        const meta = await uploadFileResumable({
+          taskId: task.id,
+          file,
+          batchMeta,
+          onProgress: (percent) => setUploadProgress(percent),
+        });
+        return meta;
+      } finally {
+        setUploadProgress(null);
       }
-      if (file.size > MAX_UPLOAD_FILE_SIZE) {
-        reject(new Error(`ไฟล์มีขนาดเกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`));
-        return;
-      }
+    }
+
+    return new Promise<UploadedFileMeta>((resolve, reject) => {
       setUploadProgress(0);
       const formData = buildUploadFormData(file, batchMeta);
       const xhr = new XMLHttpRequest();
@@ -621,7 +640,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     if (file.size > MAX_UPLOAD_FILE_SIZE) {
       e.target.value = '';
       clearSelectedUploadFiles();
-      setUploadError(`ไฟล์มีขนาดใหญ่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} กรุณาเลือกไฟล์ใหม่`);
+      setUploadError(`ไฟล์มีขนาดใหญ่เกิน ${MAX_UPLOAD_FILE_SIZE_LABEL} กรุณาเลือกไฟล์ใหม่`);
       return;
     }
 
@@ -816,8 +835,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     ? (selectedImageCount
       ? 'ระบบจะรวมรูปที่เตรียมครบเป็น PDF ตอนกดปุ่มดำเนินการ'
       : 'ระบบจะส่งไฟล์นี้เมื่อกดปุ่มดำเนินการ')
-    : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
-  const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
+    : `เลือกไฟล์จาก Choose File หรือกดปุ่ม "แนบภาพ" (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
+  const attachmentHintWithLimit = `รองรับ Word/PDF หรือแนบภาพเพื่อรวมเป็น PDF (ข้อจำกัดระบบ: ต่อไฟล์ ${MAX_UPLOAD_FILE_SIZE_LABEL} • ต่อครั้ง ${MAX_IMAGE_BATCH_COUNT} รูป/${MAX_IMAGE_BATCH_TOTAL_LABEL} • สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
   const renderAttachmentSummary = (hint: string) => (
     <div className={`mt-2 rounded-md border px-2 py-1.5 text-[0.7rem] ${(selectedWordFile || selectedImageFiles.length > 0) ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700' : 'border-slate-300 bg-slate-50/70 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>

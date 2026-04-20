@@ -4,12 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { buildPdfFilesFromPreparedImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
-  MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
+  MAX_RESUMABLE_UPLOAD_FILE_SIZE_BYTES,
+  MAX_RESUMABLE_UPLOAD_FILE_SIZE_LABEL,
   MAX_IMAGE_BATCH_COUNT,
   MAX_IMAGE_BATCH_TOTAL_BYTES,
   MAX_IMAGE_BATCH_TOTAL_LABEL,
   MAX_IMAGE_PDF_PARTS,
 } from '@/lib/files/upload-limits';
+import { uploadFileResumable } from '@/lib/files/client-upload';
 import { toFriendlyErrorMessage, toUploadFailureMessage } from '@/lib/ui/friendly-error';
 
 interface UserOption {
@@ -25,7 +27,8 @@ interface CreateTaskModalProps {
   onCreated: () => void;
 }
 
-const MAX_FILE_SIZE = MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES;
+const MAX_FILE_SIZE = MAX_RESUMABLE_UPLOAD_FILE_SIZE_BYTES;
+const MAX_FILE_SIZE_LABEL = MAX_RESUMABLE_UPLOAD_FILE_SIZE_LABEL;
 const MAX_IMAGE_SOURCE_TOTAL_SIZE = MAX_IMAGE_BATCH_TOTAL_BYTES;
 const MAX_UPLOAD_RETRIES = 2;
 const MAX_ROLLBACK_RETRIES = 2;
@@ -112,7 +115,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     const selected = e.target.files?.[0];
     if (!selected) return;
     if (!selected.name.toLowerCase().endsWith('.docx')) { setError('รองรับเฉพาะ .docx'); return; }
-    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_FILE_SIZE_LABEL}`); return; }
     setError(''); setWordFile(selected);
   }
 
@@ -120,7 +123,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     const selected = e.target.files?.[0];
     if (!selected) return;
     if (!selected.name.toLowerCase().endsWith('.pdf')) { setError('รองรับเฉพาะ .pdf'); return; }
-    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}`); return; }
+    if (selected.size > MAX_FILE_SIZE) { setError(`ขนาดไฟล์ต้องไม่เกิน ${MAX_FILE_SIZE_LABEL}`); return; }
     setError('');
     setPdfFile(selected);
     setPreparedImageFiles([]);
@@ -181,11 +184,22 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     }
   }
 
-  function uploadFileOnceWithProgress(
+  async function uploadFileOnceWithProgress(
     taskId: string,
     fileToUpload: File,
     batchMeta?: UploadBatchMeta,
   ): Promise<void> {
+    // Large files bypass the 4.5MB Vercel body limit via the resumable flow
+    // (init-upload → PUT direct to Drive → finalize).
+    if (fileToUpload.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
+      await uploadFileResumable({
+        taskId,
+        file: fileToUpload,
+        batchMeta,
+        onProgress: (percent) => setUploadProgress(percent),
+      });
+      return;
+    }
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/tasks/${taskId}/files`);
@@ -362,7 +376,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     ? (preparedImageFiles.length > 0
       ? 'ระบบจะรวมภาพที่อัปโหลดครบแล้วเป็น PDF ตอนกดสร้างงาน'
       : 'ระบบจะอัปโหลดไฟล์เหล่านี้ทันทีหลังสร้างงาน')
-    : `เลือกไฟล์ Word / PDF (ไม่เกิน ${MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}) หรือใช้ปุ่มแนบภาพ (สูงสุด ${MAX_IMAGE_BATCH_COUNT} รูป / ${MAX_IMAGE_BATCH_TOTAL_LABEL} ต่อครั้ง, แตก PDF ได้สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
+    : `เลือกไฟล์ Word / PDF (ไม่เกิน ${MAX_FILE_SIZE_LABEL}) หรือใช้ปุ่มแนบภาพ (สูงสุด ${MAX_IMAGE_BATCH_COUNT} รูป / ${MAX_IMAGE_BATCH_TOTAL_LABEL} ต่อครั้ง, แตก PDF ได้สูงสุด ${MAX_IMAGE_PDF_PARTS} part)`;
   const submitDisabledReason = isConvertingImages
     ? 'กรุณารอระบบเตรียมรูปให้ครบก่อน'
     : (loading ? 'ระบบกำลังสร้างงานและอัปโหลดไฟล์ กรุณารอสักครู่' : '');
