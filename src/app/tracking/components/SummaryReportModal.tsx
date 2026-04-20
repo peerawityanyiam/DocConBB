@@ -232,7 +232,9 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
                           {sortedOfficers.map((o, i) => (
                             <tr
                               key={o.email || i}
-                              className="border-b border-slate-100 last:border-0 hover:bg-slate-100/50 transition-colors"
+                              className={`border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-200/60 ${
+                                i % 2 === 0 ? 'bg-white' : 'bg-slate-100/70'
+                              }`}
                             >
                               <td className="px-4 py-2.5">
                                 <div className="font-medium text-slate-800">{o.display_name}</div>
@@ -268,9 +270,14 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
               {/* Pipeline Average Times */}
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 mb-3">เวลาเฉลี่ยในแต่ละสถานะ</h3>
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                  {report.pipelineAverages.map(pa => (
-                    <div key={pa.status} className="flex items-center justify-between text-sm">
+                <div className="bg-slate-50 rounded-xl overflow-hidden">
+                  {report.pipelineAverages.map((pa, i) => (
+                    <div
+                      key={pa.status}
+                      className={`flex items-center justify-between text-sm px-4 py-2 ${
+                        i % 2 === 0 ? 'bg-white' : 'bg-slate-100/70'
+                      }`}
+                    >
                       <span className="text-slate-600">
                         {STATUS_LABELS[pa.status as TaskStatus] ?? pa.status}
                       </span>
