@@ -20,7 +20,7 @@ export const DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES = 150 * 1024 * 1024;
 // UX-safe image selection limits per upload action.
 export const MAX_IMAGE_BATCH_COUNT = 30;
 export const MAX_IMAGE_BATCH_COUNT_LABEL = '30 images';
-export const MAX_IMAGE_BATCH_TOTAL_BYTES = 80 * 1024 * 1024;
-export const MAX_IMAGE_BATCH_TOTAL_LABEL = '80MB';
+export const MAX_IMAGE_BATCH_TOTAL_BYTES = 120 * 1024 * 1024;
+export const MAX_IMAGE_BATCH_TOTAL_LABEL = '120MB';
 export const MAX_IMAGE_PDF_PARTS = 30;
 export const MAX_IMAGE_PDF_PARTS_LABEL = '30 parts';
