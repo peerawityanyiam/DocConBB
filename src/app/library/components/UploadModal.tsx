@@ -2,11 +2,23 @@
 
 import { useState, useRef, useCallback } from 'react';
 import type { Standard } from './StandardCard';
+import { uploadLibraryFileResumable } from '@/lib/files/client-upload';
+import {
+  MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
+  MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL,
+  MAX_RESUMABLE_UPLOAD_FILE_SIZE_BYTES,
+  MAX_RESUMABLE_UPLOAD_FILE_SIZE_LABEL,
+} from '@/lib/files/upload-limits';
 
 interface UploadModalProps {
   standard: Standard | null;
   onClose: () => void;
   onUploaded: () => void;
+}
+
+function isExcel(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith('.xlsx') || lower.endsWith('.xls');
 }
 
 export default function UploadModal({ standard, onClose, onUploaded }: UploadModalProps) {
@@ -28,34 +40,56 @@ export default function UploadModal({ standard, onClose, onUploaded }: UploadMod
     setError('');
     setProgress(0);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('standardId', standard.id);
+    // Client-side size gate — Excel must stay under the Vercel body limit
+    // since its server route needs to read bytes to import sheets in place.
+    // Non-Excel can go up to the resumable ceiling.
+    const excel = isExcel(file.name);
+    const ceiling = excel ? MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES : MAX_RESUMABLE_UPLOAD_FILE_SIZE_BYTES;
+    const ceilingLabel = excel ? MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL : MAX_RESUMABLE_UPLOAD_FILE_SIZE_LABEL;
+    if (file.size > ceiling) {
+      setError(`ไฟล์เกินขนาดที่รองรับ (สูงสุด ${ceilingLabel}${excel ? ' สำหรับ Excel' : ''})`);
+      setProgress(null);
+      return;
+    }
 
-      // XMLHttpRequest เพื่อดู progress
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            setProgress(Math.round((e.loaded / e.total) * 100));
-          }
+    try {
+      if (!excel && file.size > MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES) {
+        // Large non-Excel → resumable direct-to-Drive upload.
+        await uploadLibraryFileResumable({
+          standardId: standard.id,
+          file,
+          onProgress: (pct) => setProgress(pct),
         });
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else {
-            try {
-              const d = JSON.parse(xhr.responseText);
-              reject(new Error(d.error ?? 'อัปโหลดไม่สำเร็จ'));
-            } catch {
-              reject(new Error('อัปโหลดไม่สำเร็จ'));
+      } else {
+        // Small files or Excel → existing multipart route so the server can
+        // handle Excel sheet import in place.
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('standardId', standard.id);
+
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              setProgress(Math.round((e.loaded / e.total) * 100));
             }
-          }
+          });
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else {
+              try {
+                const d = JSON.parse(xhr.responseText);
+                reject(new Error(d.error ?? 'อัปโหลดไม่สำเร็จ'));
+              } catch {
+                reject(new Error('อัปโหลดไม่สำเร็จ'));
+              }
+            }
+          });
+          xhr.addEventListener('error', () => reject(new Error('เกิดข้อผิดพลาดในการเชื่อมต่อ')));
+          xhr.open('POST', '/api/library/files/upload');
+          xhr.send(formData);
         });
-        xhr.addEventListener('error', () => reject(new Error('เกิดข้อผิดพลาดในการเชื่อมต่อ')));
-        xhr.open('POST', '/api/library/files/upload');
-        xhr.send(formData);
-      });
+      }
 
       setProgress(100);
       onUploaded();
@@ -115,7 +149,9 @@ export default function UploadModal({ standard, onClose, onUploaded }: UploadMod
               <div>
                 <p className="text-3xl mb-2">⬆️</p>
                 <p className="text-sm font-medium text-slate-600">ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์</p>
-                <p className="text-xs text-slate-400 mt-1">PDF, DOCX, XLSX, JPG, PNG (สูงสุด 50MB)</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  PDF, DOCX, JPG, PNG สูงสุด {MAX_RESUMABLE_UPLOAD_FILE_SIZE_LABEL} · XLSX/XLS สูงสุด {MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL}
+                </p>
               </div>
             )}
           </div>

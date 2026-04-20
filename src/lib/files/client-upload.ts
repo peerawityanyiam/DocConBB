@@ -51,7 +51,7 @@ function describeErrorFromPayload(
   return combined || `HTTP_${fallbackStatus}`;
 }
 
-function putToDrive(
+export function putFileToDriveResumable(
   uploadUrl: string,
   file: File,
   contentType: string,
@@ -114,7 +114,7 @@ export async function uploadFileResumable(
   const contentType = initPayload.mimeType || file.type || 'application/octet-stream';
 
   // 2. PUT the file bytes directly to Drive and collect the resulting file id.
-  const { driveFileId } = await putToDrive(uploadUrl, file, contentType, onProgress);
+  const { driveFileId } = await putFileToDriveResumable(uploadUrl, file, contentType, onProgress);
 
   // 3. Finalize server-side: verify the file, update DB bookkeeping, return
   //    the same response shape as the direct-upload path.
@@ -144,5 +144,76 @@ export async function uploadFileResumable(
     driveFileId: finalizePayload.driveFileId,
     driveFileName: finalizePayload.driveFileName ?? file.name,
     isPdf: Boolean(finalizePayload.isPdf),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Library (standards) resumable upload
+//
+// Same 3-step pattern as uploadFileResumable, but points at the library
+// endpoints and finalize payload.
+// ---------------------------------------------------------------------------
+
+export interface LibraryResumableUploadOptions {
+  standardId: string;
+  file: File;
+  onProgress?: (percent: number) => void;
+}
+
+export interface LibraryResumableUploadResult {
+  driveFileId: string;
+  driveFileName: string;
+  viewUrl: string;
+  warning?: string | null;
+}
+
+export async function uploadLibraryFileResumable(
+  options: LibraryResumableUploadOptions,
+): Promise<LibraryResumableUploadResult> {
+  const { standardId, file, onProgress } = options;
+
+  const initRes = await fetch('/api/library/files/init-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      standardId,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      fileSize: file.size,
+    }),
+  });
+  const initPayload = await parseJson<{ uploadUrl?: string; mimeType?: string }>(initRes);
+  if (!initRes.ok || !initPayload?.uploadUrl) {
+    throw new Error(
+      describeErrorFromPayload(initPayload as Record<string, unknown> | null, initRes.status),
+    );
+  }
+  const uploadUrl = initPayload.uploadUrl;
+  const contentType = initPayload.mimeType || file.type || 'application/octet-stream';
+
+  const { driveFileId } = await putFileToDriveResumable(uploadUrl, file, contentType, onProgress);
+
+  const finalizeRes = await fetch('/api/library/files/finalize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ standardId, driveFileId }),
+  });
+  const finalizePayload = await parseJson<{
+    driveFileId?: string;
+    driveFileName?: string;
+    viewUrl?: string;
+    warning?: string | null;
+  }>(finalizeRes);
+  if (!finalizeRes.ok || !finalizePayload?.driveFileId) {
+    throw new Error(
+      describeErrorFromPayload(finalizePayload as Record<string, unknown> | null, finalizeRes.status),
+    );
+  }
+
+  return {
+    driveFileId: finalizePayload.driveFileId,
+    driveFileName: finalizePayload.driveFileName ?? file.name,
+    viewUrl: finalizePayload.viewUrl ?? `https://drive.google.com/file/d/${finalizePayload.driveFileId}/view`,
+    warning: finalizePayload.warning ?? null,
   };
 }
