@@ -266,23 +266,22 @@ export default function SummaryReportModal({ open, onClose }: SummaryReportModal
               </div>
 
               {/* Pipeline Average Times */}
-              {report.pipelineAverages.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-700 mb-3">เวลาเฉลี่ยในแต่ละสถานะ</h3>
-                  <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                    {report.pipelineAverages.map(pa => (
-                      <div key={pa.status} className="flex items-center justify-between text-sm">
-                        <span className="text-slate-600">
-                          {STATUS_LABELS[pa.status as TaskStatus] ?? pa.status}
-                        </span>
-                        <span className="text-slate-800 font-medium">
-                          {formatDaysValue(pa.avgDays)} วัน <span className="text-xs text-slate-400">({pa.count} ครั้ง)</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">เวลาเฉลี่ยในแต่ละสถานะ</h3>
+                <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                  {report.pipelineAverages.map(pa => (
+                    <div key={pa.status} className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">
+                        {STATUS_LABELS[pa.status as TaskStatus] ?? pa.status}
+                      </span>
+                      <span className={pa.count > 0 ? 'text-slate-800 font-medium' : 'text-slate-400'}>
+                        {pa.count > 0 ? `${formatDaysValue(pa.avgDays)} วัน` : '-'}{' '}
+                        <span className="text-xs text-slate-400">({pa.count} ครั้ง)</span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
 
               {/* Generated At */}
               <p className="text-xs text-slate-400 text-right">

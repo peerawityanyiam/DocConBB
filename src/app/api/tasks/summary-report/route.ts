@@ -1,18 +1,36 @@
 import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, requireRole, handleAuthError } from '@/lib/auth/guards';
-import {
-  getStageSegmentsFromHistory,
-  type PipelineStageStatus,
-} from '@/lib/tasks/pipeline';
+import type { TaskStatus } from '@/lib/constants/status';
 
-const PIPELINE_STAGE_ORDER: PipelineStageStatus[] = [
+// Report covers every raw status the task can enter. Statuses with no
+// recorded occurrences still appear with count = 0 so the table shape is
+// stable and "missing" statuses don't silently disappear.
+const ALL_REPORTED_STATUSES: TaskStatus[] = [
   'ASSIGNED',
   'SUBMITTED_TO_DOCCON',
+  'DOCCON_REJECTED',
   'PENDING_REVIEW',
+  'REVIEWER_REJECTED',
   'WAITING_BOSS_APPROVAL',
+  'BOSS_REJECTED',
   'WAITING_SUPER_BOSS_APPROVAL',
+  'SUPER_BOSS_REJECTED',
+  'COMPLETED',
+  'CANCELLED',
 ];
+const TERMINAL_STATUSES = new Set<TaskStatus>(['COMPLETED', 'CANCELLED']);
+
+interface HistoryEntry {
+  status?: string | null;
+  changedAt?: string | null;
+}
+
+function parseIsoMs(value?: string | null): number | null {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
 
 export async function GET() {
   try {
@@ -103,24 +121,34 @@ export async function GET() {
         }
       }
 
-      const segments = getStageSegmentsFromHistory(task.status_history, {
-        currentStatus: task.status,
-        updatedAt: task.updated_at,
-        completedAt: task.completed_at,
-      });
+      // Compute per-status dwell time directly from the raw history, so that
+      // every TaskStatus (including *_REJECTED) is counted separately rather
+      // than collapsed onto its pipeline parent.
+      const rawHistory = Array.isArray(task.status_history)
+        ? (task.status_history as HistoryEntry[])
+        : [];
+      const entries = rawHistory
+        .map((e) => ({ status: String(e.status ?? ''), ms: parseIsoMs(e.changedAt) }))
+        .filter((e): e is { status: string; ms: number } => e.ms !== null && e.status.length > 0)
+        .sort((a, b) => a.ms - b.ms);
 
-      for (const segment of segments) {
-        if (!PIPELINE_STAGE_ORDER.includes(segment.stage)) continue;
+      const nowMs = Date.now();
+      const terminalTimeMs =
+        TERMINAL_STATUSES.has(task.status as TaskStatus)
+          ? parseIsoMs(task.completed_at) ?? parseIsoMs(task.updated_at) ?? nowMs
+          : nowMs;
 
-        const diffMs = segment.endMs - segment.startMs;
+      for (let i = 0; i < entries.length; i += 1) {
+        const current = entries[i];
+        const next = entries[i + 1];
+        const endMs = next ? next.ms : terminalTimeMs;
+        const diffMs = endMs - current.ms;
         if (diffMs < 0) continue;
-
-        if (!stageTimeMap[segment.stage]) {
-          stageTimeMap[segment.stage] = { totalMs: 0, count: 0 };
+        if (!stageTimeMap[current.status]) {
+          stageTimeMap[current.status] = { totalMs: 0, count: 0 };
         }
-
-        stageTimeMap[segment.stage].totalMs += diffMs;
-        stageTimeMap[segment.stage].count += 1;
+        stageTimeMap[current.status].totalMs += diffMs;
+        stageTimeMap[current.status].count += 1;
       }
     }
 
@@ -136,14 +164,10 @@ export async function GET() {
           : null,
     }));
 
-    const pipelineAverages = PIPELINE_STAGE_ORDER.map((status) => {
+    const pipelineAverages = ALL_REPORTED_STATUSES.map((status) => {
       const stat = stageTimeMap[status];
       if (!stat || stat.count === 0) {
-        return {
-          status,
-          avgDays: 0,
-          count: 0,
-        };
+        return { status, avgDays: 0, count: 0 };
       }
       return {
         status,
