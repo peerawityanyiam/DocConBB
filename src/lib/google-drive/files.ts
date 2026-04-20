@@ -19,6 +19,7 @@ export async function createResumableSession(
   fileName: string,
   mimeType: string,
   fileSize: number,
+  origin?: string,
 ): Promise<{ uploadUrl: string }> {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}');
   const impersonateEmail = process.env.GOOGLE_IMPERSONATE_EMAIL?.trim();
@@ -47,6 +48,11 @@ export async function createResumableSession(
         'Content-Type': 'application/json; charset=UTF-8',
         'X-Upload-Content-Type': mimeType,
         'X-Upload-Content-Length': String(fileSize),
+        // Pre-register the caller's browser origin so Drive returns CORS
+        // headers on the subsequent PUT. Without this, the browser blocks
+        // the upload as a cross-origin request and we see a generic
+        // network error on the client.
+        ...(origin ? { Origin: origin } : {}),
       },
       body: JSON.stringify({
         name: fileName,

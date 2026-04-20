@@ -94,7 +94,12 @@ export async function POST(
       await admin.from('tasks').update({ task_folder_id: taskFolderId }).eq('id', taskId);
     }
 
-    const { uploadUrl } = await createResumableSession(taskFolderId, fileName, mimeType, fileSize);
+    // Prefer the Origin header sent by the browser (same-origin fetch does
+     // include it on POST). Fall back to constructing origin from the request
+     // URL so server-initiated calls still work.
+    const headerOrigin = request.headers.get('origin');
+    const origin = headerOrigin && headerOrigin !== 'null' ? headerOrigin : new URL(request.url).origin;
+    const { uploadUrl } = await createResumableSession(taskFolderId, fileName, mimeType, fileSize, origin);
 
     logEvent('info', 'file_upload_init', requestId, 'Resumable session created', {
       taskId,
