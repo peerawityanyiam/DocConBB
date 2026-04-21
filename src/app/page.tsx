@@ -1,6 +1,6 @@
 ﻿import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getAuthUser } from '@/lib/auth/guards';
+import { getAuthUser, hasGlobalRole } from '@/lib/auth/guards';
 import LogoutButton from './LogoutButton';
 import HomeShortcuts from './HomeShortcuts';
 
@@ -28,7 +28,9 @@ const cards = [
 export default async function Home() {
   const user = await getAuthUser('hub');
   if (!user) redirect('/login');
-  const canManageShortcuts = Array.isArray(user.roles) && user.roles.includes('SUPER_ADMIN');
+  // Hub isn't a project slug, so user.roles is typically empty here.
+  // Check SUPER_ADMIN across any project assignment + legacy roles.
+  const canManageShortcuts = await hasGlobalRole(user.id, ['SUPER_ADMIN']);
 
   return (
     <div

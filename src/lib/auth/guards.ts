@@ -60,6 +60,30 @@ export function hasRole(user: AuthUser, allowedRoles: AppRole[]): boolean {
   return user.roles.some(r => allowedRoles.includes(r));
 }
 
+/**
+ * Look up roles across ALL projects + legacy table. Use for hub-level
+ * features (like the home page) that aren't scoped to one project slug.
+ */
+export async function getGlobalRoles(userId: string): Promise<AppRole[]> {
+  const admin = await createServiceRoleClient();
+  const [projectRoles, legacyRoles] = await Promise.all([
+    admin.from('user_project_roles').select('role').eq('user_id', userId),
+    admin.from('user_roles').select('role').eq('user_id', userId),
+  ]);
+  const merged = new Set<AppRole>();
+  for (const row of projectRoles.data ?? []) merged.add(row.role as AppRole);
+  for (const row of legacyRoles.data ?? []) merged.add(row.role as AppRole);
+  return Array.from(merged);
+}
+
+export async function hasGlobalRole(
+  userId: string,
+  allowedRoles: AppRole[],
+): Promise<boolean> {
+  const roles = await getGlobalRoles(userId);
+  return roles.some((r) => allowedRoles.includes(r));
+}
+
 export function requireRole(user: AuthUser | null, allowedRoles: AppRole[]): AuthUser {
   if (!user) {
     throw new AuthError('ไม่พบข้อมูลผู้ใช้', 401);

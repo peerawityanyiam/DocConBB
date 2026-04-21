@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { getAuthUser, handleAuthError, requireRole } from '@/lib/auth/guards';
+import { AuthError, getAuthUser, handleAuthError, hasGlobalRole } from '@/lib/auth/guards';
 import { SHORTCUT_ICONS } from '@/lib/shortcuts/icons';
 
 const MAX_LABEL_LEN = 60;
@@ -29,7 +29,9 @@ export async function PATCH(
   try {
     const user = await getAuthUser('hub');
     if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-    requireRole(user, ['SUPER_ADMIN']);
+    if (!(await hasGlobalRole(user.id, ['SUPER_ADMIN']))) {
+      throw new AuthError('ไม่มีสิทธิ์ดำเนินการ', 403);
+    }
 
     const { id } = await params;
     if (!id) return badRequest('missing id');
@@ -101,7 +103,9 @@ export async function DELETE(
   try {
     const user = await getAuthUser('hub');
     if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-    requireRole(user, ['SUPER_ADMIN']);
+    if (!(await hasGlobalRole(user.id, ['SUPER_ADMIN']))) {
+      throw new AuthError('ไม่มีสิทธิ์ดำเนินการ', 403);
+    }
 
     const { id } = await params;
     if (!id) return badRequest('missing id');
