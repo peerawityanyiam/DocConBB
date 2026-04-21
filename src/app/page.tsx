@@ -2,6 +2,7 @@
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/auth/guards';
 import LogoutButton from './LogoutButton';
+import HomeShortcuts from './HomeShortcuts';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,7 @@ const cards = [
 export default async function Home() {
   const user = await getAuthUser('hub');
   if (!user) redirect('/login');
+  const canManageShortcuts = Array.isArray(user.roles) && user.roles.includes('SUPER_ADMIN');
 
   return (
     <div
@@ -69,6 +71,8 @@ export default async function Home() {
               </Link>
             ))}
           </div>
+
+          <HomeShortcuts canManage={canManageShortcuts} />
         </div>
       </div>
 
