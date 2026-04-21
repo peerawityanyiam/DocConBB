@@ -53,21 +53,20 @@ export default async function Home() {
             ยินดีต้อนรับสู่ระบบสนับสนุนการทำงานคุณภาพ
           </p>
 
-          <div className="grid gap-[30px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+          <div className="grid gap-5 sm:gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
             {cards.map((card) => (
               <Link
                 key={card.href}
                 href={card.href}
-                className="group relative flex cursor-pointer flex-col items-center rounded-xl border border-[#eee] border-t-[5px] border-t-[#003366] bg-white text-inherit no-underline shadow-[0_4px_15px_rgba(0,0,0,0.05)] transition-all duration-300 ease-out hover:-translate-y-[5px] hover:border-t-[#c5a059] hover:shadow-[0_12px_25px_rgba(0,0,0,0.1)] active:translate-y-[1px] active:scale-[0.985] active:shadow-[0_6px_14px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#003366]/20"
-                style={{ padding: '45px 35px' }}
+                className="group relative flex cursor-pointer flex-col items-center rounded-xl border border-[#eee] border-t-[4px] border-t-[#003366] bg-white px-6 py-8 text-inherit no-underline shadow-[0_4px_15px_rgba(0,0,0,0.05)] transition-all duration-300 ease-out hover:-translate-y-[4px] hover:border-t-[#c5a059] hover:shadow-[0_10px_22px_rgba(0,0,0,0.09)] active:translate-y-[1px] active:scale-[0.985] active:shadow-[0_6px_14px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#003366]/20 sm:px-7 sm:py-9"
               >
                 <span className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-[#0ea5a3]/40 opacity-0 transition-opacity duration-150 group-active:opacity-100" />
-                <div className="mb-6 text-[45px]" style={{ filter: 'grayscale(20%)' }}>
+                <div className="mb-4 text-[36px]" style={{ filter: 'grayscale(20%)' }}>
                   {card.icon}
                 </div>
-                <h2 className="m-0 mb-3 text-[1.5rem] font-semibold text-[#003366]">{card.title}</h2>
-                <p className="m-0 text-base leading-relaxed text-[#666]">{card.description}</p>
-                <span className="mt-6 rounded border border-[#e2e8f0] bg-[#f1f5f9] px-5 py-1.5 text-[0.85rem] font-semibold text-[#003366] transition-colors duration-150 group-active:bg-[#e2e8f0]">
+                <h2 className="m-0 mb-2 text-[1.2rem] font-semibold text-[#003366] sm:text-[1.25rem]">{card.title}</h2>
+                <p className="m-0 text-[0.92rem] leading-relaxed text-[#666]">{card.description}</p>
+                <span className="mt-5 rounded border border-[#e2e8f0] bg-[#f1f5f9] px-4 py-1 text-[0.8rem] font-semibold text-[#003366] transition-colors duration-150 group-active:bg-[#e2e8f0]">
                   เข้าสู่การใช้งาน
                 </span>
               </Link>
