@@ -53,14 +53,16 @@ export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
   }
 
   return (
-    <section className="mt-10 w-full">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-[1rem] font-semibold text-[#003366]">ลิงก์ที่เกี่ยวข้อง</h3>
+    <section className="mt-12 w-full sm:mt-14">
+      <div className="mb-5 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+        <h3 className="text-[1.1rem] font-semibold text-[#003366] sm:text-[1.15rem]">
+          ลิงก์ที่เกี่ยวข้อง
+        </h3>
         {canManage && (
           <button
             type="button"
             onClick={() => setAdminOpen(true)}
-            className="rounded-md border border-[#003366]/30 bg-white px-3 py-1.5 text-xs font-semibold text-[#003366] shadow-sm transition-colors hover:bg-[#003366] hover:text-white"
+            className="rounded-md border border-[#003366]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#003366] shadow-sm transition-colors hover:bg-[#003366] hover:text-white sm:text-sm"
           >
             ⚙️ จัดการลิงก์
           </button>
@@ -74,7 +76,7 @@ export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
           {canManage ? 'ยังไม่มีลิงก์ กดปุ่ม "จัดการลิงก์" เพื่อเพิ่ม' : ''}
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {shortcuts.map((s) => {
             const emoji = getShortcutEmoji(s.icon_key);
             return (
@@ -83,10 +85,18 @@ export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
                 href={s.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3.5 py-2 text-[0.88rem] font-medium text-[#0d1b2e] shadow-sm transition-all hover:-translate-y-[1px] hover:border-[#c5a059] hover:text-[#003366] hover:shadow-md active:translate-y-0"
+                className="group flex items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 text-[0.95rem] font-medium text-[#0d1b2e] shadow-sm transition-all hover:-translate-y-[2px] hover:border-[#c5a059] hover:text-[#003366] hover:shadow-md active:translate-y-0 sm:px-5 sm:py-4"
+                title={s.url}
               >
-                {emoji && <span className="text-base leading-none">{emoji}</span>}
-                <span>{s.label}</span>
+                {emoji && (
+                  <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f1f5f9] text-xl leading-none transition-colors group-hover:bg-[#003366]/10">
+                    {emoji}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                <span className="flex-none text-sm text-slate-300 transition-colors group-hover:text-[#c5a059]">
+                  ↗
+                </span>
               </a>
             );
           })}
