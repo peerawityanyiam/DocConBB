@@ -44,7 +44,7 @@ export default async function Home() {
         </div>
       </nav>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-4 pb-20 sm:pb-28" style={{ paddingTop: '60px' }}>
+      <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 sm:pb-12" style={{ paddingTop: '60px' }}>
         <div className="w-[90%] max-w-[900px] text-center">
           <h1 className="mb-2.5 text-[2.2rem] font-bold text-[#003366]" style={{ letterSpacing: '-0.5px' }}>
             สวัสดีครับ 👋
