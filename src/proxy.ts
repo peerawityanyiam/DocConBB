@@ -7,7 +7,7 @@ const DOCUMENT_CONTROL_GAS_URL =
   process.env.NEXT_PUBLIC_DOCUMENT_CONTROL_GAS_URL ||
   'https://accounts.google.com/AccountChooser?continue=https://script.google.com/a/macros/medicine.psu.ac.th/s/AKfycbx0oytFnXvNDaMfPkfLTUQKd8zr-uHpNhuaJNv2csLnM3pKADaWxpa0laQcVciTvRe-/exec';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestId = request.headers.get('x-request-id')?.trim() || generateRequestId();
   const requestHeaders = new Headers(request.headers);

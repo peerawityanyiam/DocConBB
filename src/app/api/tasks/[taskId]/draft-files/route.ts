@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
+import { canAccessTask } from '@/lib/auth/task-access';
 import {
   uploadFile,
   getOrCreateFolder,
@@ -116,15 +117,6 @@ function getExtension(fileName: string) {
   const dotIndex = fileName.lastIndexOf('.');
   if (dotIndex < 0) return '';
   return fileName.slice(dotIndex + 1).toLowerCase();
-}
-
-function canAccessTask(task: TaskLite, userId: string, roles: string[]) {
-  const roleSet = new Set(roles.map((role) => role.toUpperCase()));
-  if (roleSet.has('SUPER_ADMIN')) return true;
-  if (task.created_by === userId) return true;
-  if (task.officer_id === userId) return true;
-  if (task.reviewer_id === userId) return true;
-  return false;
 }
 
 async function removeDriveFileBestEffort(fileId: string) {

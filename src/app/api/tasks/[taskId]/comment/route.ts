@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
+import { assertTaskAccess } from '@/lib/auth/task-access';
 import { getRequestIdFromHeaders } from '@/lib/ops/observability';
 
 // POST /api/tasks/[taskId]/comment — เพิ่มความคิดเห็น
@@ -31,11 +32,13 @@ export async function POST(
 
     const { data: task } = await admin
       .from('tasks')
-      .select('comment_history')
+      .select('comment_history, officer_id, reviewer_id, created_by')
       .eq('id', taskId)
       .single();
 
     if (!task) return NextResponse.json({ error: 'ไม่พบงาน' }, { status: 404 });
+
+    assertTaskAccess(task, user.id, user.roles);
 
     const newEntry = {
       text: text.trim(),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, handleAuthError, hasRole } from '@/lib/auth/guards';
+import { assertTaskAccess } from '@/lib/auth/task-access';
 import { deleteFilePermanent, trashFile } from '@/lib/google-drive/files';
 
 // GET /api/tasks/[taskId] — ดู task พร้อม history และชื่อผู้ใช้
@@ -22,6 +23,8 @@ export async function GET(
       .single();
 
     if (error || !task) return NextResponse.json({ error: 'ไม่พบงาน' }, { status: 404 });
+
+    assertTaskAccess(task, user.id, user.roles);
 
     // ดึงชื่อผู้ใช้
     const userIds = [task.officer_id, task.reviewer_id, task.created_by].filter(Boolean);
