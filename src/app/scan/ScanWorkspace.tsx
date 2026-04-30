@@ -641,7 +641,18 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
             <h2 className="text-sm font-bold text-slate-800">รายการสแกน</h2>
             {loading && <span className="text-xs text-slate-400">โหลด...</span>}
           </div>
-          {scans.length === 0 ? (
+          {loading ? (
+            <label className="block text-xs font-semibold text-slate-600">
+              เลือกชุดสแกน
+              <select
+                value=""
+                disabled
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500"
+              >
+                <option value="">กำลังโหลดข้อมูล</option>
+              </select>
+            </label>
+          ) : scans.length === 0 ? (
             <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">ยังไม่มีรายการ กด “ชุดใหม่” เพื่อเริ่ม</p>
           ) : (
             <div>
