@@ -274,6 +274,13 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [error, setError] = useState('');
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isApplyingServerAdjustmentsRef = useRef(false);
+  const dirtyAdjustmentRef = useRef<{
+    scanId: string;
+    pageId: string;
+    adjustments: ScanAdjustments;
+  } | null>(null);
+  const saveAdjustmentTimerRef = useRef<number | null>(null);
 
   const pages = activeScan?.pages ?? emptyPages;
   const selectedPage = useMemo(
@@ -316,13 +323,82 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   useEffect(() => {
     if (!selectedPage) {
+      isApplyingServerAdjustmentsRef.current = true;
       setAdjustments(createDefaultScanAdjustments());
       return;
     }
+    isApplyingServerAdjustmentsRef.current = true;
     setAdjustments(coerceAdjustments(selectedPage.adjustments));
   }, [selectedPage]);
 
+  useEffect(() => {
+    if (!isApplyingServerAdjustmentsRef.current) return;
+    isApplyingServerAdjustmentsRef.current = false;
+  }, [adjustments]);
+
+  const persistAdjustments = useCallback(async (
+    scanId: string,
+    pageId: string,
+    value: ScanAdjustments,
+  ) => {
+    await jsonFetch(`/api/scans/${scanId}/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adjustments: serializeAdjustments(value) }),
+    });
+    setActiveScan((current) => {
+      if (!current || current.id !== scanId) return current;
+      return {
+        ...current,
+        pages: current.pages?.map((page) => (
+          page.id === pageId ? { ...page, adjustments: serializeAdjustments(value) } : page
+        )),
+      };
+    });
+  }, []);
+
+  const flushAdjustmentSave = useCallback(async () => {
+    if (saveAdjustmentTimerRef.current !== null) {
+      window.clearTimeout(saveAdjustmentTimerRef.current);
+      saveAdjustmentTimerRef.current = null;
+    }
+    const dirty = dirtyAdjustmentRef.current;
+    if (!dirty) return;
+    dirtyAdjustmentRef.current = null;
+    await persistAdjustments(dirty.scanId, dirty.pageId, dirty.adjustments);
+  }, [persistAdjustments]);
+
+  useEffect(() => {
+    if (!activeScan || !selectedPage || isApplyingServerAdjustmentsRef.current || busy) return;
+    dirtyAdjustmentRef.current = {
+      scanId: activeScan.id,
+      pageId: selectedPage.id,
+      adjustments,
+    };
+    if (saveAdjustmentTimerRef.current !== null) {
+      window.clearTimeout(saveAdjustmentTimerRef.current);
+    }
+    saveAdjustmentTimerRef.current = window.setTimeout(() => {
+      saveAdjustmentTimerRef.current = null;
+      const dirty = dirtyAdjustmentRef.current;
+      if (!dirty) return;
+      dirtyAdjustmentRef.current = null;
+      void persistAdjustments(dirty.scanId, dirty.pageId, dirty.adjustments).catch((err) => {
+        setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
+      });
+    }, 700);
+  }, [activeScan, adjustments, busy, persistAdjustments, selectedPage]);
+
+  useEffect(() => () => {
+    if (saveAdjustmentTimerRef.current !== null) {
+      window.clearTimeout(saveAdjustmentTimerRef.current);
+    }
+  }, []);
+
   function createScan() {
+    void flushAdjustmentSave().catch((err) => {
+      setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
+    });
     setActiveScan(null);
     setSelectedPageId(null);
     setAdjustments(createDefaultScanAdjustments());
@@ -335,11 +411,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   async function saveAdjustments(pageId = selectedPage?.id, value = adjustments, reload = true) {
     if (!activeScan || !pageId) return;
-    await jsonFetch(`/api/scans/${activeScan.id}/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adjustments: serializeAdjustments(value) }),
-    });
+    await persistAdjustments(activeScan.id, pageId, value);
     if (reload) await loadScan(activeScan.id);
   }
 
@@ -418,6 +490,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setBusy(true);
     setError('');
     try {
+      await flushAdjustmentSave();
       await jsonFetch(`/api/scans/${activeScan.id}/pages/${pageId}`, { method: 'DELETE' });
       await loadScans();
       await loadScan(activeScan.id);
@@ -438,6 +511,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setBusy(true);
     setError('');
     try {
+      await flushAdjustmentSave();
       await jsonFetch(`/api/scans/${activeScan.id}/pages`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -461,6 +535,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setError('');
     setProgress('กำลังสร้าง PDF...');
     try {
+      await flushAdjustmentSave();
       const titleScan = await savePdfTitle();
       if (editingPage) await saveAdjustments(editingPage.id, editingAdjustments, false);
       const latestScan = await loadScan(activeScan.id);
@@ -665,7 +740,13 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                       <button
                         key={page.id}
                         type="button"
-                        onClick={() => setSelectedPageId(page.id)}
+                        onClick={() => {
+                          void flushAdjustmentSave()
+                            .then(() => setSelectedPageId(page.id))
+                            .catch((err) => {
+                              setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
+                            });
+                        }}
                         className={`rounded-lg border p-2 text-left ${
                           selectedPage?.id === page.id
                             ? 'border-sky-500 bg-sky-50'
