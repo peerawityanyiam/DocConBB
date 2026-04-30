@@ -225,7 +225,11 @@ function CornerEditor({
               กำลังโหลดรูป
             </div>
           )}
-          <svg className="pointer-events-none absolute inset-0 h-full w-full">
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+          >
             <polygon
               points={corners.map((c) => `${c.x * 100},${c.y * 100}`).join(' ')}
               vectorEffect="non-scaling-stroke"
