@@ -603,16 +603,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-bold text-slate-900">{activeScan.title}</h2>
                     <p className="mt-1 text-xs text-slate-500">UUID: {activeScan.id}</p>
-                    {activeScan.latest_pdf_view_url && (
-                      <a
-                        href={activeScan.latest_pdf_view_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex rounded-md border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700"
-                      >
-                        เปิด PDF ล่าสุด ({formatBytes(activeScan.latest_pdf_size_bytes)})
-                      </a>
-                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:flex">
                     <button
@@ -784,6 +774,39 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                   )}
                 </div>
               </div>
+
+              {(isGeneratingPdf || activeScan.latest_pdf_view_url) && (
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  {isGeneratingPdf ? (
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 shrink-0 animate-spin rounded-full border-4 border-slate-200 border-t-[#003366]" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-slate-800">กำลังสร้าง PDF</div>
+                        <div className="mt-1 truncate text-xs text-slate-500">
+                          {progress || 'ระบบกำลังปรับภาพและรวมไฟล์'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-slate-800">PDF ล่าสุด</div>
+                        <div className="mt-1 truncate text-xs text-slate-500">
+                          {activeScan.latest_pdf_file_name || 'scan.pdf'} · {formatBytes(activeScan.latest_pdf_size_bytes)}
+                        </div>
+                      </div>
+                      <a
+                        href={activeScan.latest_pdf_view_url ?? '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex justify-center rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700"
+                      >
+                        เปิด PDF
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="sticky bottom-0 z-20 rounded-t-lg border border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
                 <button
