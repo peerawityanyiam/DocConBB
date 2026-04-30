@@ -219,16 +219,6 @@ function CornerEditor({
             </div>
           )}
           <svg className="pointer-events-none absolute inset-0 h-full w-full">
-            <rect
-              x="0"
-              y="0"
-              width="100%"
-              height="100%"
-              vectorEffect="non-scaling-stroke"
-              fill="rgba(14,165,233,0.08)"
-              stroke="rgba(14,165,233,0.9)"
-              strokeWidth="3"
-            />
             <polygon
               points={corners.map((c) => `${c.x * 100},${c.y * 100}`).join(' ')}
               vectorEffect="non-scaling-stroke"
@@ -353,37 +343,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
       body: JSON.stringify({ adjustments: serializeAdjustments(value) }),
     });
     if (reload) await loadScan(activeScan.id);
-  }
-
-  async function saveCurrentAdjustmentsAndClose() {
-    if (!activeScan || !selectedPage || !selectedImageUrl) return;
-    setBusy(true);
-    setError('');
-    setProgress('กำลังบันทึกการปรับ');
-    try {
-      await saveAdjustments(selectedPage.id, adjustments, false);
-      const file = await renderProcessedScanFile(
-        selectedImageUrl,
-        adjustments,
-        `scan-${selectedPage.page_index + 1}.jpg`,
-      );
-      await uploadScanImageResumable({
-        scanId: activeScan.id,
-        file,
-        kind: 'processed',
-        pageId: selectedPage.id,
-        adjustments: serializeAdjustments(adjustments),
-        onProgress: (percent) => setProgress(`อัปโหลดรูปตัวอย่าง ${percent}%`),
-      });
-      await loadScans();
-      await loadScan(activeScan.id);
-      setSelectedPageId(null);
-      setProgress('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'บันทึกการปรับไม่สำเร็จ');
-    } finally {
-      setBusy(false);
-    }
   }
 
   async function handleFiles(files: FileList | File[]) {
@@ -562,7 +521,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           {scans.length === 0 ? (
             <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">ยังไม่มีรายการ กด “ชุดใหม่” เพื่อเริ่ม</p>
           ) : (
-            <div className="space-y-3">
+            <div>
               <label className="block text-xs font-semibold text-slate-600">
                 เลือกชุดสแกน
                 <select
@@ -580,15 +539,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                   ))}
                 </select>
               </label>
-              {activeScan && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  <div className="font-semibold text-slate-800">{activeScan.title}</div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span>{activeScan.page_count} หน้า</span>
-                    <span>{activeScan.status === 'PDF_READY' ? 'PDF พร้อม' : 'Draft'}</span>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </aside>
@@ -754,7 +704,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                         </div>
                       ) : (
                         <div>
-                          <div className="text-sm font-semibold text-slate-700">กดที่รูปด้านซ้ายเพื่อแก้ไข</div>
+                          <div className="text-sm font-semibold text-slate-700">กดที่รูปเพื่อแก้ไข</div>
                           <div className="mt-1 text-xs text-slate-500">ระบบจะโหลดเครื่องมือปรับภาพเฉพาะหน้าที่เลือก</div>
                         </div>
                       )}
@@ -812,18 +762,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                           >
                             Reset
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => void saveCurrentAdjustmentsAndClose()}
-                            disabled={busy}
-                            className="ml-auto rounded-md bg-slate-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                          >
-                            บันทึกการปรับ
-                          </button>
                         </div>
-                      </div>
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        ลากจุดทั้ง 4 มุมให้ตรงกับขอบเอกสาร ระบบจะปรับ perspective ตอนสร้าง PDF
                       </div>
                     </div>
                   )}
