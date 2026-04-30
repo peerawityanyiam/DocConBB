@@ -80,6 +80,7 @@ function coerceAdjustments(raw: Record<string, unknown> | null | undefined): Sca
     rotation,
     brightness: typeof raw.brightness === 'number' ? raw.brightness : fallback.brightness,
     contrast: typeof raw.contrast === 'number' ? raw.contrast : fallback.contrast,
+    shadowReduction: typeof raw.shadowReduction === 'boolean' ? raw.shadowReduction : fallback.shadowReduction,
     grayscale: typeof raw.grayscale === 'boolean' ? raw.grayscale : fallback.grayscale,
     blackWhite: typeof raw.blackWhite === 'boolean' ? raw.blackWhite : fallback.blackWhite,
   };
@@ -94,6 +95,7 @@ function serializeAdjustments(adjustments: ScanAdjustments): Record<string, unkn
     rotation: adjustments.rotation,
     brightness: adjustments.brightness,
     contrast: Number(adjustments.contrast.toFixed(2)),
+    shadowReduction: adjustments.shadowReduction,
     grayscale: adjustments.grayscale,
     blackWhite: adjustments.blackWhite,
   };
@@ -869,6 +871,13 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold"
                           >
                             หมุน 90°
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustmentChange({ shadowReduction: !adjustments.shadowReduction })}
+                            className={`rounded-md border px-3 py-2 text-xs font-semibold ${adjustments.shadowReduction ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-300 bg-white'}`}
+                          >
+                            ลดเงา
                           </button>
                           <button
                             type="button"

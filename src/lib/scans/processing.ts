@@ -11,6 +11,7 @@ export interface ScanAdjustments {
   rotation: 0 | 90 | 180 | 270;
   brightness: number;
   contrast: number;
+  shadowReduction: boolean;
   grayscale: boolean;
   blackWhite: boolean;
 }
@@ -35,6 +36,7 @@ export function createDefaultScanAdjustments(): ScanAdjustments {
     rotation: 0,
     brightness: 10,
     contrast: 1.16,
+    shadowReduction: false,
     grayscale: false,
     blackWhite: false,
   };
@@ -145,12 +147,30 @@ function getHomography(source: ScanCorner[], width: number, height: number) {
   return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
 }
 
+function reduceShadowPixel(r: number, g: number, b: number) {
+  const lightness = Math.max(r, g, b);
+  if (lightness >= 205) return [r, g, b];
+  const lift = ((205 - lightness) / 205) * 42;
+  const normalize = 1 + ((205 - lightness) / 205) * 0.38;
+  return [
+    clamp((r + lift) * normalize, 0, 255),
+    clamp((g + lift) * normalize, 0, 255),
+    clamp((b + lift) * normalize, 0, 255),
+  ];
+}
+
 function enhancePixel(r: number, g: number, b: number, adjustments: ScanAdjustments) {
+  let sr = r;
+  let sg = g;
+  let sb = b;
+  if (adjustments.shadowReduction) {
+    [sr, sg, sb] = reduceShadowPixel(sr, sg, sb);
+  }
   const contrast = clamp(adjustments.contrast, 0.5, 2);
   const brightness = clamp(adjustments.brightness, -80, 80);
-  let nr = clamp((r - 128) * contrast + 128 + brightness, 0, 255);
-  let ng = clamp((g - 128) * contrast + 128 + brightness, 0, 255);
-  let nb = clamp((b - 128) * contrast + 128 + brightness, 0, 255);
+  let nr = clamp((sr - 128) * contrast + 128 + brightness, 0, 255);
+  let ng = clamp((sg - 128) * contrast + 128 + brightness, 0, 255);
+  let nb = clamp((sb - 128) * contrast + 128 + brightness, 0, 255);
   if (adjustments.grayscale || adjustments.blackWhite) {
     const gray = 0.299 * nr + 0.587 * ng + 0.114 * nb;
     const value = adjustments.blackWhite ? (gray > 168 ? 255 : 0) : gray;
