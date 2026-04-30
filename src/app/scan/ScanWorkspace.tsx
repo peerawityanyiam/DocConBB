@@ -10,7 +10,9 @@ import {
 import {
   buildSingleScanPdfFile,
   createDefaultScanAdjustments,
+  renderProcessedScanCanvas,
   renderProcessedScanFile,
+  renderRotatedScanCanvas,
   type ScanAdjustments,
 } from '@/lib/scans/processing';
 import { uploadScanImageResumable, uploadScanPdfResumable } from '@/lib/scans/client-upload';
@@ -121,8 +123,23 @@ function CornerEditor({
   onChange: (next: ScanAdjustments) => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const draggingRef = useRef<number | null>(null);
+  const sourceRenderRef = useRef(0);
+  const previewRenderRef = useRef(0);
+  const [sourceLoading, setSourceLoading] = useState(true);
   const corners = adjustments.corners;
+
+  const copyCanvas = useCallback((source: HTMLCanvasElement, target: HTMLCanvasElement | null) => {
+    if (!target) return;
+    target.width = source.width;
+    target.height = source.height;
+    const ctx = target.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, target.width, target.height);
+    ctx.drawImage(source, 0, 0);
+  }, []);
 
   const updateCorner = useCallback((index: number, event: PointerEvent | React.PointerEvent) => {
     const box = boxRef.current;
@@ -133,6 +150,38 @@ function CornerEditor({
     const nextCorners = corners.map((corner, i) => i === index ? { x, y } : corner) as ScanAdjustments['corners'];
     onChange({ ...adjustments, corners: nextCorners });
   }, [adjustments, corners, onChange]);
+
+  useEffect(() => {
+    const renderId = sourceRenderRef.current + 1;
+    sourceRenderRef.current = renderId;
+    const timeoutId = window.setTimeout(() => {
+      setSourceLoading(true);
+      renderRotatedScanCanvas(imageUrl, adjustments.rotation)
+        .then((canvas) => {
+          if (sourceRenderRef.current !== renderId) return;
+          copyCanvas(canvas, sourceCanvasRef.current);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (sourceRenderRef.current === renderId) setSourceLoading(false);
+        });
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [adjustments.rotation, copyCanvas, imageUrl]);
+
+  useEffect(() => {
+    const renderId = previewRenderRef.current + 1;
+    previewRenderRef.current = renderId;
+    const timeoutId = window.setTimeout(() => {
+      renderProcessedScanCanvas(imageUrl, adjustments, 820)
+        .then((canvas) => {
+          if (previewRenderRef.current !== renderId) return;
+          copyCanvas(canvas, previewCanvasRef.current);
+        })
+        .catch(() => undefined);
+    }, 90);
+    return () => window.clearTimeout(timeoutId);
+  }, [adjustments, copyCanvas, imageUrl]);
 
   useEffect(() => {
     function handleMove(event: PointerEvent) {
@@ -153,32 +202,55 @@ function CornerEditor({
   }, [updateCorner]);
 
   return (
-    <div ref={boxRef} className="relative overflow-hidden rounded-lg border border-slate-300 bg-slate-950">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={imageUrl} alt="preview" className="block w-full select-none" draggable={false} />
-      <svg className="pointer-events-none absolute inset-0 h-full w-full">
-        <polygon
-          points={corners.map((c) => `${c.x * 100},${c.y * 100}`).join(' ')}
-          vectorEffect="non-scaling-stroke"
-          fill="rgba(14,165,233,0.12)"
-          stroke="rgba(14,165,233,0.95)"
-          strokeWidth="1.5"
-        />
-      </svg>
-      {corners.map((corner, index) => (
-        <button
-          key={index}
-          type="button"
-          aria-label={`corner ${index + 1}`}
-          onPointerDown={(event) => {
-            draggingRef.current = index;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            updateCorner(index, event);
-          }}
-          className="absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-sky-500 shadow-lg"
-          style={{ left: `${corner.x * 100}%`, top: `${corner.y * 100}%` }}
-        />
-      ))}
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.72fr)]">
+      <div>
+        <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600">
+          <span>ลาก 4 มุมบนรูปต้นฉบับ</span>
+          <span>{adjustments.rotation}°</span>
+        </div>
+        <div
+          ref={boxRef}
+          className="relative touch-none overflow-hidden rounded-lg border border-slate-300 bg-slate-950"
+        >
+          <canvas ref={sourceCanvasRef} className="block w-full select-none" />
+          {sourceLoading && (
+            <div className="absolute inset-0 grid place-items-center bg-slate-950/70 text-xs font-semibold text-white">
+              กำลังโหลดรูป
+            </div>
+          )}
+          <svg className="pointer-events-none absolute inset-0 h-full w-full">
+            <polygon
+              points={corners.map((c) => `${c.x * 100},${c.y * 100}`).join(' ')}
+              vectorEffect="non-scaling-stroke"
+              fill="rgba(14,165,233,0.12)"
+              stroke="rgba(14,165,233,0.95)"
+              strokeWidth="1.5"
+            />
+          </svg>
+          {corners.map((corner, index) => (
+            <button
+              key={index}
+              type="button"
+              aria-label={`corner ${index + 1}`}
+              onPointerDown={(event) => {
+                draggingRef.current = index;
+                event.currentTarget.setPointerCapture(event.pointerId);
+                updateCorner(index, event);
+              }}
+              className="absolute h-9 w-9 touch-none -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-sky-500 text-[10px] font-bold text-white shadow-lg"
+              style={{ left: `${corner.x * 100}%`, top: `${corner.y * 100}%` }}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="mb-2 text-xs font-semibold text-slate-600">ตัวอย่างผลลัพธ์</div>
+        <div className="relative overflow-hidden rounded-lg border border-slate-300 bg-white">
+          <canvas ref={previewCanvasRef} className="block w-full select-none" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -190,6 +262,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [adjustments, setAdjustments] = useState<ScanAdjustments>(createDefaultScanAdjustments);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -359,7 +432,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   async function generatePdf() {
     if (!activeScan || pages.length === 0) return;
     setBusy(true);
+    setIsGeneratingPdf(true);
     setError('');
+    setProgress('กำลังสร้าง PDF...');
     try {
       if (selectedPage) await saveAdjustments(selectedPage.id, adjustments);
       const latestScan = await loadScan(activeScan.id);
@@ -400,6 +475,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'สร้าง PDF ไม่สำเร็จ');
     } finally {
+      setIsGeneratingPdf(false);
       setBusy(false);
     }
   }
@@ -688,7 +764,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                   disabled={busy || pages.length === 0}
                   className="w-full rounded-lg bg-[#c5a059] px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
                 >
-                  {activeScan.latest_pdf_file_id ? 'สร้าง PDF ใหม่' : 'สร้าง PDF'}
+                  {isGeneratingPdf
+                    ? progress || 'กำลังสร้าง PDF...'
+                    : activeScan.latest_pdf_file_id ? 'สร้าง PDF ใหม่' : 'สร้าง PDF'}
                 </button>
               </div>
             </>

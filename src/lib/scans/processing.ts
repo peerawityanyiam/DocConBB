@@ -86,6 +86,22 @@ function drawRotatedSource(source: ImageSource, rotation: ScanAdjustments['rotat
   return canvas;
 }
 
+function scaleCanvas(sourceCanvas: HTMLCanvasElement, maxEdge: number) {
+  const edge = Math.max(sourceCanvas.width, sourceCanvas.height);
+  if (edge <= maxEdge) return sourceCanvas;
+
+  const scale = maxEdge / edge;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(sourceCanvas.width * scale));
+  canvas.height = Math.max(1, Math.round(sourceCanvas.height * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas_context_unavailable');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
 function solveLinearSystem(matrix: number[][], vector: number[]) {
   const n = vector.length;
   const a = matrix.map((row, i) => [...row, vector[i]]);
@@ -209,6 +225,34 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
       else reject(new Error('image_export_failed'));
     }, 'image/jpeg', quality);
   });
+}
+
+export async function renderRotatedScanCanvas(
+  sourceUrl: string,
+  rotation: ScanAdjustments['rotation'],
+  maxEdge = 1200,
+): Promise<HTMLCanvasElement> {
+  const source = await loadImageSource(sourceUrl);
+  try {
+    const canvas = drawRotatedSource(source, rotation);
+    return scaleCanvas(canvas, maxEdge);
+  } finally {
+    source.close?.();
+  }
+}
+
+export async function renderProcessedScanCanvas(
+  sourceUrl: string,
+  adjustments: ScanAdjustments,
+  maxEdge = 900,
+): Promise<HTMLCanvasElement> {
+  const source = await loadImageSource(sourceUrl);
+  try {
+    const sourceCanvas = drawRotatedSource(source, adjustments.rotation);
+    return renderWarpedCanvas(sourceCanvas, adjustments, maxEdge);
+  } finally {
+    source.close?.();
+  }
 }
 
 export async function renderProcessedScanFile(
