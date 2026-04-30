@@ -23,10 +23,10 @@ interface ImageSource {
 }
 
 const DEFAULT_CORNERS: [ScanCorner, ScanCorner, ScanCorner, ScanCorner] = [
-  { x: 0.04, y: 0.04 },
-  { x: 0.96, y: 0.04 },
-  { x: 0.96, y: 0.96 },
-  { x: 0.04, y: 0.96 },
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
 ];
 
 export function createDefaultScanAdjustments(): ScanAdjustments {

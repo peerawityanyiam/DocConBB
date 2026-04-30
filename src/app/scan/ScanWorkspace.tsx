@@ -219,12 +219,22 @@ function CornerEditor({
             </div>
           )}
           <svg className="pointer-events-none absolute inset-0 h-full w-full">
+            <rect
+              x="0"
+              y="0"
+              width="100%"
+              height="100%"
+              vectorEffect="non-scaling-stroke"
+              fill="rgba(14,165,233,0.08)"
+              stroke="rgba(14,165,233,0.9)"
+              strokeWidth="3"
+            />
             <polygon
               points={corners.map((c) => `${c.x * 100},${c.y * 100}`).join(' ')}
               vectorEffect="non-scaling-stroke"
-              fill="rgba(14,165,233,0.12)"
+              fill="rgba(14,165,233,0.24)"
               stroke="rgba(14,165,233,0.95)"
-              strokeWidth="1.5"
+              strokeWidth="3"
             />
           </svg>
           {corners.map((corner, index) => (
@@ -263,6 +273,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -270,7 +281,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   const pages = activeScan?.pages ?? emptyPages;
   const selectedPage = useMemo(
-    () => pages.find((page) => page.id === selectedPageId) ?? pages[0] ?? null,
+    () => pages.find((page) => page.id === selectedPageId) ?? null,
     [pages, selectedPageId],
   );
 
@@ -289,7 +300,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setActiveScan(data.scan);
     setSelectedPageId((current) => {
       if (current && data.scan.pages?.some((page) => page.id === current)) return current;
-      return data.scan.pages?.[0]?.id ?? null;
+      return null;
     });
     return data.scan;
   }, []);
@@ -324,6 +335,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: `เอกสารสแกน ${new Date().toLocaleString('th-TH')}` }),
       });
+      setSelectedPageId(null);
       await loadScans();
       await loadScan(data.scan.id);
     } catch (err) {
@@ -333,14 +345,45 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     }
   }
 
-  async function saveAdjustments(pageId = selectedPage?.id, value = adjustments) {
+  async function saveAdjustments(pageId = selectedPage?.id, value = adjustments, reload = true) {
     if (!activeScan || !pageId) return;
     await jsonFetch(`/api/scans/${activeScan.id}/pages/${pageId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adjustments: serializeAdjustments(value) }),
     });
-    await loadScan(activeScan.id);
+    if (reload) await loadScan(activeScan.id);
+  }
+
+  async function saveCurrentAdjustmentsAndClose() {
+    if (!activeScan || !selectedPage || !selectedImageUrl) return;
+    setBusy(true);
+    setError('');
+    setProgress('กำลังบันทึกการปรับ');
+    try {
+      await saveAdjustments(selectedPage.id, adjustments, false);
+      const file = await renderProcessedScanFile(
+        selectedImageUrl,
+        adjustments,
+        `scan-${selectedPage.page_index + 1}.jpg`,
+      );
+      await uploadScanImageResumable({
+        scanId: activeScan.id,
+        file,
+        kind: 'processed',
+        pageId: selectedPage.id,
+        adjustments: serializeAdjustments(adjustments),
+        onProgress: (percent) => setProgress(`อัปโหลดรูปตัวอย่าง ${percent}%`),
+      });
+      await loadScans();
+      await loadScan(activeScan.id);
+      setSelectedPageId(null);
+      setProgress('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'บันทึกการปรับไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleFiles(files: FileList | File[]) {
@@ -348,6 +391,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     if (fileArray.length === 0) return;
     setError('');
     setBusy(true);
+    setIsUploadingImages(true);
     try {
       let scan = activeScan;
       if (!scan) {
@@ -381,10 +425,12 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
       }
       await loadScans();
       await loadScan(scan.id);
+      setSelectedPageId(null);
       setProgress('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'อัปโหลดรูปไม่สำเร็จ');
     } finally {
+      setIsUploadingImages(false);
       setBusy(false);
       if (cameraInputRef.current) cameraInputRef.current.value = '';
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -431,19 +477,22 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   async function generatePdf() {
     if (!activeScan || pages.length === 0) return;
+    const editingPage = selectedPage;
+    const editingAdjustments = adjustments;
     setBusy(true);
     setIsGeneratingPdf(true);
+    setSelectedPageId(null);
     setError('');
     setProgress('กำลังสร้าง PDF...');
     try {
-      if (selectedPage) await saveAdjustments(selectedPage.id, adjustments);
+      if (editingPage) await saveAdjustments(editingPage.id, editingAdjustments, false);
       const latestScan = await loadScan(activeScan.id);
       const latestPages = latestScan.pages ?? [];
       const processedFiles: File[] = [];
       for (let i = 0; i < latestPages.length; i += 1) {
         const page = latestPages[i];
-        const pageAdjustments = page.id === selectedPage?.id
-          ? adjustments
+        const pageAdjustments = page.id === editingPage?.id
+          ? editingAdjustments
           : coerceAdjustments(page.adjustments);
         setProgress(`ปรับภาพหน้า ${i + 1}/${latestPages.length}`);
         const file = await renderProcessedScanFile(
@@ -510,29 +559,38 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
             <h2 className="text-sm font-bold text-slate-800">รายการสแกน</h2>
             {loading && <span className="text-xs text-slate-400">โหลด...</span>}
           </div>
-          <div className="space-y-2">
-            {scans.length === 0 && (
-              <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">ยังไม่มีรายการ กด “ชุดใหม่” เพื่อเริ่ม</p>
-            )}
-            {scans.map((scan) => (
-              <button
-                key={scan.id}
-                type="button"
-                onClick={() => void loadScan(scan.id)}
-                className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                  activeScan?.id === scan.id
-                    ? 'border-[#003366] bg-[#003366]/5'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <div className="truncate text-sm font-semibold text-slate-800">{scan.title}</div>
-                <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                  <span>{scan.page_count} หน้า</span>
-                  <span>{scan.status === 'PDF_READY' ? 'PDF พร้อม' : 'Draft'}</span>
+          {scans.length === 0 ? (
+            <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">ยังไม่มีรายการ กด “ชุดใหม่” เพื่อเริ่ม</p>
+          ) : (
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-600">
+                เลือกชุดสแกน
+                <select
+                  value={activeScan?.id ?? ''}
+                  onChange={(event) => {
+                    setSelectedPageId(null);
+                    void loadScan(event.target.value);
+                  }}
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                >
+                  {scans.map((scan) => (
+                    <option key={scan.id} value={scan.id}>
+                      {scan.title} · {scan.page_count} หน้า
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {activeScan && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                  <div className="font-semibold text-slate-800">{activeScan.title}</div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span>{activeScan.page_count} หน้า</span>
+                    <span>{activeScan.status === 'PDF_READY' ? 'PDF พร้อม' : 'Draft'}</span>
+                  </div>
                 </div>
-              </button>
-            ))}
-          </div>
+              )}
+            </div>
+          )}
         </aside>
 
         <section className="space-y-4">
@@ -632,7 +690,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                         <div className="aspect-[3/4] overflow-hidden rounded bg-slate-100">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={scanFileUrl(activeScan.id, page.original_drive_file_id)}
+                            src={scanFileUrl(activeScan.id, page.processed_drive_file_id || page.original_drive_file_id)}
                             alt={`page ${index + 1}`}
                             className="h-full w-full object-cover"
                             loading="lazy"
@@ -640,7 +698,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                         </div>
                         <div className="mt-2 flex items-center justify-between gap-1 text-xs">
                           <span className="font-semibold text-slate-700">หน้า {index + 1}</span>
-                          <span className="text-slate-400">{formatBytes(page.original_size_bytes)}</span>
+                          <span className="text-slate-400">{page.processed_drive_file_id ? 'ปรับแล้ว' : formatBytes(page.original_size_bytes)}</span>
                         </div>
                         <div className="mt-2 flex gap-1">
                           <span
@@ -673,12 +731,34 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                         </div>
                       </button>
                     ))}
+                    {isUploadingImages && (
+                      <div className="rounded-lg border border-dashed border-sky-300 bg-sky-50 p-2">
+                        <div className="grid aspect-[3/4] place-items-center rounded bg-white">
+                          <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600" />
+                        </div>
+                        <div className="mt-2 text-center text-xs font-semibold text-sky-700">
+                          กำลังเพิ่มรูป
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
                   {!selectedPage ? (
-                    <div className="py-12 text-center text-sm text-slate-500">เพิ่มรูปเพื่อเริ่มปรับภาพ</div>
+                    <div className="grid min-h-[260px] place-items-center rounded-lg bg-slate-50 px-4 py-12 text-center">
+                      {isUploadingImages ? (
+                        <div>
+                          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#003366]" />
+                          <div className="mt-4 text-sm font-semibold text-slate-700">กำลังโหลดรูปเข้ารายการ</div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-sm font-semibold text-slate-700">กดที่รูปด้านซ้ายเพื่อแก้ไข</div>
+                          <div className="mt-1 text-xs text-slate-500">ระบบจะโหลดเครื่องมือปรับภาพเฉพาะหน้าที่เลือก</div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       <CornerEditor
@@ -727,13 +807,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAdjustmentChange({ blackWhite: !adjustments.blackWhite, grayscale: false })}
-                            className={`rounded-md border px-3 py-2 text-xs font-semibold ${adjustments.blackWhite ? 'border-sky-400 bg-sky-50 text-sky-700' : 'border-slate-300 bg-white'}`}
-                          >
-                            B/W
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => setAdjustments(createDefaultScanAdjustments())}
                             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold"
                           >
@@ -741,7 +814,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => void saveAdjustments()}
+                            onClick={() => void saveCurrentAdjustmentsAndClose()}
                             disabled={busy}
                             className="ml-auto rounded-md bg-slate-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                           >
