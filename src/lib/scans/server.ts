@@ -47,6 +47,16 @@ export function getScanRootFolderId(): string {
   return folderId;
 }
 
+function formatDriveTimestamp(value: string | null | undefined) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().replace(/[:.]/g, '-');
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/[:.]/g, '-');
+}
+
+function scanFolderName(scan: Pick<ScanDocumentRow, 'id' | 'created_at'>) {
+  return `${formatDriveTimestamp(scan.created_at)}_${scan.id}`;
+}
+
 export async function canAccessScan(scan: Pick<ScanDocumentRow, 'owner_id'>, user: AuthUser): Promise<boolean> {
   if (scan.owner_id === user.id) return true;
   return hasGlobalRole(user.id, ['SUPER_ADMIN']);
@@ -87,7 +97,8 @@ export async function ensureScanFolders(
   pdfFolderId: string;
 }> {
   const rootFolderId = getScanRootFolderId();
-  const scanFolderId = scan.scan_folder_id || await getOrCreateFolder(rootFolderId, scan.id);
+  const userFolderId = await getOrCreateFolder(rootFolderId, scan.owner_id);
+  const scanFolderId = scan.scan_folder_id || await getOrCreateFolder(userFolderId, scanFolderName(scan));
   const originalsFolderId = scan.originals_folder_id || await getOrCreateFolder(scanFolderId, 'originals');
   const processedFolderId = scan.processed_folder_id || await getOrCreateFolder(scanFolderId, 'processed');
   const pdfFolderId = scan.pdf_folder_id || await getOrCreateFolder(scanFolderId, 'pdf');
