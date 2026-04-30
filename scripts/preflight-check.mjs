@@ -8,6 +8,7 @@ const requiredEnv = [
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'GOOGLE_UPLOAD_FOLDER_ID',
+  'GOOGLE_SCAN_FOLDER_ID',
 ];
 
 const cwd = process.cwd();

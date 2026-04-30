@@ -23,6 +23,12 @@ const cards = [
     description: 'จัดการระบบเอกสารคุณภาพ',
     href: DOCUMENT_CONTROL_GAS_URL,
   },
+  {
+    title: 'สแกนเอกสารเป็น PDF',
+    icon: '📷',
+    description: 'ถ่ายรูป ปรับภาพ และรวมเป็น PDF',
+    href: '/scan',
+  },
 ];
 
 export default async function Home() {
@@ -93,4 +99,3 @@ export default async function Home() {
     </div>
   );
 }
-

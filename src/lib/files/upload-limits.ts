@@ -24,3 +24,10 @@ export const MAX_IMAGE_BATCH_TOTAL_BYTES = 120 * 1024 * 1024;
 export const MAX_IMAGE_BATCH_TOTAL_LABEL = '120MB';
 export const MAX_IMAGE_PDF_PARTS = 30;
 export const MAX_IMAGE_PDF_PARTS_LABEL = '30 parts';
+
+// Scanner module limits. Each source photo is uploaded browser-to-Drive
+// through resumable upload; keep per-photo size modest for mobile reliability.
+export const SCAN_MAX_IMAGE_FILE_SIZE_BYTES = 4 * 1024 * 1024;
+export const SCAN_MAX_IMAGE_FILE_SIZE_LABEL = '4MB';
+export const SCAN_MAX_PAGE_COUNT = 30;
+export const SCAN_MAX_PAGE_COUNT_LABEL = '30 pages';

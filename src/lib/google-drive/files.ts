@@ -245,18 +245,48 @@ export async function getFileMetadata(fileId: string): Promise<{
   name: string;
   appProperties: Record<string, string>;
   webViewLink: string | null;
+  mimeType?: string | null;
 }> {
   const res = await drive().files.get({
     fileId,
-    fields: 'id,name,appProperties,webViewLink',
+    fields: 'id,name,mimeType,appProperties,webViewLink',
     supportsAllDrives: true,
   });
 
   return {
     id: res.data.id!,
     name: res.data.name ?? '',
+    mimeType: res.data.mimeType ?? null,
     appProperties: (res.data.appProperties ?? {}) as Record<string, string>,
     webViewLink: res.data.webViewLink ?? null,
+  };
+}
+
+export async function downloadFileBytes(fileId: string): Promise<{
+  bytes: Buffer;
+  mimeType: string;
+  name: string;
+}> {
+  const meta = await drive().files.get({
+    fileId,
+    fields: 'id,name,mimeType,trashed',
+    supportsAllDrives: true,
+  });
+  if (meta.data.trashed) throw new Error('File is in trash');
+
+  const res = await drive().files.get(
+    {
+      fileId,
+      alt: 'media',
+      supportsAllDrives: true,
+    },
+    { responseType: 'arraybuffer' },
+  );
+
+  return {
+    bytes: Buffer.from(res.data as ArrayBuffer),
+    mimeType: meta.data.mimeType ?? 'application/octet-stream',
+    name: meta.data.name ?? 'file',
   };
 }
 

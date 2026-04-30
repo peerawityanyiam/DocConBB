@@ -10,6 +10,21 @@
   "orientation": "portrait",
   "background_color": "#0d1b2e",
   "theme_color": "#0d1b2e",
+  "shortcuts": [
+    {
+      "name": "สแกนเอกสารเป็น PDF",
+      "short_name": "สแกน PDF",
+      "description": "ถ่ายรูป ปรับภาพ และรวมเป็น PDF",
+      "url": "/scan",
+      "icons": [
+        {
+          "src": "/icons/icon-192-v2.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-192-v2.png",
