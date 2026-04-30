@@ -275,6 +275,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isApplyingServerAdjustmentsRef = useRef(false);
+  const selectedAdjustmentKeyRef = useRef<string | null>(null);
   const dirtyAdjustmentRef = useRef<{
     scanId: string;
     pageId: string;
@@ -291,6 +292,8 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const selectedImageUrl = activeScan && selectedPage
     ? scanFileUrl(activeScan.id, selectedPage.original_drive_file_id)
     : '';
+  const activeScanId = activeScan?.id ?? null;
+  const selectedPagePersistId = selectedPage?.id ?? null;
 
   const loadScans = useCallback(async () => {
     const data = await jsonFetch<{ scans: ScanDocument[] }>('/api/scans');
@@ -322,6 +325,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   }, [loadScans]);
 
   useEffect(() => {
+    const pageKey = activeScan && selectedPage ? `${activeScan.id}:${selectedPage.id}` : null;
+    if (selectedAdjustmentKeyRef.current === pageKey) return;
+    selectedAdjustmentKeyRef.current = pageKey;
     if (!selectedPage) {
       isApplyingServerAdjustmentsRef.current = true;
       setAdjustments(createDefaultScanAdjustments());
@@ -329,7 +335,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     }
     isApplyingServerAdjustmentsRef.current = true;
     setAdjustments(coerceAdjustments(selectedPage.adjustments));
-  }, [selectedPage]);
+  }, [activeScan, selectedPage]);
 
   useEffect(() => {
     if (!isApplyingServerAdjustmentsRef.current) return;
@@ -369,10 +375,10 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   }, [persistAdjustments]);
 
   useEffect(() => {
-    if (!activeScan || !selectedPage || isApplyingServerAdjustmentsRef.current || busy) return;
+    if (!activeScanId || !selectedPagePersistId || isApplyingServerAdjustmentsRef.current || busy) return;
     dirtyAdjustmentRef.current = {
-      scanId: activeScan.id,
-      pageId: selectedPage.id,
+      scanId: activeScanId,
+      pageId: selectedPagePersistId,
       adjustments,
     };
     if (saveAdjustmentTimerRef.current !== null) {
@@ -387,7 +393,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
         setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
       });
     }, 700);
-  }, [activeScan, adjustments, busy, persistAdjustments, selectedPage]);
+  }, [activeScanId, adjustments, busy, persistAdjustments, selectedPagePersistId]);
 
   useEffect(() => () => {
     if (saveAdjustmentTimerRef.current !== null) {
