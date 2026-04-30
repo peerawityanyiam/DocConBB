@@ -1,7 +1,6 @@
 ﻿import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import SessionIdleGuard from "@/components/SessionIdleGuard";
 
 export const metadata: Metadata = {
@@ -41,7 +40,6 @@ export default function RootLayout({
         <ToastProvider>
           <SessionIdleGuard />
           {children}
-          <PWAInstallPrompt />
         </ToastProvider>
       </body>
     </html>

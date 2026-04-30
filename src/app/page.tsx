@@ -1,6 +1,7 @@
 ﻿import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAuthUser, hasGlobalRole } from '@/lib/auth/guards';
+import PWAInstallButton from '@/components/PWAInstallButton';
 import LogoutButton from './LogoutButton';
 import HomeShortcuts from './HomeShortcuts';
 
@@ -45,8 +46,13 @@ export default async function Home() {
     >
       <nav className="fixed left-0 right-0 top-0 z-50 bg-[#212529] shadow-sm" style={{ height: '45px' }}>
         <div className="mx-auto flex h-full max-w-[900px] items-center justify-between px-5">
-          <span className="text-sm font-normal tracking-wide text-white/80">{user.email}</span>
-          <LogoutButton />
+          <span className="min-w-0 flex-1 truncate pr-3 text-sm font-normal tracking-wide text-white/80">
+            {user.email}
+          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <PWAInstallButton />
+            <LogoutButton />
+          </div>
         </div>
       </nav>
 
