@@ -103,6 +103,11 @@ function isImageFile(file: File) {
   return file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
 }
 
+function normalizePdfTitle(value: string) {
+  const cleaned = value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
+  return cleaned || `เอกสารสแกน ${new Date().toLocaleString('th-TH')}`;
+}
+
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const payload = await res.json().catch(() => ({}));
@@ -264,6 +269,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [busy, setBusy] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [pdfTitle, setPdfTitle] = useState('');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -288,6 +294,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const loadScan = useCallback(async (scanId: string) => {
     const data = await jsonFetch<{ scan: ScanDocument }>(`/api/scans/${scanId}`);
     setActiveScan(data.scan);
+    setPdfTitle(data.scan.title);
     setSelectedPageId((current) => {
       if (current && data.scan.pages?.some((page) => page.id === current)) return current;
       return null;
@@ -319,6 +326,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setActiveScan(null);
     setSelectedPageId(null);
     setAdjustments(createDefaultScanAdjustments());
+    setPdfTitle('');
     setError('');
     setProgress('');
     if (cameraInputRef.current) cameraInputRef.current.value = '';
@@ -333,6 +341,25 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
       body: JSON.stringify({ adjustments: serializeAdjustments(value) }),
     });
     if (reload) await loadScan(activeScan.id);
+  }
+
+  async function savePdfTitle() {
+    if (!activeScan) return activeScan;
+    const title = normalizePdfTitle(pdfTitle || activeScan.title);
+    setPdfTitle(title);
+    if (title === activeScan.title) return activeScan;
+
+    const data = await jsonFetch<{ scan: ScanDocument }>(`/api/scans/${activeScan.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    setActiveScan((current) => current ? { ...current, title: data.scan.title } : data.scan);
+    setScans((current) => current.map((scan) => (
+      scan.id === data.scan.id ? { ...scan, title: data.scan.title, updated_at: data.scan.updated_at } : scan
+    )));
+    setPdfTitle(data.scan.title);
+    return data.scan;
   }
 
   async function handleFiles(files: FileList | File[]) {
@@ -434,6 +461,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setError('');
     setProgress('กำลังสร้าง PDF...');
     try {
+      const titleScan = await savePdfTitle();
       if (editingPage) await saveAdjustments(editingPage.id, editingAdjustments, false);
       const latestScan = await loadScan(activeScan.id);
       const latestPages = latestScan.pages ?? [];
@@ -460,7 +488,8 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
         });
       }
       setProgress('สร้าง PDF');
-      const pdfFile = await buildSingleScanPdfFile(processedFiles, `${latestScan.title || 'scan'}.pdf`);
+      const pdfBaseName = normalizePdfTitle(titleScan?.title || pdfTitle || latestScan.title || 'scan');
+      const pdfFile = await buildSingleScanPdfFile(processedFiles, `${pdfBaseName}.pdf`);
       setProgress(`อัปโหลด PDF ${formatBytes(pdfFile.size)}`);
       await uploadScanPdfResumable({
         scanId: latestScan.id,
@@ -775,8 +804,25 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                 </div>
               </div>
 
-              {(isGeneratingPdf || activeScan.latest_pdf_view_url) && (
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <label className="block text-xs font-semibold text-slate-600">
+                  ชื่อ PDF
+                  <input
+                    type="text"
+                    value={pdfTitle}
+                    onChange={(event) => setPdfTitle(event.target.value)}
+                    onBlur={() => {
+                      void savePdfTitle().catch((err) => {
+                        setError(err instanceof Error ? err.message : 'เปลี่ยนชื่อ PDF ไม่สำเร็จ');
+                      });
+                    }}
+                    disabled={busy}
+                    maxLength={120}
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60"
+                    placeholder="ตั้งชื่อ PDF"
+                  />
+                </label>
+                <div className="mt-4 border-t border-slate-100 pt-4">
                   {isGeneratingPdf ? (
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 shrink-0 animate-spin rounded-full border-4 border-slate-200 border-t-[#003366]" />
@@ -787,7 +833,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                         </div>
                       </div>
                     </div>
-                  ) : (
+                  ) : activeScan.latest_pdf_view_url ? (
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-slate-800">PDF ล่าสุด</div>
@@ -804,9 +850,11 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                         เปิด PDF
                       </a>
                     </div>
+                  ) : (
+                    <div className="text-sm text-slate-500">ยังไม่มี PDF ที่สร้างแล้ว</div>
                   )}
                 </div>
-              )}
+              </div>
 
               <div className="sticky bottom-0 z-20 rounded-t-lg border border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
                 <button
