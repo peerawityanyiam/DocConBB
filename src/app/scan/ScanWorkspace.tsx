@@ -298,15 +298,14 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   useEffect(() => {
     void (async () => {
       try {
-        const list = await loadScans();
-        if (list[0]) await loadScan(list[0].id);
+        await loadScans();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
       } finally {
         setLoading(false);
       }
     })();
-  }, [loadScan, loadScans]);
+  }, [loadScans]);
 
   useEffect(() => {
     if (!selectedPage) {
@@ -316,23 +315,14 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setAdjustments(coerceAdjustments(selectedPage.adjustments));
   }, [selectedPage]);
 
-  async function createScan() {
-    setBusy(true);
+  function createScan() {
+    setActiveScan(null);
+    setSelectedPageId(null);
+    setAdjustments(createDefaultScanAdjustments());
     setError('');
-    try {
-      const data = await jsonFetch<{ scan: ScanDocument }>('/api/scans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: `เอกสารสแกน ${new Date().toLocaleString('th-TH')}` }),
-      });
-      setSelectedPageId(null);
-      await loadScans();
-      await loadScan(data.scan.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'สร้างชุดสแกนไม่สำเร็จ');
-    } finally {
-      setBusy(false);
-    }
+    setProgress('');
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function saveAdjustments(pageId = selectedPage?.id, value = adjustments, reload = true) {
@@ -512,6 +502,23 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
         </div>
       </header>
 
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(event) => event.target.files && void handleFiles(event.target.files)}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(event) => event.target.files && void handleFiles(event.target.files)}
+      />
+
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="rounded-lg border border-slate-200 bg-white p-3">
           <div className="mb-3 flex items-center justify-between">
@@ -527,11 +534,16 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                 <select
                   value={activeScan?.id ?? ''}
                   onChange={(event) => {
+                    if (!event.target.value) {
+                      createScan();
+                      return;
+                    }
                     setSelectedPageId(null);
                     void loadScan(event.target.value);
                   }}
                   className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
                 >
+                  <option value="">ชุดใหม่</option>
                   {scans.map((scan) => (
                     <option key={scan.id} value={scan.id}>
                       {scan.title} · {scan.page_count} หน้า
@@ -553,16 +565,36 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
           {!activeScan ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
-              <h2 className="text-lg font-bold text-slate-800">เริ่มสแกนเอกสาร</h2>
-              <p className="mt-2 text-sm text-slate-500">สร้างชุดสแกนใหม่ แล้วถ่ายรูปหรือเลือกรูปจากมือถือ</p>
-              <button
-                type="button"
-                onClick={createScan}
-                disabled={busy}
-                className="mt-5 rounded-lg bg-[#003366] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                สร้างชุดสแกน
-              </button>
+              {isUploadingImages ? (
+                <div>
+                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#003366]" />
+                  <h2 className="mt-4 text-lg font-bold text-slate-800">กำลังสร้างชุดสแกน</h2>
+                  <p className="mt-2 text-sm text-slate-500">ระบบจะเริ่มบันทึกเมื่ออัปโหลดรูปแรกสำเร็จ</p>
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-lg font-bold text-slate-800">เริ่มสแกนเอกสาร</h2>
+                  <p className="mt-2 text-sm text-slate-500">ถ่ายรูปหรือเลือกรูปเพื่อสร้างชุดสแกนใหม่</p>
+                  <div className="mt-5 grid gap-2 sm:mx-auto sm:max-w-sm sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={busy}
+                      className="rounded-lg bg-[#00a896] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      ถ่ายรูป
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={busy}
+                      className="rounded-lg border border-[#003366]/30 bg-white px-5 py-2.5 text-sm font-semibold text-[#003366] disabled:opacity-50"
+                    >
+                      เลือกรูป
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -599,22 +631,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                     >
                       เลือกรูป
                     </button>
-                    <input
-                      ref={cameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(event) => event.target.files && void handleFiles(event.target.files)}
-                    />
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => event.target.files && void handleFiles(event.target.files)}
-                    />
                   </div>
                 </div>
                 <p className="mt-3 text-xs text-slate-500">
