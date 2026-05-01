@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  SCAN_MAX_DOCUMENT_COUNT,
   SCAN_MAX_IMAGE_FILE_SIZE_BYTES,
   SCAN_MAX_IMAGE_FILE_SIZE_LABEL,
   SCAN_MAX_PAGE_COUNT,
@@ -271,6 +272,7 @@ function CornerEditor({
 
 export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [scans, setScans] = useState<ScanDocument[]>([]);
+  const [allScans, setAllScans] = useState<ScanDocument[]>([]);
   const [activeScan, setActiveScan] = useState<ScanDocument | null>(null);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [adjustments, setAdjustments] = useState<ScanAdjustments>(createDefaultScanAdjustments);
@@ -282,6 +284,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [pdfTitle, setPdfTitle] = useState('');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const [activeListTab, setActiveListTab] = useState<'current' | 'all'>('current');
+  const [allScansLoading, setAllScansLoading] = useState(false);
+  const [deletingScanId, setDeletingScanId] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isApplyingServerAdjustmentsRef = useRef(false);
@@ -296,6 +301,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   const pages = activeScan?.pages ?? emptyPages;
   const hasPendingDeletes = pendingDeleteCount > 0;
+  const knownScanCount = Math.max(scans.length, allScans.length);
+  const hasReachedScanLimit = knownScanCount >= SCAN_MAX_DOCUMENT_COUNT;
+  const allScanRows = allScans.length > 0 ? allScans : scans;
   const selectedPage = useMemo(
     () => pages.find((page) => page.id === selectedPageId) ?? null,
     [pages, selectedPageId],
@@ -310,7 +318,26 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const loadScans = useCallback(async () => {
     const data = await jsonFetch<{ scans: ScanDocument[] }>('/api/scans');
     setScans(data.scans);
+    setAllScans((current) => {
+      if (current.length === 0) return data.scans;
+      const merged = new Map(current.map((scan) => [scan.id, scan]));
+      for (const scan of data.scans) merged.set(scan.id, scan);
+      return Array.from(merged.values()).sort((a, b) => (
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      ));
+    });
     return data.scans;
+  }, []);
+
+  const loadAllScans = useCallback(async () => {
+    setAllScansLoading(true);
+    try {
+      const data = await jsonFetch<{ scans: ScanDocument[] }>('/api/scans?view=all');
+      setAllScans(data.scans);
+      return data.scans;
+    } finally {
+      setAllScansLoading(false);
+    }
   }, []);
 
   const loadScan = useCallback(async (scanId: string) => {
@@ -428,6 +455,11 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   function createScan() {
     if (hasPendingDeletes) return;
+    if (hasReachedScanLimit) {
+      setError(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+      setActiveListTab('all');
+      return;
+    }
     void flushAdjustmentSave().catch((err) => {
       setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
     });
@@ -462,6 +494,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setScans((current) => current.map((scan) => (
       scan.id === data.scan.id ? { ...scan, title: data.scan.title, updated_at: data.scan.updated_at } : scan
     )));
+    setAllScans((current) => current.map((scan) => (
+      scan.id === data.scan.id ? { ...scan, title: data.scan.title, updated_at: data.scan.updated_at } : scan
+    )));
     setPdfTitle(data.scan.title);
     return data.scan;
   }
@@ -475,12 +510,17 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     try {
       let scan = activeScan;
       if (!scan) {
+        if (hasReachedScanLimit) {
+          setActiveListTab('all');
+          throw new Error(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+        }
         const created = await jsonFetch<{ scan: ScanDocument }>('/api/scans', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: `เอกสารสแกน ${new Date().toLocaleString('th-TH')}` }),
         });
         scan = created.scan;
+        setAllScans((current) => [created.scan, ...current.filter((item) => item.id !== created.scan.id)]);
         await loadScans();
       }
       const currentCount = scan.pages?.length ?? scan.page_count ?? 0;
@@ -543,6 +583,11 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
         ? { ...scan, page_count: Math.max(0, scan.page_count - 1), updated_at: new Date().toISOString() }
         : scan
     )));
+    setAllScans((current) => current.map((scan) => (
+      scan.id === scanBeforeDelete.id
+        ? { ...scan, page_count: Math.max(0, scan.page_count - 1), updated_at: new Date().toISOString() }
+        : scan
+    )));
     setPendingDeleteCount((count) => count + 1);
 
     const deletePromise = (async (): Promise<boolean> => {
@@ -567,6 +612,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           setScans((current) => current.map((scan) => (
             scan.id === scanBeforeDelete.id ? { ...scan, page_count: scanBeforeDelete.page_count } : scan
           )));
+          setAllScans((current) => current.map((scan) => (
+            scan.id === scanBeforeDelete.id ? { ...scan, page_count: scanBeforeDelete.page_count } : scan
+          )));
         }
         return false;
       } finally {
@@ -576,6 +624,42 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     })();
 
     pendingDeletesRef.current = [...pendingDeletesRef.current, deletePromise];
+  }
+
+  async function deleteScan(scanId: string) {
+    const scan = allScanRows.find((item) => item.id === scanId);
+    if (deletingScanId || busy || hasPendingDeletes || !scan) return;
+    if (!confirm(`ลบชุดสแกน "${scan.title}"? ไฟล์ใน Google Drive ของชุดนี้จะถูกลบด้วย`)) return;
+
+    setDeletingScanId(scanId);
+    setError('');
+    try {
+      if (dirtyAdjustmentRef.current?.scanId === scanId) {
+        dirtyAdjustmentRef.current = null;
+        if (saveAdjustmentTimerRef.current !== null) {
+          window.clearTimeout(saveAdjustmentTimerRef.current);
+          saveAdjustmentTimerRef.current = null;
+        }
+      } else {
+        await flushAdjustmentSave();
+      }
+
+      await jsonFetch(`/api/scans/${scanId}`, { method: 'DELETE' });
+      setScans((current) => current.filter((item) => item.id !== scanId));
+      setAllScans((current) => current.filter((item) => item.id !== scanId));
+      if (activeScan?.id === scanId) {
+        setActiveScan(null);
+        setSelectedPageId(null);
+        setAdjustments(createDefaultScanAdjustments());
+        setPdfTitle('');
+        setProgress('');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ลบชุดสแกนไม่สำเร็จ');
+      await loadScans().catch(() => undefined);
+    } finally {
+      setDeletingScanId(null);
+    }
   }
 
   async function movePage(pageId: string, direction: -1 | 1) {
@@ -710,7 +794,72 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
             <h2 className="text-sm font-bold text-slate-800">รายการสแกน</h2>
             {loading && <span className="text-xs text-slate-400">โหลด...</span>}
           </div>
-          {loading ? (
+          <div className="mb-3 grid grid-cols-2 rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setActiveListTab('current')}
+              className={`rounded-md px-2 py-1.5 ${activeListTab === 'current' ? 'bg-white text-[#003366] shadow-sm' : 'text-slate-500'}`}
+            >
+              ชุดปัจจุบัน
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveListTab('all');
+                void loadAllScans().catch((err) => {
+                  setError(err instanceof Error ? err.message : 'โหลดงานทั้งหมดไม่สำเร็จ');
+                });
+              }}
+              className={`rounded-md px-2 py-1.5 ${activeListTab === 'all' ? 'bg-white text-[#003366] shadow-sm' : 'text-slate-500'}`}
+            >
+              งานทั้งหมด
+            </button>
+          </div>
+          {activeListTab === 'all' ? (
+            <div>
+              <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+                <span>{allScanRows.length}/{SCAN_MAX_DOCUMENT_COUNT} ชุด</span>
+                {hasReachedScanLimit && <span className="font-semibold text-red-600">เต็มแล้ว</span>}
+              </div>
+              {loading || allScansLoading ? (
+                <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">กำลังโหลดข้อมูล</div>
+              ) : allScanRows.length === 0 ? (
+                <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">ยังไม่มีงานสแกน</p>
+              ) : (
+                <div className="max-h-[56vh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+                  {allScanRows.map((scan) => (
+                    <div
+                      key={scan.id}
+                      className={`flex items-start gap-2 p-2 ${activeScan?.id === scan.id ? 'bg-sky-50' : 'bg-white'}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveListTab('current');
+                          setSelectedPageId(null);
+                          void loadScan(scan.id);
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="truncate text-sm font-semibold text-slate-800">{scan.title}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {scan.page_count} หน้า · {new Date(scan.updated_at).toLocaleString('th-TH')}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteScan(scan.id)}
+                        disabled={busy || hasPendingDeletes || deletingScanId === scan.id}
+                        className="rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-600 disabled:opacity-50"
+                      >
+                        {deletingScanId === scan.id ? 'ลบ...' : 'ลบ'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : loading ? (
             <label className="block text-xs font-semibold text-slate-600">
               เลือกชุดสแกน
               <select
@@ -771,7 +920,14 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                   <div className="mt-5 grid gap-2 sm:mx-auto sm:max-w-sm sm:grid-cols-2">
                     <button
                       type="button"
-                      onClick={() => cameraInputRef.current?.click()}
+                      onClick={() => {
+                        if (hasReachedScanLimit) {
+                          setError(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+                          setActiveListTab('all');
+                          return;
+                        }
+                        cameraInputRef.current?.click();
+                      }}
                       disabled={busy || hasPendingDeletes}
                       className="rounded-lg bg-[#00a896] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                     >
@@ -779,7 +935,14 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => {
+                        if (hasReachedScanLimit) {
+                          setError(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+                          setActiveListTab('all');
+                          return;
+                        }
+                        fileInputRef.current?.click();
+                      }}
                       disabled={busy || hasPendingDeletes}
                       className="rounded-lg border border-[#003366]/30 bg-white px-5 py-2.5 text-sm font-semibold text-[#003366] disabled:opacity-50"
                     >

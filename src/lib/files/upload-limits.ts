@@ -31,3 +31,4 @@ export const SCAN_MAX_IMAGE_FILE_SIZE_BYTES = 4 * 1024 * 1024;
 export const SCAN_MAX_IMAGE_FILE_SIZE_LABEL = '4MB';
 export const SCAN_MAX_PAGE_COUNT = 30;
 export const SCAN_MAX_PAGE_COUNT_LABEL = '30 pages';
+export const SCAN_MAX_DOCUMENT_COUNT = 50;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, handleAuthError, hasGlobalRole } from '@/lib/auth/guards';
+import { SCAN_MAX_DOCUMENT_COUNT } from '@/lib/files/upload-limits';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { ensureScanFolders, type ScanDocumentRow } from '@/lib/scans/server';
 
@@ -7,18 +8,19 @@ export const dynamic = 'force-dynamic';
 
 const MAX_TITLE_LEN = 120;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser('hub');
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const admin = await createServiceRoleClient();
     const isSuperAdmin = await hasGlobalRole(user.id, ['SUPER_ADMIN']);
+    const showAll = request.nextUrl.searchParams.get('view') === 'all';
     let query = admin
       .from('scan_documents')
       .select('*')
       .order('updated_at', { ascending: false })
-      .limit(50);
+      .limit(showAll ? 500 : SCAN_MAX_DOCUMENT_COUNT);
     if (!isSuperAdmin) query = query.eq('owner_id', user.id);
 
     const { data, error } = await query;
@@ -39,6 +41,18 @@ export async function POST(request: NextRequest) {
     const title = titleRaw.slice(0, MAX_TITLE_LEN) || `เอกสารสแกน ${new Date().toLocaleDateString('th-TH')}`;
 
     const admin = await createServiceRoleClient();
+    const { count, error: countError } = await admin
+      .from('scan_documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', user.id);
+    if (countError) throw countError;
+    if ((count ?? 0) >= SCAN_MAX_DOCUMENT_COUNT) {
+      return NextResponse.json({
+        error: 'scan_limit_reached',
+        message: `คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`,
+      }, { status: 400 });
+    }
+
     const { data: created, error } = await admin
       .from('scan_documents')
       .insert({
