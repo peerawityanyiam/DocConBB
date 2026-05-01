@@ -17,7 +17,8 @@ function errorResponse(status: number, error: string, message: string) {
 
 function isSupportedImage(mimeType: string, fileName: string) {
   const ext = fileName.toLowerCase().split('.').pop() ?? '';
-  return mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(ext);
+  if (['heic', 'heif'].includes(ext) || /hei[cf]$/i.test(mimeType)) return false;
+  return ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
 }
 
 export async function POST(
@@ -50,7 +51,7 @@ export async function POST(
       return errorResponse(400, 'file_too_large', `Each image must be ${SCAN_MAX_IMAGE_FILE_SIZE_LABEL} or smaller.`);
     }
     if (!isSupportedImage(mimeType, fileName)) {
-      return errorResponse(400, 'unsupported_file_type', 'Only image files are supported.');
+      return errorResponse(400, 'unsupported_file_type', 'Only JPEG, PNG, and WebP images are supported. HEIC/HEIF is not supported.');
     }
     if (kind === 'processed' && !body.pageId) {
       return errorResponse(400, 'page_required', 'pageId is required for processed uploads.');

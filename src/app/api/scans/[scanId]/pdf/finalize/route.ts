@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { trashFile, verifyUploadedFile } from '@/lib/google-drive/files';
-import { setFilePublic } from '@/lib/google-drive/permissions';
 import { ensureScanFolders, getScanForUser } from '@/lib/scans/server';
 
 function errorResponse(status: number, error: string, message: string) {
@@ -30,8 +29,7 @@ export async function POST(
       return errorResponse(400, 'unsupported_file_type', 'Uploaded file is not a PDF.');
     }
 
-    await setFilePublic(driveFileId);
-    const viewUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
+    const viewUrl = `/api/scans/${scanId}/files/${driveFileId}`;
     const oldPdfId = scan.latest_pdf_file_id;
 
     const { data, error } = await admin

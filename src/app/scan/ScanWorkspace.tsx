@@ -102,7 +102,8 @@ function serializeAdjustments(adjustments: ScanAdjustments): Record<string, unkn
 }
 
 function isImageFile(file: File) {
-  return file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+  if (/\.hei[cf]$/i.test(file.name) || /hei[cf]$/i.test(file.type)) return false;
+  return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
 }
 
 function normalizePdfTitle(value: string) {
@@ -114,7 +115,9 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = typeof payload.error === 'string' ? payload.error : `HTTP_${res.status}`;
+    const message = typeof payload.message === 'string'
+      ? payload.message
+      : typeof payload.error === 'string' ? payload.error : `HTTP_${res.status}`;
     throw new Error(message);
   }
   return payload as T;
@@ -289,7 +292,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     adjustments: ScanAdjustments;
   } | null>(null);
   const saveAdjustmentTimerRef = useRef<number | null>(null);
-  const pendingDeletesRef = useRef<Promise<void>[]>([]);
+  const pendingDeletesRef = useRef<Promise<boolean>[]>([]);
 
   const pages = activeScan?.pages ?? emptyPages;
   const hasPendingDeletes = pendingDeleteCount > 0;
@@ -384,10 +387,15 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   }, [persistAdjustments]);
 
   const flushPendingDeletes = useCallback(async () => {
+    let hasFailedDelete = false;
     while (pendingDeletesRef.current.length > 0) {
       const pending = pendingDeletesRef.current;
       pendingDeletesRef.current = [];
-      await Promise.allSettled(pending);
+      const results = await Promise.all(pending);
+      hasFailedDelete = results.some((ok) => !ok) || hasFailedDelete;
+    }
+    if (hasFailedDelete) {
+      throw new Error('ลบหน้าไม่สำเร็จ กรุณาตรวจสอบรายการก่อนสร้าง PDF');
     }
   }, []);
 
@@ -537,11 +545,12 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     )));
     setPendingDeleteCount((count) => count + 1);
 
-    const deletePromise = (async () => {
+    const deletePromise = (async (): Promise<boolean> => {
       try {
         await jsonFetch(`/api/scans/${scanBeforeDelete.id}/pages/${pageId}`, { method: 'DELETE' });
         await loadScans();
         await loadScan(scanBeforeDelete.id);
+        return true;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'ลบหน้าไม่สำเร็จ');
         if (removedPage) {
@@ -559,6 +568,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
             scan.id === scanBeforeDelete.id ? { ...scan, page_count: scanBeforeDelete.page_count } : scan
           )));
         }
+        return false;
       } finally {
         pendingDeletesRef.current = pendingDeletesRef.current.filter((pending) => pending !== deletePromise);
         setPendingDeleteCount((count) => Math.max(0, count - 1));
@@ -680,7 +690,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         capture="environment"
         className="hidden"
         onChange={(event) => event.target.files && void handleFiles(event.target.files)}
@@ -688,7 +698,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         multiple
         className="hidden"
         onChange={(event) => event.target.files && void handleFiles(event.target.files)}

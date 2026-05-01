@@ -125,8 +125,12 @@ export async function ensureScanFolders(
 }
 
 export function toScanDocumentPayload(scan: ScanDocumentRow, pages: ScanPageRow[] = []) {
+  const latestPdfViewUrl = scan.latest_pdf_file_id
+    ? `/api/scans/${scan.id}/files/${scan.latest_pdf_file_id}`
+    : null;
   return {
     ...scan,
+    latest_pdf_view_url: latestPdfViewUrl,
     pages,
   };
 }
