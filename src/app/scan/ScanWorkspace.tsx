@@ -745,14 +745,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           {error && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           )}
-          {progress && (
-            <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800">{progress}</div>
-          )}
-          {!progress && hasPendingDeletes && (
-            <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800">
-              กำลังลบหน้าเอกสาร...
-            </div>
-          )}
 
           {!activeScan ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
