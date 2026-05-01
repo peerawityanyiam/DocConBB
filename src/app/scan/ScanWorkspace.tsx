@@ -302,6 +302,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const pages = activeScan?.pages ?? emptyPages;
   const hasPendingDeletes = pendingDeleteCount > 0;
   const knownScanCount = Math.max(scans.length, allScans.length);
+  const remainingScanCount = Math.max(0, SCAN_MAX_DOCUMENT_COUNT - knownScanCount);
   const hasReachedScanLimit = knownScanCount >= SCAN_MAX_DOCUMENT_COUNT;
   const allScanRows = allScans.length > 0 ? allScans : scans;
   const selectedPage = useMemo(
@@ -456,7 +457,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   function createScan() {
     if (hasPendingDeletes) return;
     if (hasReachedScanLimit) {
-      setError(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+      setError(`คุณมีงานสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} งานแล้ว กรุณาลบงานเก่าก่อนสร้างงานใหม่`);
       setActiveListTab('all');
       return;
     }
@@ -513,7 +514,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
       if (!scan) {
         if (hasReachedScanLimit) {
           setActiveListTab('all');
-          throw new Error(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+          throw new Error(`คุณมีงานสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} งานแล้ว กรุณาลบงานเก่าก่อนสร้างงานใหม่`);
         }
         const created = await jsonFetch<{ scan: ScanDocument }>('/api/scans', {
           method: 'POST',
@@ -794,7 +795,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
               disabled={busy || hasPendingDeletes}
               className={`rounded-md px-2 py-1.5 ${activeListTab === 'current' ? 'bg-white text-[#003366] shadow-sm' : 'text-slate-500'}`}
             >
-              ชุดใหม่
+              งานใหม่
             </button>
             <button
               type="button"
@@ -812,7 +813,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           {activeListTab === 'all' ? (
             <div>
               <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
-                <span>{allScanRows.length}/{SCAN_MAX_DOCUMENT_COUNT} ชุด</span>
+                <span>{allScanRows.length}/{SCAN_MAX_DOCUMENT_COUNT} งาน</span>
                 {hasReachedScanLimit && <span className="font-semibold text-red-600">เต็มแล้ว</span>}
               </div>
               {loading || allScansLoading ? (
@@ -854,13 +855,13 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
             </div>
           ) : (
             <div className="rounded-lg bg-slate-50 p-3">
-              <div className="text-sm font-semibold text-slate-800">ชุดใหม่</div>
+              <div className="text-sm font-semibold text-slate-800">งานใหม่</div>
               <div className="mt-1 text-xs text-slate-500">
-                {knownScanCount}/{SCAN_MAX_DOCUMENT_COUNT} ชุด
+                สร้างได้อีก {remainingScanCount}/{SCAN_MAX_DOCUMENT_COUNT} งาน
               </div>
               {hasReachedScanLimit && (
                 <div className="mt-2 text-xs font-semibold text-red-600">
-                  ลบงานเก่าก่อนสร้างชุดใหม่
+                  ลบงานเก่าก่อนสร้างงานใหม่
                 </div>
               )}
             </div>
@@ -889,7 +890,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                       type="button"
                       onClick={() => {
                         if (hasReachedScanLimit) {
-                          setError(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+                          setError(`คุณมีงานสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} งานแล้ว กรุณาลบงานเก่าก่อนสร้างงานใหม่`);
                           setActiveListTab('all');
                           return;
                         }
@@ -904,7 +905,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                       type="button"
                       onClick={() => {
                         if (hasReachedScanLimit) {
-                          setError(`คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`);
+                          setError(`คุณมีงานสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} งานแล้ว กรุณาลบงานเก่าก่อนสร้างงานใหม่`);
                           setActiveListTab('all');
                           return;
                         }
