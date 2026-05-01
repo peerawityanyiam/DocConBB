@@ -29,6 +29,8 @@ const DEFAULT_CORNERS: [ScanCorner, ScanCorner, ScanCorner, ScanCorner] = [
   { x: 1, y: 1 },
   { x: 0, y: 1 },
 ];
+const A4_PORTRAIT = { width: 595.28, height: 841.89 };
+const A4_LANDSCAPE = { width: A4_PORTRAIT.height, height: A4_PORTRAIT.width };
 
 export function createDefaultScanAdjustments(): ScanAdjustments {
   return {
@@ -319,12 +321,16 @@ export async function buildSingleScanPdfFile(files: File[], outputName: string):
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const embedded = await pdf.embedJpg(bytes);
-      const page = pdf.addPage([bitmap.width, bitmap.height]);
+      const pageSize = bitmap.width > bitmap.height ? A4_LANDSCAPE : A4_PORTRAIT;
+      const page = pdf.addPage([pageSize.width, pageSize.height]);
+      const scale = Math.min(pageSize.width / bitmap.width, pageSize.height / bitmap.height);
+      const drawWidth = bitmap.width * scale;
+      const drawHeight = bitmap.height * scale;
       page.drawImage(embedded, {
-        x: 0,
-        y: 0,
-        width: bitmap.width,
-        height: bitmap.height,
+        x: (pageSize.width - drawWidth) / 2,
+        y: (pageSize.height - drawHeight) / 2,
+        width: drawWidth,
+        height: drawHeight,
       });
     } finally {
       bitmap.close();
