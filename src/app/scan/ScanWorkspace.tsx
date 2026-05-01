@@ -288,8 +288,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [activeListTab, setActiveListTab] = useState<'current' | 'all'>('current');
   const [allScansLoading, setAllScansLoading] = useState(false);
   const [deletingScanId, setDeletingScanId] = useState<string | null>(null);
-  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
-  const [pdfViewerName, setPdfViewerName] = useState<string>('');
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedAdjustmentKeyRef = useRef<string | null>(null);
@@ -1177,8 +1175,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                         type="button"
                         onClick={() => {
                           if (!activeScan.latest_pdf_view_url) return;
-                          setPdfViewerUrl(activeScan.latest_pdf_view_url);
-                          setPdfViewerName(activeScan.latest_pdf_file_name || 'scan.pdf');
+                          window.open(activeScan.latest_pdf_view_url, '_blank', 'noopener,noreferrer');
                         }}
                         className="inline-flex justify-center rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700"
                       >
@@ -1209,35 +1206,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           )}
         </section>
       </div>
-
-      {pdfViewerUrl && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/90">
-          <div className="flex items-center justify-between gap-3 bg-white px-4 py-2">
-            <div className="min-w-0 truncate text-sm font-semibold text-slate-800">{pdfViewerName}</div>
-            <div className="flex shrink-0 gap-2">
-              <a
-                href={pdfViewerUrl}
-                download={pdfViewerName}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-              >
-                ดาวน์โหลด
-              </a>
-              <button
-                type="button"
-                onClick={() => setPdfViewerUrl(null)}
-                className="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white"
-              >
-                ปิด
-              </button>
-            </div>
-          </div>
-          <iframe
-            src={pdfViewerUrl}
-            title={pdfViewerName}
-            className="flex-1 w-full border-0 bg-white"
-          />
-        </div>
-      )}
     </main>
   );
 }
