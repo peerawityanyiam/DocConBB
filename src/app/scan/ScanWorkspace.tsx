@@ -275,6 +275,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [busy, setBusy] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [pendingDeleteCount, setPendingDeleteCount] = useState(0);
   const [pdfTitle, setPdfTitle] = useState('');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
@@ -288,8 +289,10 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     adjustments: ScanAdjustments;
   } | null>(null);
   const saveAdjustmentTimerRef = useRef<number | null>(null);
+  const pendingDeletesRef = useRef<Promise<void>[]>([]);
 
   const pages = activeScan?.pages ?? emptyPages;
+  const hasPendingDeletes = pendingDeleteCount > 0;
   const selectedPage = useMemo(
     () => pages.find((page) => page.id === selectedPageId) ?? null,
     [pages, selectedPageId],
@@ -380,6 +383,14 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     await persistAdjustments(dirty.scanId, dirty.pageId, dirty.adjustments);
   }, [persistAdjustments]);
 
+  const flushPendingDeletes = useCallback(async () => {
+    while (pendingDeletesRef.current.length > 0) {
+      const pending = pendingDeletesRef.current;
+      pendingDeletesRef.current = [];
+      await Promise.allSettled(pending);
+    }
+  }, []);
+
   useEffect(() => {
     if (!activeScanId || !selectedPagePersistId || isApplyingServerAdjustmentsRef.current || busy) return;
     dirtyAdjustmentRef.current = {
@@ -408,6 +419,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   }, []);
 
   function createScan() {
+    if (hasPendingDeletes) return;
     void flushAdjustmentSave().catch((err) => {
       setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
     });
@@ -448,7 +460,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   async function handleFiles(files: FileList | File[]) {
     const fileArray = Array.from(files);
-    if (fileArray.length === 0) return;
+    if (fileArray.length === 0 || hasPendingDeletes) return;
     setError('');
     setBusy(true);
     setIsUploadingImages(true);
@@ -499,22 +511,65 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
   async function deletePage(pageId: string) {
     if (!activeScan || !confirm('ลบหน้านี้?')) return;
-    setBusy(true);
+    const scanBeforeDelete = activeScan;
+    const removedPage = scanBeforeDelete.pages?.find((page) => page.id === pageId);
+    const nextPages = (scanBeforeDelete.pages ?? []).filter((page) => page.id !== pageId);
     setError('');
-    try {
-      await flushAdjustmentSave();
-      await jsonFetch(`/api/scans/${activeScan.id}/pages/${pageId}`, { method: 'DELETE' });
-      await loadScans();
-      await loadScan(activeScan.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'ลบหน้าไม่สำเร็จ');
-    } finally {
-      setBusy(false);
+    if (selectedPageId === pageId) {
+      setSelectedPageId(null);
     }
+    if (dirtyAdjustmentRef.current?.pageId === pageId) {
+      dirtyAdjustmentRef.current = null;
+      if (saveAdjustmentTimerRef.current !== null) {
+        window.clearTimeout(saveAdjustmentTimerRef.current);
+        saveAdjustmentTimerRef.current = null;
+      }
+    }
+    setActiveScan({
+      ...scanBeforeDelete,
+      pages: nextPages,
+      page_count: Math.max(0, scanBeforeDelete.page_count - 1),
+    });
+    setScans((current) => current.map((scan) => (
+      scan.id === scanBeforeDelete.id
+        ? { ...scan, page_count: Math.max(0, scan.page_count - 1), updated_at: new Date().toISOString() }
+        : scan
+    )));
+    setPendingDeleteCount((count) => count + 1);
+
+    const deletePromise = (async () => {
+      try {
+        await jsonFetch(`/api/scans/${scanBeforeDelete.id}/pages/${pageId}`, { method: 'DELETE' });
+        await loadScans();
+        await loadScan(scanBeforeDelete.id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'ลบหน้าไม่สำเร็จ');
+        if (removedPage) {
+          setActiveScan((current) => {
+            if (!current || current.id !== scanBeforeDelete.id) return current;
+            if (current.pages?.some((page) => page.id === pageId)) return current;
+            const restoredPages = [...(current.pages ?? []), removedPage].sort((a, b) => a.page_index - b.page_index);
+            return {
+              ...current,
+              pages: restoredPages,
+              page_count: restoredPages.length,
+            };
+          });
+          setScans((current) => current.map((scan) => (
+            scan.id === scanBeforeDelete.id ? { ...scan, page_count: scanBeforeDelete.page_count } : scan
+          )));
+        }
+      } finally {
+        pendingDeletesRef.current = pendingDeletesRef.current.filter((pending) => pending !== deletePromise);
+        setPendingDeleteCount((count) => Math.max(0, count - 1));
+      }
+    })();
+
+    pendingDeletesRef.current = [...pendingDeletesRef.current, deletePromise];
   }
 
   async function movePage(pageId: string, direction: -1 | 1) {
-    if (!activeScan) return;
+    if (!activeScan || hasPendingDeletes) return;
     const ids = pages.map((page) => page.id);
     const index = ids.indexOf(pageId);
     const nextIndex = index + direction;
@@ -547,6 +602,10 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setError('');
     setProgress('กำลังสร้าง PDF...');
     try {
+      if (pendingDeletesRef.current.length > 0) {
+        setProgress('กำลังลบหน้าที่เลือก...');
+        await flushPendingDeletes();
+      }
       await flushAdjustmentSave();
       const titleScan = await savePdfTitle();
       if (editingPage) await saveAdjustments(editingPage.id, editingAdjustments, false);
@@ -610,7 +669,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           <button
             type="button"
             onClick={createScan}
-            disabled={busy}
+            disabled={busy || hasPendingDeletes}
             className="rounded-lg bg-[#003366] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
           >
             + ชุดใหม่
@@ -689,6 +748,11 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           {progress && (
             <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800">{progress}</div>
           )}
+          {!progress && hasPendingDeletes && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800">
+              กำลังลบหน้าเอกสาร...
+            </div>
+          )}
 
           {!activeScan ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
@@ -706,7 +770,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                     <button
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
-                      disabled={busy}
+                      disabled={busy || hasPendingDeletes}
                       className="rounded-lg bg-[#00a896] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       ถ่ายรูป
@@ -714,7 +778,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={busy}
+                      disabled={busy || hasPendingDeletes}
                       className="rounded-lg border border-[#003366]/30 bg-white px-5 py-2.5 text-sm font-semibold text-[#003366] disabled:opacity-50"
                     >
                       เลือกรูป
@@ -735,7 +799,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                     <button
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
-                      disabled={busy || pages.length >= SCAN_MAX_PAGE_COUNT}
+                      disabled={busy || hasPendingDeletes || pages.length >= SCAN_MAX_PAGE_COUNT}
                       className="rounded-lg bg-[#00a896] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       ถ่ายรูป
@@ -743,7 +807,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={busy || pages.length >= SCAN_MAX_PAGE_COUNT}
+                      disabled={busy || hasPendingDeletes || pages.length >= SCAN_MAX_PAGE_COUNT}
                       className="rounded-lg border border-[#003366]/30 bg-white px-4 py-2 text-sm font-semibold text-[#003366] disabled:opacity-50"
                     >
                       เลือกรูป
@@ -971,10 +1035,12 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                 <button
                   type="button"
                   onClick={() => void generatePdf()}
-                  disabled={busy || pages.length === 0}
+                  disabled={busy || hasPendingDeletes || pages.length === 0}
                   className="w-full rounded-lg bg-[#c5a059] px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
                 >
-                  {isGeneratingPdf
+                  {hasPendingDeletes
+                    ? 'กำลังลบหน้า...'
+                    : isGeneratingPdf
                     ? progress || 'กำลังสร้าง PDF...'
                     : activeScan.latest_pdf_file_id ? 'สร้าง PDF ใหม่' : 'สร้าง PDF'}
                 </button>
