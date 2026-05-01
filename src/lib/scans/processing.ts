@@ -249,6 +249,47 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
   });
 }
 
+/**
+ * Downscale a camera-quality image to a Drive-friendly JPEG before upload.
+ * Targets ~1MB at 2400px max edge, which keeps text readable while shaving
+ * 4-8x off the network transfer time for typical 4MB phone photos.
+ */
+export async function compressScanImageFile(file: File): Promise<File> {
+  const blob = file as Blob;
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const maxEdge = 2400;
+    const edge = Math.max(bitmap.width, bitmap.height);
+    const scale = edge > maxEdge ? maxEdge / edge : 1;
+    const targetWidth = Math.max(1, Math.round(bitmap.width * scale));
+    const targetHeight = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('canvas_context_unavailable');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+
+    const attempts: number[] = [0.85, 0.78, 0.7];
+    let lastBlob: Blob | null = null;
+    for (const quality of attempts) {
+      const next = await canvasToBlob(canvas, quality);
+      lastBlob = next;
+      if (next.size <= SCAN_MAX_IMAGE_FILE_SIZE_BYTES) break;
+    }
+    if (!lastBlob) throw new Error('image_export_failed');
+    const baseName = file.name.replace(/\.[^/.]+$/, '') || 'scan';
+    return new File([lastBlob], `${baseName}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
 export async function renderRotatedScanCanvas(
   sourceUrl: string,
   rotation: ScanAdjustments['rotation'],
