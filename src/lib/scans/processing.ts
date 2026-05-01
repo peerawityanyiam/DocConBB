@@ -251,14 +251,14 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
 
 /**
  * Downscale a camera-quality image to a Drive-friendly JPEG before upload.
- * Targets ~1MB at 2400px max edge, which keeps text readable while shaving
- * 4-8x off the network transfer time for typical 4MB phone photos.
+ * Keep source pages crisp enough for later perspective correction while still
+ * enforcing the scanner module's 4MB per-photo upload cap.
  */
 export async function compressScanImageFile(file: File): Promise<File> {
   const blob = file as Blob;
   const bitmap = await createImageBitmap(blob);
   try {
-    const maxEdge = 2400;
+    const maxEdge = 3200;
     const edge = Math.max(bitmap.width, bitmap.height);
     const scale = edge > maxEdge ? maxEdge / edge : 1;
     const targetWidth = Math.max(1, Math.round(bitmap.width * scale));
@@ -272,7 +272,7 @@ export async function compressScanImageFile(file: File): Promise<File> {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
 
-    const attempts: number[] = [0.85, 0.78, 0.7];
+    const attempts: number[] = [0.93, 0.9, 0.86, 0.8];
     let lastBlob: Blob | null = null;
     for (const quality of attempts) {
       const next = await canvasToBlob(canvas, quality);
@@ -327,10 +327,10 @@ export async function renderProcessedScanFile(
   try {
     const sourceCanvas = drawRotatedSource(source, adjustments.rotation);
     const attempts = [
-      { maxEdge: 2200, quality: 0.88 },
-      { maxEdge: 1900, quality: 0.82 },
-      { maxEdge: 1600, quality: 0.76 },
-      { maxEdge: 1300, quality: 0.7 },
+      { maxEdge: 2800, quality: 0.92 },
+      { maxEdge: 2400, quality: 0.88 },
+      { maxEdge: 2000, quality: 0.84 },
+      { maxEdge: 1700, quality: 0.78 },
     ];
     let lastBlob: Blob | null = null;
     for (const attempt of attempts) {
