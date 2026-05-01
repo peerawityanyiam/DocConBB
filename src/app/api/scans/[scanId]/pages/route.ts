@@ -3,6 +3,8 @@ import { getAuthUser, handleAuthError } from '@/lib/auth/guards';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getScanForUser } from '@/lib/scans/server';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ scanId: string }> },
@@ -14,29 +16,21 @@ export async function PATCH(
     const { scanId } = await params;
     const body = (await request.json()) as { orderedPageIds?: string[] };
     const orderedPageIds = Array.isArray(body.orderedPageIds) ? body.orderedPageIds : [];
-    if (orderedPageIds.length === 0) {
+    if (orderedPageIds.length === 0 || !orderedPageIds.every((id) => typeof id === 'string' && UUID_RE.test(id))) {
       return NextResponse.json({ error: 'orderedPageIds_required' }, { status: 400 });
     }
 
     const admin = await createServiceRoleClient();
     await getScanForUser(admin, scanId, user);
 
-    const { data: existing, error: existingError } = await admin
-      .from('scan_pages')
-      .select('id')
-      .eq('scan_id', scanId);
-    if (existingError) throw existingError;
-
-    const existingIds = new Set((existing ?? []).map((row) => row.id));
-    if (orderedPageIds.length !== existingIds.size || orderedPageIds.some((id) => !existingIds.has(id))) {
+    const { error } = await admin.rpc('reorder_scan_pages', {
+      p_scan_id: scanId,
+      p_ordered_ids: orderedPageIds,
+    });
+    if (error?.message?.includes('invalid_page_order')) {
       return NextResponse.json({ error: 'invalid_page_order' }, { status: 400 });
     }
-
-    await Promise.all(
-      orderedPageIds.map((id, pageIndex) => (
-        admin.from('scan_pages').update({ page_index: pageIndex }).eq('id', id).eq('scan_id', scanId)
-      )),
-    );
+    if (error) throw error;
 
     return NextResponse.json({ ok: true });
   } catch (err) {

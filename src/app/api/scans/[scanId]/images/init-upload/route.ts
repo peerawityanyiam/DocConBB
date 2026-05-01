@@ -18,7 +18,8 @@ function errorResponse(status: number, error: string, message: string) {
 function isSupportedImage(mimeType: string, fileName: string) {
   const ext = fileName.toLowerCase().split('.').pop() ?? '';
   if (['heic', 'heif'].includes(ext) || /hei[cf]$/i.test(mimeType)) return false;
-  return ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+  return ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)
+    && ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
 }
 
 export async function POST(

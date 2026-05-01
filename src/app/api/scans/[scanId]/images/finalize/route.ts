@@ -17,7 +17,8 @@ function errorResponse(status: number, error: string, message: string) {
 function isSupportedUploadedImage(mimeType: string, name: string) {
   const ext = name.toLowerCase().split('.').pop() ?? '';
   if (['heic', 'heif'].includes(ext) || /hei[cf]$/i.test(mimeType)) return false;
-  return ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+  return ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)
+    && ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
 }
 
 export async function POST(
@@ -46,6 +47,9 @@ export async function POST(
     const expectedFolder = kind === 'processed' ? folders.processedFolderId : folders.originalsFolderId;
     const meta = await verifyUploadedFile(driveFileId, expectedFolder);
     if (!isSupportedUploadedImage(meta.mimeType, meta.name)) {
+      try { await trashFile(driveFileId); } catch {
+        // best-effort cleanup
+      }
       return errorResponse(400, 'unsupported_file_type', 'Only JPEG, PNG, and WebP images are supported. HEIC/HEIF is not supported.');
     }
 

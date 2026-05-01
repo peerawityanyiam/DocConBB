@@ -78,29 +78,22 @@ export async function DELETE(
     const admin = await createServiceRoleClient();
     const scan = await getScanForUser(admin, scanId, user);
 
-    const { data: pages } = await admin
-      .from('scan_pages')
-      .select('original_drive_file_id, processed_drive_file_id')
-      .eq('scan_id', scanId);
+    // Trash the Drive folder first; if this fails we still have the DB row,
+    // so the scan stays visible to the user (and retryable) instead of leaving
+    // orphaned files. Trashing the parent folder cascades to all child files.
+    if (scan.scan_folder_id) {
+      try {
+        await trashFile(scan.scan_folder_id);
+      } catch {
+        return NextResponse.json({
+          error: 'drive_cleanup_failed',
+          message: 'ลบไฟล์บน Drive ไม่สำเร็จ กรุณาลองใหม่',
+        }, { status: 502 });
+      }
+    }
 
     const { error } = await admin.from('scan_documents').delete().eq('id', scanId);
     if (error) throw error;
-
-    const driveIds = new Set<string>();
-    for (const page of pages ?? []) {
-      if (page.original_drive_file_id) driveIds.add(page.original_drive_file_id);
-      if (page.processed_drive_file_id) driveIds.add(page.processed_drive_file_id);
-    }
-    if (scan.latest_pdf_file_id) driveIds.add(scan.latest_pdf_file_id);
-    if (scan.scan_folder_id) driveIds.add(scan.scan_folder_id);
-
-    for (const fileId of driveIds) {
-      try {
-        await trashFile(fileId);
-      } catch {
-        // best-effort cleanup only
-      }
-    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

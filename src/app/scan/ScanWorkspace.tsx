@@ -289,7 +289,6 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [deletingScanId, setDeletingScanId] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isApplyingServerAdjustmentsRef = useRef(false);
   const selectedAdjustmentKeyRef = useRef<string | null>(null);
   const dirtyAdjustmentRef = useRef<{
     scanId: string;
@@ -368,19 +367,8 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     const pageKey = activeScan && selectedPage ? `${activeScan.id}:${selectedPage.id}` : null;
     if (selectedAdjustmentKeyRef.current === pageKey) return;
     selectedAdjustmentKeyRef.current = pageKey;
-    if (!selectedPage) {
-      isApplyingServerAdjustmentsRef.current = true;
-      setAdjustments(createDefaultScanAdjustments());
-      return;
-    }
-    isApplyingServerAdjustmentsRef.current = true;
-    setAdjustments(coerceAdjustments(selectedPage.adjustments));
+    setAdjustments(selectedPage ? coerceAdjustments(selectedPage.adjustments) : createDefaultScanAdjustments());
   }, [activeScan, selectedPage]);
-
-  useEffect(() => {
-    if (!isApplyingServerAdjustmentsRef.current) return;
-    isApplyingServerAdjustmentsRef.current = false;
-  }, [adjustments]);
 
   const persistAdjustments = useCallback(async (
     scanId: string,
@@ -428,7 +416,15 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   }, []);
 
   useEffect(() => {
-    if (!activeScanId || !selectedPagePersistId || isApplyingServerAdjustmentsRef.current || busy) return;
+    if (!activeScanId || !selectedPagePersistId || busy) return;
+    // Skip the auto-save when the current adjustments match what the server
+    // already has — this is the case right after we load a page, where the
+    // setAdjustments call above isn't actually a user edit.
+    const serverSerialized = JSON.stringify(
+      selectedPage ? serializeAdjustments(coerceAdjustments(selectedPage.adjustments)) : null,
+    );
+    const currentSerialized = JSON.stringify(serializeAdjustments(adjustments));
+    if (serverSerialized === currentSerialized) return;
     dirtyAdjustmentRef.current = {
       scanId: activeScanId,
       pageId: selectedPagePersistId,
@@ -446,7 +442,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
         setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
       });
     }, 700);
-  }, [activeScanId, adjustments, busy, persistAdjustments, selectedPagePersistId]);
+  }, [activeScanId, adjustments, busy, persistAdjustments, selectedPage, selectedPagePersistId]);
 
   useEffect(() => () => {
     if (saveAdjustmentTimerRef.current !== null) {
@@ -509,6 +505,8 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setError('');
     setBusy(true);
     setIsUploadingImages(true);
+    let createdScanId: string | null = null;
+    let uploadedCount = 0;
     try {
       let scan = activeScan;
       if (!scan) {
@@ -522,6 +520,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           body: JSON.stringify({ title: `เอกสารสแกน ${new Date().toLocaleString('th-TH')}` }),
         });
         scan = created.scan;
+        createdScanId = created.scan.id;
         setAllScans((current) => [created.scan, ...current.filter((item) => item.id !== created.scan.id)]);
         await loadScans();
       }
@@ -544,6 +543,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           kind: 'original',
           onProgress: (percent) => setProgress(`อัปโหลดรูป ${i + 1}/${fileArray.length} ${percent}%`),
         });
+        uploadedCount += 1;
       }
       await loadScans();
       await loadScan(scan.id);
@@ -551,6 +551,17 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
       setProgress('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'อัปโหลดรูปไม่สำเร็จ');
+      // If we just created a brand-new scan and didn't manage to upload any
+      // pages, clean it up so it doesn't sit empty in the user's quota.
+      if (createdScanId && uploadedCount === 0) {
+        try {
+          await fetch(`/api/scans/${createdScanId}`, { method: 'DELETE' });
+          setScans((current) => current.filter((s) => s.id !== createdScanId));
+          setAllScans((current) => current.filter((s) => s.id !== createdScanId));
+        } catch {
+          // best-effort
+        }
+      }
     } finally {
       setIsUploadingImages(false);
       setBusy(false);
@@ -713,6 +724,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
         const pageAdjustments = page.id === editingPage?.id
           ? editingAdjustments
           : coerceAdjustments(page.adjustments);
+        const nextSerialized = serializeAdjustments(pageAdjustments);
+        const prevSerialized = serializeAdjustments(coerceAdjustments(page.adjustments));
+        const adjustmentsUnchanged = JSON.stringify(nextSerialized) === JSON.stringify(prevSerialized);
         setProgress(`ปรับภาพหน้า ${i + 1}/${latestPages.length}`);
         const file = await renderProcessedScanFile(
           scanFileUrl(latestScan.id, page.original_drive_file_id),
@@ -720,12 +734,17 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
           `scan-${i + 1}.jpg`,
         );
         processedFiles.push(file);
+        // If we already have a saved processed file and the adjustments haven't
+        // changed since, reuse it instead of re-uploading the same render.
+        if (adjustmentsUnchanged && page.processed_drive_file_id) {
+          continue;
+        }
         await uploadScanImageResumable({
           scanId: latestScan.id,
           file,
           kind: 'processed',
           pageId: page.id,
-          adjustments: serializeAdjustments(pageAdjustments),
+          adjustments: nextSerialized,
           onProgress: (percent) => setProgress(`อัปโหลดภาพหน้า ${i + 1}/${latestPages.length} ${percent}%`),
         });
       }
@@ -957,65 +976,63 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                   <h3 className="mb-3 text-sm font-bold text-slate-700">หน้าเอกสาร</h3>
                   <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
                     {pages.map((page, index) => (
-                      <button
+                      <div
                         key={page.id}
-                        type="button"
-                        onClick={() => {
-                          void flushAdjustmentSave()
-                            .then(() => setSelectedPageId(page.id))
-                            .catch((err) => {
-                              setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
-                            });
-                        }}
-                        className={`rounded-lg border p-2 text-left ${
+                        className={`rounded-lg border p-2 ${
                           selectedPage?.id === page.id
                             ? 'border-sky-500 bg-sky-50'
                             : 'border-slate-200 bg-white'
                         }`}
                       >
-                        <div className="aspect-[3/4] overflow-hidden rounded bg-slate-100">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={scanFileUrl(activeScan.id, page.processed_drive_file_id || page.original_drive_file_id)}
-                            alt={`page ${index + 1}`}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-1 text-xs">
-                          <span className="font-semibold text-slate-700">หน้า {index + 1}</span>
-                          <span className="text-slate-400">{page.processed_drive_file_id ? 'ปรับแล้ว' : formatBytes(page.original_size_bytes)}</span>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void flushAdjustmentSave()
+                              .then(() => setSelectedPageId(page.id))
+                              .catch((err) => {
+                                setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
+                              });
+                          }}
+                          className="block w-full text-left"
+                        >
+                          <div className="aspect-[3/4] overflow-hidden rounded bg-slate-100">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={scanFileUrl(activeScan.id, page.processed_drive_file_id || page.original_drive_file_id)}
+                              alt={`page ${index + 1}`}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="mt-2 flex items-center justify-between gap-1 text-xs">
+                            <span className="font-semibold text-slate-700">หน้า {index + 1}</span>
+                            <span className="text-slate-400">{page.processed_drive_file_id ? 'ปรับแล้ว' : formatBytes(page.original_size_bytes)}</span>
+                          </div>
+                        </button>
                         <div className="mt-2 flex gap-1">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => { event.stopPropagation(); void movePage(page.id, -1); }}
-                            onKeyDown={(event) => { if (event.key === 'Enter') void movePage(page.id, -1); }}
+                          <button
+                            type="button"
+                            onClick={() => void movePage(page.id, -1)}
                             className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
                           >
                             ↑
-                          </span>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => { event.stopPropagation(); void movePage(page.id, 1); }}
-                            onKeyDown={(event) => { if (event.key === 'Enter') void movePage(page.id, 1); }}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void movePage(page.id, 1)}
                             className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
                           >
                             ↓
-                          </span>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => { event.stopPropagation(); void deletePage(page.id); }}
-                            onKeyDown={(event) => { if (event.key === 'Enter') void deletePage(page.id); }}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deletePage(page.id)}
                             className="ml-auto rounded bg-red-50 px-2 py-1 text-xs text-red-600"
                           >
                             ลบ
-                          </span>
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     ))}
                     {isUploadingImages && (
                       <div className="rounded-lg border border-dashed border-sky-300 bg-sky-50 p-2">

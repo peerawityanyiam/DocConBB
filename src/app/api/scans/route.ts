@@ -41,28 +41,20 @@ export async function POST(request: NextRequest) {
     const title = titleRaw.slice(0, MAX_TITLE_LEN) || `เอกสารสแกน ${new Date().toLocaleDateString('th-TH')}`;
 
     const admin = await createServiceRoleClient();
-    const { count, error: countError } = await admin
-      .from('scan_documents')
-      .select('id', { count: 'exact', head: true })
-      .eq('owner_id', user.id);
-    if (countError) throw countError;
-    if ((count ?? 0) >= SCAN_MAX_DOCUMENT_COUNT) {
+    const { data: created, error } = await admin
+      .rpc('create_scan_document', {
+        p_owner_id: user.id,
+        p_title: title,
+        p_max: SCAN_MAX_DOCUMENT_COUNT,
+      })
+      .single<ScanDocumentRow>();
+
+    if (error?.message?.includes('scan_limit_reached')) {
       return NextResponse.json({
         error: 'scan_limit_reached',
         message: `คุณมีชุดสแกนครบ ${SCAN_MAX_DOCUMENT_COUNT} ชุดแล้ว กรุณาลบงานเก่าก่อนสร้างชุดใหม่`,
       }, { status: 400 });
     }
-
-    const { data: created, error } = await admin
-      .from('scan_documents')
-      .insert({
-        owner_id: user.id,
-        title,
-        status: 'DRAFT',
-      })
-      .select('*')
-      .single<ScanDocumentRow>();
-
     if (error || !created) throw error ?? new Error('scan_create_failed');
     await ensureScanFolders(admin, created);
 

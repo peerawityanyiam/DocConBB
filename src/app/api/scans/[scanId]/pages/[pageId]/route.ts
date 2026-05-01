@@ -48,36 +48,15 @@ export async function DELETE(
     const admin = await createServiceRoleClient();
     await getScanForUser(admin, scanId, user);
 
-    const { data: page, error: pageError } = await admin
-      .from('scan_pages')
-      .select('*')
-      .eq('id', pageId)
-      .eq('scan_id', scanId)
-      .single<ScanPageRow>();
-    if (pageError || !page) return NextResponse.json({ error: 'page_not_found' }, { status: 404 });
+    const { data, error } = await admin
+      .rpc('delete_scan_page', { p_scan_id: scanId, p_page_id: pageId })
+      .single<{ original_drive_file_id: string | null; processed_drive_file_id: string | null }>();
+    if (error?.message?.includes('page_not_found')) {
+      return NextResponse.json({ error: 'page_not_found' }, { status: 404 });
+    }
+    if (error || !data) throw error ?? new Error('page_delete_failed');
 
-    const { error } = await admin.from('scan_pages').delete().eq('id', pageId).eq('scan_id', scanId);
-    if (error) throw error;
-
-    const { data: remaining } = await admin
-      .from('scan_pages')
-      .select('id')
-      .eq('scan_id', scanId)
-      .order('page_index', { ascending: true });
-    await Promise.all(
-      (remaining ?? []).map((row, pageIndex) => (
-        admin.from('scan_pages').update({ page_index: pageIndex }).eq('id', row.id)
-      )),
-    );
-    await admin
-      .from('scan_documents')
-      .update({
-        page_count: remaining?.length ?? 0,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', scanId);
-
-    for (const fileId of [page.original_drive_file_id, page.processed_drive_file_id]) {
+    for (const fileId of [data.original_drive_file_id, data.processed_drive_file_id]) {
       if (!fileId) continue;
       try {
         await trashFile(fileId);

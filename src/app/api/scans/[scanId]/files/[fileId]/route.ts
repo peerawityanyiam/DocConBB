@@ -13,18 +13,23 @@ export async function GET(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { scanId, fileId } = await params;
+    // Drive file IDs are URL-safe base64-ish; reject anything that could break a
+    // PostgREST filter or downstream Drive call.
+    if (!/^[A-Za-z0-9_-]{10,128}$/.test(fileId)) {
+      return NextResponse.json({ error: 'file_not_found' }, { status: 404 });
+    }
     const admin = await createServiceRoleClient();
     const scan = await getScanForUser(admin, scanId, user);
 
     let allowed = scan.latest_pdf_file_id === fileId;
     if (!allowed) {
-      const { data: page } = await admin
+      const { data: matches } = await admin
         .from('scan_pages')
         .select('id')
         .eq('scan_id', scanId)
-        .or(`original_drive_file_id.eq.${fileId},processed_drive_file_id.eq.${fileId}`)
-        .maybeSingle();
-      allowed = Boolean(page);
+        .or(`original_drive_file_id.eq."${fileId}",processed_drive_file_id.eq."${fileId}"`)
+        .limit(1);
+      allowed = Boolean(matches && matches.length > 0);
     }
     if (!allowed) return NextResponse.json({ error: 'file_not_found' }, { status: 404 });
 
