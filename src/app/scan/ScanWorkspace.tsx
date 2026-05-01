@@ -288,9 +288,11 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   const [activeListTab, setActiveListTab] = useState<'current' | 'all'>('current');
   const [allScansLoading, setAllScansLoading] = useState(false);
   const [deletingScanId, setDeletingScanId] = useState<string | null>(null);
+  const [loadingScanId, setLoadingScanId] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedAdjustmentKeyRef = useRef<string | null>(null);
+  const scanSelectionRequestRef = useRef(0);
   const dirtyAdjustmentRef = useRef<{
     scanId: string;
     pageId: string;
@@ -314,6 +316,8 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     ? scanFileUrl(activeScan.id, selectedPage.original_drive_file_id)
     : '';
   const activeScanId = activeScan?.id ?? null;
+  const isActiveScanLoading = Boolean(activeScanId && loadingScanId === activeScanId);
+  const showPageLoading = isActiveScanLoading && pages.length === 0;
   const selectedPagePersistId = selectedPage?.id ?? null;
 
   const loadScans = useCallback(async () => {
@@ -341,8 +345,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     }
   }, []);
 
-  const loadScan = useCallback(async (scanId: string) => {
+  const loadScan = useCallback(async (scanId: string, requestId?: number) => {
     const data = await jsonFetch<{ scan: ScanDocument }>(`/api/scans/${scanId}`);
+    if (requestId !== undefined && scanSelectionRequestRef.current !== requestId) return data.scan;
     setActiveScan(data.scan);
     setPdfTitle(data.scan.title);
     setSelectedPageId((current) => {
@@ -680,6 +685,27 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     }
   }
 
+  function openScanFromHistory(scan: ScanDocument) {
+    const requestId = scanSelectionRequestRef.current + 1;
+    scanSelectionRequestRef.current = requestId;
+    setError('');
+    setSelectedPageId(null);
+    setPdfTitle(scan.title);
+    setLoadingScanId(scan.id);
+    setActiveScan((current) => {
+      if (current?.id === scan.id && current.pages) return current;
+      return { ...scan, pages: undefined };
+    });
+    void loadScan(scan.id, requestId)
+      .catch((err) => {
+        if (scanSelectionRequestRef.current !== requestId) return;
+        setError(err instanceof Error ? err.message : 'โหลดงานสแกนไม่สำเร็จ');
+      })
+      .finally(() => {
+        if (scanSelectionRequestRef.current === requestId) setLoadingScanId(null);
+      });
+  }
+
   async function movePage(pageId: string, direction: -1 | 1) {
     if (!activeScan || hasPendingDeletes) return;
     const ids = pages.map((page) => page.id);
@@ -849,20 +875,23 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
                   {allScanRows.map((scan) => (
                     <div
                       key={scan.id}
-                      className={`flex items-start gap-2 p-2 ${activeScan?.id === scan.id ? 'bg-sky-50' : 'bg-white'}`}
+                      className={`flex items-start gap-2 p-2 ${activeScan?.id === scan.id || loadingScanId === scan.id ? 'bg-sky-50' : 'bg-white'}`}
                     >
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedPageId(null);
-                          void loadScan(scan.id);
-                        }}
+                        onClick={() => openScanFromHistory(scan)}
                         className="min-w-0 flex-1 text-left"
                       >
                         <div className="truncate text-sm font-semibold text-slate-800">{scan.title}</div>
                         <div className="mt-1 text-xs text-slate-500">
                           {scan.page_count} หน้า · {new Date(scan.updated_at).toLocaleString('th-TH')}
                         </div>
+                        {loadingScanId === scan.id && (
+                          <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-sky-700">
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600" />
+                            กำลังโหลด
+                          </div>
+                        )}
                       </button>
                       <button
                         type="button"
@@ -978,9 +1007,21 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
 
               <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
-                  <h3 className="mb-3 text-sm font-bold text-slate-700">หน้าเอกสาร</h3>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold text-slate-700">หน้าเอกสาร</h3>
+                    {isActiveScanLoading && (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#003366]" />
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
-                    {pages.map((page, index) => (
+                    {showPageLoading ? (
+                      <div className="col-span-2 grid min-h-40 place-items-center rounded-lg bg-slate-50 text-center xl:col-span-1">
+                        <div>
+                          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#003366]" />
+                          <div className="mt-3 text-xs font-semibold text-slate-600">กำลังโหลดหน้าเอกสาร</div>
+                        </div>
+                      </div>
+                    ) : pages.map((page, index) => (
                       <div
                         key={page.id}
                         className={`rounded-lg border p-2 ${
