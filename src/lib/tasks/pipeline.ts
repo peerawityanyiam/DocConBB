@@ -56,6 +56,7 @@ interface StageSegmentOptions {
 
 export interface CurrentStageStuckInfo {
   stage: PipelineStageStatus;
+  sourceStatus: string;
   days: number;
   enteredAt: string;
 }
@@ -196,6 +197,7 @@ export function getCurrentStageStuckInfo(params: {
   const enteredMs = currentSegment?.startMs ?? parseIsoMs(params.updatedAt) ?? nowMs;
   return {
     stage: currentStage,
+    sourceStatus: currentSegment?.sourceStatus ?? String(params.status),
     days: safeNonNegativeDiffDays(nowMs - enteredMs),
     enteredAt: new Date(enteredMs).toISOString(),
   };

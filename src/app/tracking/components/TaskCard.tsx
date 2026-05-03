@@ -223,7 +223,7 @@ export default function TaskCard({
     completedAt: task.completed_at,
   });
   const stuckStageLabel = currentStageStuck
-    ? STATUS_LABELS[currentStageStuck.stage as TaskStatus]
+    ? (STATUS_LABELS[currentStageStuck.sourceStatus as TaskStatus] ?? STATUS_LABELS[currentStageStuck.stage as TaskStatus])
     : null;
   const ageForBadge = currentStageStuck?.days ?? age;
   const isRejected = REJECTED_STATUSES.has(task.status);

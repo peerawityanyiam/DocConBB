@@ -269,7 +269,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   const stageStuckDays = currentStageStuck?.days ?? 0;
   const stageStuckDaysLabel = formatDaysValue(stageStuckDays);
   const stageStuckLabel = currentStageStuck
-    ? STATUS_LABELS[currentStageStuck.stage as TaskStatus]
+    ? (STATUS_LABELS[currentStageStuck.sourceStatus as TaskStatus] ?? STATUS_LABELS[currentStageStuck.stage as TaskStatus])
     : '';
   const isOwnedStaffCard = activeRole === 'STAFF' && task.officer_id === userId;
 
