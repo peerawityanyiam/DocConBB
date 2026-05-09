@@ -298,6 +298,7 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     pageId: string;
     adjustments: ScanAdjustments;
   } | null>(null);
+  const adjustmentSaveQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const saveAdjustmentTimerRef = useRef<number | null>(null);
   const pendingDeletesRef = useRef<Promise<boolean>[]>([]);
 
@@ -376,37 +377,79 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
     setAdjustments(selectedPage ? coerceAdjustments(selectedPage.adjustments) : createDefaultScanAdjustments());
   }, [activeScan, selectedPage]);
 
-  const persistAdjustments = useCallback(async (
+  const applyLocalPageAdjustments = useCallback((
     scanId: string,
     pageId: string,
     value: ScanAdjustments,
   ) => {
-    await jsonFetch(`/api/scans/${scanId}/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adjustments: serializeAdjustments(value) }),
-    });
+    const serialized = serializeAdjustments(value);
     setActiveScan((current) => {
       if (!current || current.id !== scanId) return current;
       return {
         ...current,
         pages: current.pages?.map((page) => (
-          page.id === pageId ? { ...page, adjustments: serializeAdjustments(value) } : page
+          page.id === pageId ? { ...page, adjustments: serialized } : page
         )),
       };
     });
   }, []);
 
+  const persistAdjustments = useCallback(async (
+    scanId: string,
+    pageId: string,
+    value: ScanAdjustments,
+  ) => {
+    applyLocalPageAdjustments(scanId, pageId, value);
+    const key = `${scanId}:${pageId}`;
+    const previous = adjustmentSaveQueueRef.current.get(key) ?? Promise.resolve();
+    const serialized = serializeAdjustments(value);
+    const next = previous.catch(() => undefined).then(async () => {
+      await jsonFetch(`/api/scans/${scanId}/pages/${pageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adjustments: serialized }),
+      });
+    });
+    adjustmentSaveQueueRef.current.set(key, next);
+    try {
+      await next;
+    } finally {
+      if (adjustmentSaveQueueRef.current.get(key) === next) {
+        adjustmentSaveQueueRef.current.delete(key);
+      }
+    }
+  }, [applyLocalPageAdjustments]);
+
+  const waitForAdjustmentSaves = useCallback(async () => {
+    const pending = Array.from(adjustmentSaveQueueRef.current.values());
+    if (pending.length > 0) await Promise.all(pending);
+  }, []);
+
+  const stageCurrentAdjustmentSave = useCallback(() => {
+    if (!activeScanId || !selectedPagePersistId || !selectedPage) return;
+    const serverSerialized = JSON.stringify(serializeAdjustments(coerceAdjustments(selectedPage.adjustments)));
+    const currentSerialized = JSON.stringify(serializeAdjustments(adjustments));
+    if (serverSerialized === currentSerialized) return;
+    dirtyAdjustmentRef.current = {
+      scanId: activeScanId,
+      pageId: selectedPagePersistId,
+      adjustments,
+    };
+  }, [activeScanId, adjustments, selectedPage, selectedPagePersistId]);
+
   const flushAdjustmentSave = useCallback(async () => {
+    stageCurrentAdjustmentSave();
     if (saveAdjustmentTimerRef.current !== null) {
       window.clearTimeout(saveAdjustmentTimerRef.current);
       saveAdjustmentTimerRef.current = null;
     }
     const dirty = dirtyAdjustmentRef.current;
-    if (!dirty) return;
-    dirtyAdjustmentRef.current = null;
-    await persistAdjustments(dirty.scanId, dirty.pageId, dirty.adjustments);
-  }, [persistAdjustments]);
+    if (dirty) {
+      dirtyAdjustmentRef.current = null;
+      await persistAdjustments(dirty.scanId, dirty.pageId, dirty.adjustments);
+    }
+    await waitForAdjustmentSaves();
+  }, [persistAdjustments, stageCurrentAdjustmentSave, waitForAdjustmentSaves]);
 
   const flushPendingDeletes = useCallback(async () => {
     let hasFailedDelete = false;
@@ -686,6 +729,9 @@ export default function ScanWorkspace({ userEmail }: ScanWorkspaceProps) {
   }
 
   function openScanFromHistory(scan: ScanDocument) {
+    void flushAdjustmentSave().catch((err) => {
+      setError(err instanceof Error ? err.message : 'บันทึกค่าปรับภาพไม่สำเร็จ');
+    });
     const requestId = scanSelectionRequestRef.current + 1;
     scanSelectionRequestRef.current = requestId;
     setError('');
