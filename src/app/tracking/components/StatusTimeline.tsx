@@ -72,20 +72,29 @@ const STATUS_ICON: Record<string, string> = {
   REASSIGNED: '🔁',
 };
 
-const STATUS_OWNER_LABEL: Record<string, string> = {
-  ASSIGNED: 'เจ้าหน้าที่ผู้รับผิดชอบ',
-  SUBMITTED_TO_DOCCON: 'DocCon',
-  DOCCON_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
-  PENDING_REVIEW: 'ผู้ตรวจสอบ',
-  REVIEWER_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
-  WAITING_BOSS_APPROVAL: 'ผู้สั่งงาน',
-  BOSS_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
-  WAITING_SUPER_BOSS_APPROVAL: 'หัวหน้างาน',
-  SUPER_BOSS_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
-  COMPLETED: 'เสร็จสิ้น',
-  CANCELLED: 'ยกเลิกแล้ว',
-  REASSIGNED: 'ผู้รับผิดชอบใหม่',
+const STATUS_ACTION_LABEL: Record<string, string> = {
+  ASSIGNED: 'สร้างงานใหม่',
+  SUBMITTED_TO_DOCCON: 'ส่งให้ DocCon ตรวจ',
+  DOCCON_REJECTED: 'ส่งกลับให้เจ้าหน้าที่แก้ไข',
+  PENDING_REVIEW: 'ส่งให้ผู้ตรวจสอบเนื้อหา',
+  REVIEWER_REJECTED: 'ส่งกลับให้เจ้าหน้าที่แก้ไข',
+  WAITING_BOSS_APPROVAL: 'ส่งให้ผู้สั่งงานอนุมัติ',
+  BOSS_REJECTED: 'ส่งกลับให้เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
+  WAITING_SUPER_BOSS_APPROVAL: 'ส่งให้หัวหน้างานอนุมัติ',
+  SUPER_BOSS_REJECTED: 'ส่งกลับให้เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
+  COMPLETED: 'อนุมัติให้เสร็จสิ้น',
+  CANCELLED: 'ยกเลิกงาน',
+  REASSIGNED: 'โอนงาน',
 };
+
+function getActionLabel(entry: HistoryEntry, statusLabel: string): string {
+  const note = entry.note ?? '';
+
+  if (note.startsWith('sentBackToDocconBy:')) return 'ส่งกลับให้ DocCon ตรวจใหม่';
+  if (note.startsWith('reopenFromCompletedBy:')) return 'ดึงงานที่เสร็จแล้วกลับมาแก้ไข';
+
+  return STATUS_ACTION_LABEL[entry.status] ?? `เปลี่ยนสถานะเป็น ${statusLabel}`;
+}
 
 export default function StatusTimeline({
   history,
@@ -114,7 +123,7 @@ export default function StatusTimeline({
         const stuckDays = durationByIndex[index];
         const systemNote = entry.note ? resolveSystemNote(entry.note) : null;
         const actorName = entry.changedByName || entry.changedBy || 'ไม่ระบุ';
-        const ownerLabel = STATUS_OWNER_LABEL[entry.status] ?? 'ดูจากสถานะปัจจุบัน';
+        const actionLabel = getActionLabel(entry, statusLabel);
 
         return (
           <li key={`${entry.changedAt}-${index}`} className="ml-4">
@@ -125,14 +134,11 @@ export default function StatusTimeline({
                 <span className="w-2 h-2 rounded-full bg-slate-300 block" />
               )}
             </div>
-            <div className="bg-white border border-slate-100 rounded-lg px-3.5 py-3 shadow-xs">
+            <div className="bg-white border border-slate-100 rounded-lg px-3 py-2.5 shadow-xs">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium text-slate-400">สถานะหลังทำรายการ</p>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <span className="text-sm">{STATUS_ICON[entry.status] ?? '•'}</span>
-                    <span className="text-sm font-semibold text-slate-900">{statusLabel}</span>
-                  </div>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="text-sm">{STATUS_ICON[entry.status] ?? '•'}</span>
+                  <span className="text-sm font-semibold text-slate-900">{statusLabel}</span>
                 </div>
                 {idx === 0 && (
                   <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[11px] font-semibold text-yellow-700">
@@ -141,42 +147,24 @@ export default function StatusTimeline({
                 )}
               </div>
 
-              <div className="mt-3 grid grid-cols-1 gap-2 border-t border-slate-100 pt-2.5 sm:grid-cols-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] text-slate-400">ผู้ทำรายการ</p>
-                  <p className="truncate text-xs font-semibold text-slate-700">{actorName}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-slate-400">งานอยู่ที่</p>
-                  <p className="truncate text-xs font-semibold text-slate-700">{ownerLabel}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-slate-400">เวลา</p>
-                  <p className="truncate text-xs text-slate-600">{formatDateTime(entry.changedAt)}</p>
-                </div>
-              </div>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                <span className="font-semibold text-slate-700">{actorName}</span>{' '}
+                {actionLabel}
+                <span className="text-slate-400"> &bull; {formatDateTime(entry.changedAt)}</span>
+              </p>
 
               {typeof stuckDays === 'number' && Number.isFinite(stuckDays) && (
-                <p className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-[11px] text-slate-500">
-                  ระยะเวลาที่อยู่ในสถานะนี้ {formatDaysValue(stuckDays)} วัน
+                <p className="mt-1 text-[11px] text-slate-400">
+                  ค้างสถานะนี้ {formatDaysValue(stuckDays)} วัน
                 </p>
               )}
 
               {entry.note && !systemNote && (
-                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5">
-                  <p className="text-[11px] text-slate-400">หมายเหตุ</p>
-                  <p className="text-xs text-slate-600 italic">&ldquo;{entry.note}&rdquo;</p>
-                </div>
+                <p className="mt-1 text-xs italic text-slate-600">&ldquo;{entry.note}&rdquo;</p>
               )}
 
-              {systemNote && (
-                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5">
-                  <p className="text-[11px] text-slate-400">หมายเหตุระบบ</p>
-                  <p className="text-xs text-slate-600">
-                    {systemNote.text}
-                    {systemNote.reason ? ` เพราะ ${systemNote.reason}` : ''}
-                  </p>
-                </div>
+              {systemNote?.reason && (
+                <p className="mt-1 text-xs italic text-slate-600">&ldquo;{systemNote.reason}&rdquo;</p>
               )}
             </div>
           </li>
