@@ -126,7 +126,7 @@ export default function StatusTimeline({
         const actionLabel = getActionLabel(entry, statusLabel);
 
         return (
-          <li key={`${entry.changedAt}-${index}`} className="ml-4 pt-1.5">
+          <li key={`${entry.changedAt}-${index}`} className="ml-4">
             <div className="absolute -left-2 mt-1 w-4 h-4 rounded-full bg-white border-2 border-slate-300 flex items-center justify-center text-[10px]">
               {idx === 0 ? (
                 <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 block" />
@@ -134,7 +134,7 @@ export default function StatusTimeline({
                 <span className="w-2 h-2 rounded-full bg-slate-300 block" />
               )}
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="text-sm">{STATUS_ICON[entry.status] ?? '•'}</span>
