@@ -7,10 +7,6 @@ import HomeShortcuts from './HomeShortcuts';
 
 export const dynamic = 'force-dynamic';
 
-const DOCUMENT_CONTROL_GAS_URL =
-  process.env.NEXT_PUBLIC_DOCUMENT_CONTROL_GAS_URL ||
-  'https://accounts.google.com/AccountChooser?continue=https://script.google.com/a/macros/medicine.psu.ac.th/s/AKfycbx0oytFnXvNDaMfPkfLTUQKd8zr-uHpNhuaJNv2csLnM3pKADaWxpa0laQcVciTvRe-/exec';
-
 const cards = [
   {
     title: 'ระบบติดตามเอกสาร',
@@ -22,7 +18,7 @@ const cards = [
     title: 'Document Library',
     icon: '📑',
     description: 'จัดการระบบเอกสารคุณภาพ',
-    href: DOCUMENT_CONTROL_GAS_URL,
+    href: '/library',
   },
   {
     title: 'สแกนเอกสารเป็น PDF',

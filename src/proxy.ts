@@ -3,22 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { generateRequestId } from '@/lib/ops/observability';
 
 const PUBLIC_PATHS = ['/login', '/callback', '/api/cron', '/api/health'];
-const DOCUMENT_CONTROL_GAS_URL =
-  process.env.NEXT_PUBLIC_DOCUMENT_CONTROL_GAS_URL ||
-  'https://accounts.google.com/AccountChooser?continue=https://script.google.com/a/macros/medicine.psu.ac.th/s/AKfycbx0oytFnXvNDaMfPkfLTUQKd8zr-uHpNhuaJNv2csLnM3pKADaWxpa0laQcVciTvRe-/exec';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestId = request.headers.get('x-request-id')?.trim() || generateRequestId();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-request-id', requestId);
-
-  // Deprecated internal library module: force route to GAS
-  if (pathname === '/library' || pathname.startsWith('/library/')) {
-    const response = NextResponse.redirect(DOCUMENT_CONTROL_GAS_URL);
-    response.headers.set('x-request-id', requestId);
-    return response;
-  }
 
   // Deprecated internal library APIs: disable to avoid accidentally running old flow
   if (pathname === '/api/library' || pathname.startsWith('/api/library/')) {

@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation';
+import { getAuthUser } from '@/lib/auth/guards';
+import { buildDocumentControlUrl } from '@/lib/google-apps-script/document-control';
 
 export const dynamic = 'force-dynamic';
 
-const DOCUMENT_CONTROL_GAS_URL =
-  process.env.NEXT_PUBLIC_DOCUMENT_CONTROL_GAS_URL ||
-  'https://accounts.google.com/AccountChooser?continue=https://script.google.com/a/macros/medicine.psu.ac.th/s/AKfycbx0oytFnXvNDaMfPkfLTUQKd8zr-uHpNhuaJNv2csLnM3pKADaWxpa0laQcVciTvRe-/exec';
-
 export default async function LibraryPage() {
-  redirect(DOCUMENT_CONTROL_GAS_URL);
+  const user = await getAuthUser('hub');
+  if (!user) redirect('/login');
+
+  redirect(buildDocumentControlUrl(user.email));
 }
