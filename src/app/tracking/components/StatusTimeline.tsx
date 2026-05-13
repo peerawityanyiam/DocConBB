@@ -134,9 +134,9 @@ export default function StatusTimeline({
                 <span className="w-2 h-2 rounded-full bg-slate-300 block" />
               )}
             </div>
-            <div className="bg-white border border-slate-100 rounded-lg px-3 py-2.5 shadow-xs">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-1.5">
+                <div className="flex min-w-0 items-center gap-2 rounded-md bg-white px-2.5 py-1 shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)]">
                   <span className="text-sm">{STATUS_ICON[entry.status] ?? '•'}</span>
                   <span className="text-sm font-semibold text-slate-900">{statusLabel}</span>
                 </div>
@@ -147,25 +147,27 @@ export default function StatusTimeline({
                 )}
               </div>
 
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                <span className="font-semibold text-slate-700">{actorName}</span>{' '}
-                {actionLabel}
-                <span className="text-slate-400"> &bull; {formatDateTime(entry.changedAt)}</span>
-              </p>
-
-              {typeof stuckDays === 'number' && Number.isFinite(stuckDays) && (
-                <p className="mt-1 text-[11px] text-slate-400">
-                  ค้างสถานะนี้ {formatDaysValue(stuckDays)} วัน
+              <div className="px-3 py-2">
+                <p className="text-xs leading-relaxed text-slate-600">
+                  <span className="font-semibold text-slate-700">{actorName}</span>{' '}
+                  {actionLabel}
+                  <span className="text-slate-400"> &bull; {formatDateTime(entry.changedAt)}</span>
                 </p>
-              )}
 
-              {entry.note && !systemNote && (
-                <p className="mt-1 text-xs italic text-slate-600">&ldquo;{entry.note}&rdquo;</p>
-              )}
+                {typeof stuckDays === 'number' && Number.isFinite(stuckDays) && (
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    ค้างสถานะนี้ {formatDaysValue(stuckDays)} วัน
+                  </p>
+                )}
 
-              {systemNote?.reason && (
-                <p className="mt-1 text-xs italic text-slate-600">&ldquo;{systemNote.reason}&rdquo;</p>
-              )}
+                {entry.note && !systemNote && (
+                  <p className="mt-1 text-xs italic text-slate-600">&ldquo;{entry.note}&rdquo;</p>
+                )}
+
+                {systemNote?.reason && (
+                  <p className="mt-1 text-xs italic text-slate-600">&ldquo;{systemNote.reason}&rdquo;</p>
+                )}
+              </div>
             </div>
           </li>
         );
