@@ -72,6 +72,21 @@ const STATUS_ICON: Record<string, string> = {
   REASSIGNED: '🔁',
 };
 
+const STATUS_OWNER_LABEL: Record<string, string> = {
+  ASSIGNED: 'เจ้าหน้าที่ผู้รับผิดชอบ',
+  SUBMITTED_TO_DOCCON: 'DocCon',
+  DOCCON_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
+  PENDING_REVIEW: 'ผู้ตรวจสอบ',
+  REVIEWER_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
+  WAITING_BOSS_APPROVAL: 'ผู้สั่งงาน',
+  BOSS_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
+  WAITING_SUPER_BOSS_APPROVAL: 'หัวหน้างาน',
+  SUPER_BOSS_REJECTED: 'เจ้าหน้าที่แก้ไขแล้วส่งใหม่',
+  COMPLETED: 'เสร็จสิ้น',
+  CANCELLED: 'ยกเลิกแล้ว',
+  REASSIGNED: 'ผู้รับผิดชอบใหม่',
+};
+
 export default function StatusTimeline({
   history,
   currentStatus,
@@ -98,6 +113,8 @@ export default function StatusTimeline({
         const statusLabel = STATUS_LABELS[entry.status as TaskStatus] ?? entry.status;
         const stuckDays = durationByIndex[index];
         const systemNote = entry.note ? resolveSystemNote(entry.note) : null;
+        const actorName = entry.changedByName || entry.changedBy || 'ไม่ระบุ';
+        const ownerLabel = STATUS_OWNER_LABEL[entry.status] ?? 'ดูจากสถานะปัจจุบัน';
 
         return (
           <li key={`${entry.changedAt}-${index}`} className="ml-4">
@@ -108,28 +125,58 @@ export default function StatusTimeline({
                 <span className="w-2 h-2 rounded-full bg-slate-300 block" />
               )}
             </div>
-            <div className="bg-white border border-slate-100 rounded-lg px-3 py-2 shadow-xs">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-sm">{STATUS_ICON[entry.status] ?? '•'}</span>
-                <span className="text-sm font-medium text-slate-800">{statusLabel}</span>
+            <div className="bg-white border border-slate-100 rounded-lg px-3.5 py-3 shadow-xs">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium text-slate-400">สถานะหลังทำรายการ</p>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <span className="text-sm">{STATUS_ICON[entry.status] ?? '•'}</span>
+                    <span className="text-sm font-semibold text-slate-900">{statusLabel}</span>
+                  </div>
+                </div>
+                {idx === 0 && (
+                  <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[11px] font-semibold text-yellow-700">
+                    ล่าสุด
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-slate-500">
-                {entry.changedByName} &bull; {formatDateTime(entry.changedAt)}
-              </p>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 border-t border-slate-100 pt-2.5 sm:grid-cols-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] text-slate-400">ผู้ทำรายการ</p>
+                  <p className="truncate text-xs font-semibold text-slate-700">{actorName}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-slate-400">งานอยู่ที่</p>
+                  <p className="truncate text-xs font-semibold text-slate-700">{ownerLabel}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-slate-400">เวลา</p>
+                  <p className="truncate text-xs text-slate-600">{formatDateTime(entry.changedAt)}</p>
+                </div>
+              </div>
 
               {typeof stuckDays === 'number' && Number.isFinite(stuckDays) && (
-                <p className="text-[11px] text-slate-400 mt-1">ค้างขั้นนี้ {formatDaysValue(stuckDays)} วัน</p>
+                <p className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-[11px] text-slate-500">
+                  ระยะเวลาที่อยู่ในสถานะนี้ {formatDaysValue(stuckDays)} วัน
+                </p>
               )}
 
               {entry.note && !systemNote && (
-                <p className="text-xs text-slate-600 mt-1 italic">&ldquo;{entry.note}&rdquo;</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5">
+                  <p className="text-[11px] text-slate-400">หมายเหตุ</p>
+                  <p className="text-xs text-slate-600 italic">&ldquo;{entry.note}&rdquo;</p>
+                </div>
               )}
 
               {systemNote && (
-                <p className="text-xs text-slate-500 mt-1">
-                  {systemNote.text}
-                  {systemNote.reason ? ` เพราะ ${systemNote.reason}` : ''}
-                </p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5">
+                  <p className="text-[11px] text-slate-400">หมายเหตุระบบ</p>
+                  <p className="text-xs text-slate-600">
+                    {systemNote.text}
+                    {systemNote.reason ? ` เพราะ ${systemNote.reason}` : ''}
+                  </p>
+                </div>
               )}
             </div>
           </li>
