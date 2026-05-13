@@ -134,31 +134,34 @@ export default function StatusTimeline({
                 <span className="w-2 h-2 rounded-full bg-slate-300 block" />
               )}
             </div>
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-1.5">
-                <div className="flex min-w-0 items-center gap-2 rounded-md bg-white px-2.5 py-1 shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)]">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
+                <div className="flex min-w-0 items-center gap-2">
                   <span className="text-sm">{STATUS_ICON[entry.status] ?? '•'}</span>
                   <span className="text-sm font-semibold text-slate-900">{statusLabel}</span>
                 </div>
-                {idx === 0 && (
-                  <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[11px] font-semibold text-yellow-700">
-                    ล่าสุด
-                  </span>
-                )}
+                {(typeof stuckDays === 'number' && Number.isFinite(stuckDays)) || idx === 0 ? (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {typeof stuckDays === 'number' && Number.isFinite(stuckDays) && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                        ใช้เวลา {formatDaysValue(stuckDays)} วัน
+                      </span>
+                    )}
+                    {idx === 0 && (
+                      <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[11px] font-semibold text-yellow-700">
+                        ล่าสุด
+                      </span>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
-              <div className="px-3 py-2">
+              <div className="rounded-md border border-slate-100 bg-slate-50/60 px-3 py-2 shadow-xs">
                 <p className="text-xs leading-relaxed text-slate-600">
                   <span className="font-semibold text-slate-700">{actorName}</span>{' '}
                   {actionLabel}
                   <span className="text-slate-400"> &bull; {formatDateTime(entry.changedAt)}</span>
                 </p>
-
-                {typeof stuckDays === 'number' && Number.isFinite(stuckDays) && (
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    ค้างสถานะนี้ {formatDaysValue(stuckDays)} วัน
-                  </p>
-                )}
 
                 {entry.note && !systemNote && (
                   <p className="mt-1 text-xs italic text-slate-600">&ldquo;{entry.note}&rdquo;</p>
