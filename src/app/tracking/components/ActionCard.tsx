@@ -84,7 +84,7 @@ const PIPELINE_STAGES: { key: string; label: string }[] = [
   { key: 'ASSIGNED', label: 'เจ้าหน้าที่' },
   { key: 'SUBMITTED_TO_DOCCON', label: 'ตรวจรูปแบบ' },
   { key: 'PENDING_REVIEW', label: 'ตรวจเนื้อหา' },
-  { key: 'WAITING_BOSS_APPROVAL', label: 'Boss' },
+  { key: 'WAITING_BOSS_APPROVAL', label: 'ผู้สั่งงาน' },
   { key: 'WAITING_SUPER_BOSS_APPROVAL', label: 'หัวหน้างาน' },
 ];
 

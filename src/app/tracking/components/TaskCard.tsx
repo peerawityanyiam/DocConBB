@@ -10,7 +10,7 @@ const PIPELINE_STAGES: { key: string; label: string; icon: string }[] = [
   { key: 'ASSIGNED', label: 'เจ้าหน้าที่', icon: '1' },
   { key: 'SUBMITTED_TO_DOCCON', label: 'DocCon', icon: '2' },
   { key: 'PENDING_REVIEW', label: 'ผู้ตรวจสอบ', icon: '3' },
-  { key: 'WAITING_BOSS_APPROVAL', label: 'Boss', icon: '4' },
+  { key: 'WAITING_BOSS_APPROVAL', label: 'ผู้สั่งงาน', icon: '4' },
   { key: 'WAITING_SUPER_BOSS_APPROVAL', label: 'หัวหน้างาน', icon: '5' },
   { key: 'COMPLETED', label: 'เสร็จสิ้น', icon: '6' },
 ];
