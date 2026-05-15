@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { SHORTCUT_ICONS, getShortcutEmoji } from '@/lib/shortcuts/icons';
 
@@ -25,6 +26,15 @@ type DraftState = {
 
 const EMPTY_DRAFT: DraftState = { id: null, label: '', url: '', icon_key: null };
 
+const FIXED_RELATED_LINKS = [
+  {
+    id: 'scan-module',
+    label: 'สแกนเอกสารเป็น PDF',
+    href: '/scan',
+    icon: '📷',
+  },
+];
+
 export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
   const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,11 +57,6 @@ export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
     void loadShortcuts();
   }, [loadShortcuts]);
 
-  if (!canManage && !loading && shortcuts.length === 0) {
-    // Non-admins see nothing when empty.
-    return null;
-  }
-
   return (
     <section className="mt-12 w-full sm:mt-14">
       <div className="mb-5 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
@@ -69,15 +74,24 @@ export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
         )}
       </div>
 
-      {loading ? (
-        <div className="text-left text-xs text-slate-400">กำลังโหลด…</div>
-      ) : shortcuts.length === 0 ? (
-        <p className="text-left text-xs text-slate-400">
-          {canManage ? 'ยังไม่มีลิงก์ กดปุ่ม "จัดการลิงก์" เพื่อเพิ่ม' : ''}
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {shortcuts.map((s) => {
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {FIXED_RELATED_LINKS.map((link) => (
+          <Link
+            key={link.id}
+            href={link.href}
+            className="group flex items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white px-4 py-3.5 text-[0.95rem] font-medium text-[#0d1b2e] shadow-sm transition-all hover:-translate-y-[2px] hover:border-[#c5a059] hover:text-[#003366] hover:shadow-md active:translate-y-0 sm:px-5 sm:py-4"
+          >
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f1f5f9] text-xl leading-none transition-colors group-hover:bg-[#003366]/10">
+              {link.icon}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{link.label}</span>
+            <span className="flex-none text-sm text-slate-300 transition-colors group-hover:text-[#c5a059]">
+              →
+            </span>
+          </Link>
+        ))}
+
+        {shortcuts.map((s) => {
             const emoji = getShortcutEmoji(s.icon_key);
             return (
               <a
@@ -99,9 +113,16 @@ export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
                 </span>
               </a>
             );
-          })}
-        </div>
-      )}
+        })}
+      </div>
+
+      {loading ? (
+        <div className="mt-3 text-left text-xs text-slate-400">กำลังโหลดลิงก์เพิ่มเติม…</div>
+      ) : shortcuts.length === 0 && canManage ? (
+        <p className="mt-3 text-left text-xs text-slate-400">
+          ยังไม่มีลิงก์เพิ่มเติม กดปุ่มจัดการลิงก์เพื่อเพิ่ม
+        </p>
+      ) : null}
 
       {adminOpen && canManage && (
         <AdminModal

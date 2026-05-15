@@ -20,12 +20,6 @@ const cards = [
     description: 'จัดการระบบเอกสารคุณภาพ',
     href: '/library',
   },
-  {
-    title: 'สแกนเอกสารเป็น PDF',
-    icon: '📷',
-    description: 'ถ่ายรูป ปรับภาพ และรวมเป็น PDF',
-    href: '/scan',
-  },
 ];
 
 export default async function Home() {
