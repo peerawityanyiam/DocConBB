@@ -81,6 +81,11 @@ export async function GET(request: NextRequest) {
           break;
         case 'completed': {
           const userRolesSet = new Set(user.roles);
+          const canViewAllCompleted =
+            userRolesSet.has('DOCCON') ||
+            userRolesSet.has('BOSS') ||
+            userRolesSet.has('SUPER_BOSS') ||
+            userRolesSet.has('SUPER_ADMIN');
 
           let completedQuery = admin
             .from('tasks')
@@ -88,7 +93,7 @@ export async function GET(request: NextRequest) {
             .eq('status', 'COMPLETED')
             .order('updated_at', { ascending: false });
 
-          if (!userRolesSet.has('DOCCON') && !userRolesSet.has('SUPER_BOSS') && !userRolesSet.has('SUPER_ADMIN')) {
+          if (!canViewAllCompleted) {
             completedQuery = completedQuery.or(
               `officer_id.eq.${dbUserId},reviewer_id.eq.${dbUserId},created_by.eq.${dbUserId}`,
             );

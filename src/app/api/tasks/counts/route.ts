@@ -23,6 +23,11 @@ export async function GET() {
     const admin = await createServiceRoleClient();
     const userId = user.id;
     const roleSet = new Set(user.roles);
+    const canViewAllCompleted =
+      roleSet.has('DOCCON') ||
+      roleSet.has('BOSS') ||
+      roleSet.has('SUPER_BOSS') ||
+      roleSet.has('SUPER_ADMIN');
 
     const counts: Record<string, number> = {};
 
@@ -79,7 +84,7 @@ export async function GET() {
       );
     }
 
-    if (roleSet.has('DOCCON') || roleSet.has('SUPER_BOSS') || roleSet.has('SUPER_ADMIN')) {
+    if (canViewAllCompleted) {
       counts.completed = await countExact(
         admin
           .from('tasks')
