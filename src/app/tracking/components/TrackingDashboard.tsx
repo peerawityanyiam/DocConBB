@@ -167,6 +167,11 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
   const [completedSort, setCompletedSort] = useState<CompletedSort>('completed_date');
   const [visibleCount, setVisibleCount] = useState(TASKS_PAGE_SIZE);
   const deferredSearch = useDeferredValue(search);
+  const canViewCompletedTab =
+    userRoles.includes('DOCCON') ||
+    userRoles.includes('BOSS') ||
+    userRoles.includes('SUPER_BOSS') ||
+    userRoles.includes('SUPER_ADMIN');
 
   const isCompletedTab = activeTab === 'completed';
   const subTabs = useMemo(
@@ -370,7 +375,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 py-5 overflow-x-hidden">
       {/* Role Switcher - pill buttons */}
-      {availableTabs.length > 1 && (
+      {(availableTabs.length > 1 || canViewCompletedTab) && (
         <div className="flex gap-1.5 flex-wrap mb-5">
           {availableTabs.map(t => (
             <button key={t.role} onClick={() => setActiveTab(t.role)}
@@ -391,8 +396,7 @@ export default function TrackingDashboard({ userRoles, userId, userEmail }: Trac
               )}
             </button>
           ))}
-          {/* Bug 8: completed pill only for DOCCON, BOSS, SUPER_BOSS */}
-          {(userRoles.includes('DOCCON') || userRoles.includes('BOSS') || userRoles.includes('SUPER_BOSS')) && (
+          {canViewCompletedTab && (
             <button onClick={() => setActiveTab('completed')}
               className={`px-4 py-1.5 text-xs rounded-full font-semibold tracking-wide border transition-all shadow-sm ${
                 activeTab === 'completed'
