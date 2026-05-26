@@ -267,6 +267,7 @@ export default function UserManagement({ initialUsers, projects, currentUserId }
         <RoleAssignmentModal
           user={roleUser}
           projects={projects}
+          currentUserId={currentUserId}
           onSave={handleRolesSaved}
         />
       )}

@@ -94,8 +94,7 @@ export async function DELETE(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const currentUser = await getAuthUser('tracking');
-    requireRole(currentUser, ['DOCCON', 'SUPER_ADMIN']);
+    const currentUser = requireRole(await getAuthUser('tracking'), ['DOCCON', 'SUPER_ADMIN']);
 
     const { userId } = await params;
     const { project_id, role } = await request.json() as { project_id: string; role: string };
@@ -111,6 +110,30 @@ export async function DELETE(
     if (!trackingProject || project_id !== trackingProject.id) {
       return NextResponse.json({ error: 'จัดการสิทธิ์ได้เฉพาะระบบติดตามเอกสาร' }, { status: 400 });
     }
+
+    if (role === 'SUPER_ADMIN') {
+      if (userId === currentUser.id) {
+        return NextResponse.json(
+          { error: 'ไม่สามารถถอดสิทธิ์ผู้ดูแลระบบของบัญชีตัวเองได้' },
+          { status: 400 },
+        );
+      }
+
+      const { count, error: countError } = await admin
+        .from('user_project_roles')
+        .select('id', { head: true, count: 'exact' })
+        .eq('project_id', trackingProject.id)
+        .eq('role', 'SUPER_ADMIN');
+
+      if (countError) throw countError;
+      if ((count ?? 0) <= 1) {
+        return NextResponse.json(
+          { error: 'ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน' },
+          { status: 400 },
+        );
+      }
+    }
+
     const { error } = await admin
       .from('user_project_roles')
       .delete()

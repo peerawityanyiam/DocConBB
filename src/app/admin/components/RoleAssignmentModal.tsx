@@ -27,12 +27,13 @@ interface Project {
 interface Props {
   user: User;
   projects: Project[];
+  currentUserId: string;
   onSave: (userId: string, newRoles: UserRole[]) => void;
 }
 
 const ALL_ROLES: AppRole[] = ['STAFF', 'DOCCON', 'REVIEWER', 'BOSS', 'SUPER_BOSS', 'SUPER_ADMIN'];
 
-export default function RoleAssignmentModal({ user, projects, onSave }: Props) {
+export default function RoleAssignmentModal({ user, projects, currentUserId, onSave }: Props) {
   // currentRoles: set of "projectId|role" strings
   const [currentRoles, setCurrentRoles] = useState<Set<string>>(
     new Set(user.roles.map(r => `${r.project_id}|${r.role}`))
@@ -135,21 +136,24 @@ export default function RoleAssignmentModal({ user, projects, onSave }: Props) {
                   const key = `${project.id}|${role}`;
                   const isOn = hasRole(project.id, role);
                   const isLoading = loading.has(key);
+                  const isLockedSelfSuperAdmin = user.id === currentUserId && role === 'SUPER_ADMIN' && isOn;
 
                   return (
                     <label
                       key={role}
+                      title={isLockedSelfSuperAdmin ? 'ไม่สามารถถอดสิทธิ์ผู้ดูแลระบบของบัญชีตัวเองได้' : undefined}
                       className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
                         isOn
                           ? 'border-slate-900 bg-slate-50'
                           : 'border-slate-200 hover:border-slate-300'
-                      } ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
+                      } ${(isLoading || isLockedSelfSuperAdmin) ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       <div className="relative">
                         <input
                           type="checkbox"
                           checked={isOn}
                           onChange={() => toggleRole(project, role)}
+                          disabled={isLockedSelfSuperAdmin}
                           className="sr-only"
                         />
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
@@ -171,6 +175,9 @@ export default function RoleAssignmentModal({ user, projects, onSave }: Props) {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
+                        )}
+                        {isLockedSelfSuperAdmin && (
+                          <span className="text-[0.65rem] text-slate-500">ล็อกไว้</span>
                         )}
                       </div>
                     </label>
