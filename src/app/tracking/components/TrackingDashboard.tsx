@@ -97,6 +97,12 @@ const ROLE_SUB_TABS: Record<string, SubTabDef[]> = {
       useActionCard: true,
     },
     {
+      key: 'tracking',
+      label: 'ติดตามงาน',
+      filter: (t, userId) => t.reviewer_id === userId && !['COMPLETED', 'CANCELLED'].includes(t.status),
+      useActionCard: false,
+    },
+    {
       key: 'completed',
       label: 'เสร็จแล้ว',
       filter: (t, userId) => t.reviewer_id === userId && t.status === 'COMPLETED',
