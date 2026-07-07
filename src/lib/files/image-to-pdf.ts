@@ -80,18 +80,51 @@ function normalizeMaxPartSize(maxPartSizeBytes: number): number {
   return Math.max(Math.floor(maxPartSizeBytes), MIN_PART_SIZE_BYTES);
 }
 
-// Returns the EXIF orientation tag value; 1 means upright (or no EXIF).
-function readJpegOrientation(bytes: Uint8Array): number {
-  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return 1;
+interface JpegMetadata {
+  width: number;
+  height: number;
+  orientation: number;
+}
+
+function readExifOrientation(bytes: Uint8Array, view: DataView, app1Offset: number): number {
+  const tiff = app1Offset + 10;
+  if (tiff + 8 > bytes.length) return 1;
+  const littleEndian = view.getUint16(tiff, false) === 0x4949;
+  const ifd = tiff + view.getUint32(tiff + 4, littleEndian);
+  if (ifd + 2 > bytes.length) return 1;
+  const entryCount = view.getUint16(ifd, littleEndian);
+  for (let i = 0; i < entryCount; i += 1) {
+    const entry = ifd + 2 + i * 12;
+    if (entry + 12 > bytes.length) return 1;
+    if (view.getUint16(entry, littleEndian) === 0x0112) {
+      return view.getUint16(entry + 8, littleEndian);
+    }
+  }
+  return 1;
+}
+
+// Walks the JPEG marker stream once, collecting the frame dimensions (SOF)
+// and the EXIF orientation tag, without decoding any pixels.
+function parseJpegMetadata(bytes: Uint8Array): JpegMetadata | null {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let orientation = 1;
+  let width = 0;
+  let height = 0;
   let offset = 2;
   while (offset + 4 <= bytes.length) {
-    if (bytes[offset] !== 0xff) return 1;
+    if (bytes[offset] !== 0xff) break;
     const marker = bytes[offset + 1];
-    // Start-of-scan or end-of-image: no EXIF segment ahead.
-    if (marker === 0xda || marker === 0xd9) return 1;
+    // Start-of-scan or end-of-image: all header segments are behind us.
+    if (marker === 0xda || marker === 0xd9) break;
     const segmentLength = view.getUint16(offset + 2, false);
-    if (segmentLength < 2) return 1;
+    if (segmentLength < 2) break;
+    const isSof = marker >= 0xc0 && marker <= 0xcf
+      && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof && offset + 9 <= bytes.length) {
+      height = view.getUint16(offset + 5, false);
+      width = view.getUint16(offset + 7, false);
+    }
     const isExifApp1 = marker === 0xe1
       && offset + 10 <= bytes.length
       && bytes[offset + 4] === 0x45 // 'Exif\0\0'
@@ -101,24 +134,12 @@ function readJpegOrientation(bytes: Uint8Array): number {
       && bytes[offset + 8] === 0x00
       && bytes[offset + 9] === 0x00;
     if (isExifApp1) {
-      const tiff = offset + 10;
-      if (tiff + 8 > bytes.length) return 1;
-      const littleEndian = view.getUint16(tiff, false) === 0x4949;
-      const ifd = tiff + view.getUint32(tiff + 4, littleEndian);
-      if (ifd + 2 > bytes.length) return 1;
-      const entryCount = view.getUint16(ifd, littleEndian);
-      for (let i = 0; i < entryCount; i += 1) {
-        const entry = ifd + 2 + i * 12;
-        if (entry + 12 > bytes.length) return 1;
-        if (view.getUint16(entry, littleEndian) === 0x0112) {
-          return view.getUint16(entry + 8, littleEndian);
-        }
-      }
-      return 1;
+      orientation = readExifOrientation(bytes, view, offset);
     }
     offset += 2 + segmentLength;
   }
-  return 1;
+  if (!width || !height) return null;
+  return { width, height, orientation };
 }
 
 // Byte-for-byte pass-through for upright camera JPEGs, so the PDF page keeps
@@ -126,8 +147,13 @@ function readJpegOrientation(bytes: Uint8Array): number {
 async function tryPassThroughJpeg(image: File): Promise<File | null> {
   if (image.type !== 'image/jpeg' || image.size > JPEG_PASS_THROUGH_MAX_BYTES) return null;
   const bytes = new Uint8Array(await image.arrayBuffer());
-  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
-  if (readJpegOrientation(bytes) !== 1) return null;
+  const meta = parseJpegMetadata(bytes);
+  if (!meta) return null;
+  if (meta.orientation !== 1) return null;
+  // Photos wider than our top profile get the high-quality downscale instead:
+  // PDF viewers shrink huge pages with cheap filters that break thin lines
+  // on screen, so an untouched 4000px photo LOOKS worse at fit-width zoom.
+  if (Math.max(meta.width, meta.height) > CONVERSION_PROFILES[0].maxEdge) return null;
   return image;
 }
 
