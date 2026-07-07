@@ -6,27 +6,30 @@ const DEFAULT_MAX_PDF_PART_BYTES = DEFAULT_IMAGE_TO_PDF_PART_SIZE_BYTES;
 const MIN_PART_SIZE_BYTES = 512 * 1024;
 const PDF_BASE_OVERHEAD_BYTES = 96 * 1024;
 const PDF_IMAGE_ESTIMATE_MULTIPLIER = 1.08;
-const PREPARED_IMAGE_SOFT_TARGET_BYTES = Math.floor(2.8 * 1024 * 1024);
+// 30 images x 3.4MB x 1.08 estimate stays under the 150MB part ceiling.
+const PREPARED_IMAGE_SOFT_TARGET_BYTES = Math.floor(3.4 * 1024 * 1024);
 
 interface ConversionProfile {
   maxEdge: number;
   quality: number;
 }
 
+// Quality tuned for document photos: below ~0.8, JPEG block artifacts make
+// thin table lines look segmented, so the high-resolution tiers stay above it.
 const CONVERSION_PROFILES: ConversionProfile[] = [
-  { maxEdge: 2400, quality: 0.82 },
-  { maxEdge: 2000, quality: 0.76 },
-  { maxEdge: 1600, quality: 0.7 },
-  { maxEdge: 1280, quality: 0.64 },
-  { maxEdge: 1024, quality: 0.58 },
-  { maxEdge: 768, quality: 0.52 },
-  { maxEdge: 640, quality: 0.5 },
-  { maxEdge: 512, quality: 0.48 },
+  { maxEdge: 2800, quality: 0.88 },
+  { maxEdge: 2400, quality: 0.84 },
+  { maxEdge: 2000, quality: 0.8 },
+  { maxEdge: 1600, quality: 0.75 },
+  { maxEdge: 1280, quality: 0.68 },
+  { maxEdge: 1024, quality: 0.6 },
+  { maxEdge: 768, quality: 0.54 },
+  { maxEdge: 512, quality: 0.5 },
 ];
 
 interface PdfImageSource {
   name: string;
-  bytes: Uint8Array;
+  bytes: Uint8Array<ArrayBuffer>;
   width: number;
   height: number;
 }
@@ -59,18 +62,65 @@ function normalizeMaxPartSize(maxPartSizeBytes: number): number {
   return Math.max(Math.floor(maxPartSizeBytes), MIN_PART_SIZE_BYTES);
 }
 
+async function decodeImageFile(file: File): Promise<ImageBitmap> {
+  try {
+    // Explicit orientation keeps phone photos upright on browsers whose
+    // default is still 'none'.
+    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    try {
+      // Older browsers reject the options bag itself.
+      return await createImageBitmap(file);
+    } catch {
+      // Undecodable format (e.g. HEIC outside Safari) or corrupt file.
+      throw new Error(`unsupported_image_file:${file.name}`);
+    }
+  }
+}
+
+function scaleStep(
+  source: ImageBitmap | HTMLCanvasElement,
+  sourceWidth: number,
+  sourceHeight: number,
+  stepWidth: number,
+  stepHeight: number,
+): HTMLCanvasElement {
+  const stepCanvas = document.createElement('canvas');
+  stepCanvas.width = stepWidth;
+  stepCanvas.height = stepHeight;
+  const stepCtx = stepCanvas.getContext('2d');
+  if (!stepCtx) throw new Error('image_processing_failed');
+  stepCtx.imageSmoothingEnabled = true;
+  stepCtx.imageSmoothingQuality = 'high';
+  stepCtx.drawImage(source, 0, 0, sourceWidth, sourceHeight, 0, 0, stepWidth, stepHeight);
+  return stepCanvas;
+}
+
 async function readImageSource(file: File, profile: ConversionProfile): Promise<PdfImageSource> {
   if (!file.type.startsWith('image/')) {
     throw new Error(`unsupported_image_file:${file.name}`);
   }
 
-  const imageBitmap = await createImageBitmap(file);
+  const imageBitmap = await decodeImageFile(file);
 
   try {
     const longestEdge = Math.max(imageBitmap.width, imageBitmap.height);
     const scale = longestEdge > profile.maxEdge ? (profile.maxEdge / longestEdge) : 1;
     const targetWidth = Math.max(1, Math.round(imageBitmap.width * scale));
     const targetHeight = Math.max(1, Math.round(imageBitmap.height * scale));
+
+    // Downscale in 2x steps: a single large jump drops source pixels and
+    // breaks thin document lines into dashes.
+    let source: ImageBitmap | HTMLCanvasElement = imageBitmap;
+    let sourceWidth = imageBitmap.width;
+    let sourceHeight = imageBitmap.height;
+    while (sourceWidth >= targetWidth * 2 && sourceHeight >= targetHeight * 2) {
+      const stepWidth = Math.max(targetWidth, Math.round(sourceWidth / 2));
+      const stepHeight = Math.max(targetHeight, Math.round(sourceHeight / 2));
+      source = scaleStep(source, sourceWidth, sourceHeight, stepWidth, stepHeight);
+      sourceWidth = stepWidth;
+      sourceHeight = stepHeight;
+    }
 
     const canvas = document.createElement('canvas');
     canvas.width = targetWidth;
@@ -83,7 +133,7 @@ async function readImageSource(file: File, profile: ConversionProfile): Promise<
     ctx.imageSmoothingQuality = 'high';
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, targetWidth, targetHeight);
-    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
+    ctx.drawImage(source, 0, 0, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
@@ -121,12 +171,14 @@ async function appendImagePage(pdf: PDFDocument, source: PdfImageSource): Promis
   });
 }
 
-async function renderPdfBytes(sources: PdfImageSource[]): Promise<Uint8Array> {
+async function renderPdfBytes(sources: PdfImageSource[]): Promise<Uint8Array<ArrayBuffer>> {
   const pdf = await PDFDocument.create();
   for (const source of sources) {
     await appendImagePage(pdf, source);
   }
-  return Uint8Array.from(await pdf.save());
+  // pdf-lib allocates from a plain ArrayBuffer; its typings just predate
+  // the generic TypedArray, so this cast avoids copying the whole PDF.
+  return (await pdf.save()) as Uint8Array<ArrayBuffer>;
 }
 
 async function readPreparedImageSource(file: File): Promise<PdfImageSource> {
@@ -134,7 +186,7 @@ async function readPreparedImageSource(file: File): Promise<PdfImageSource> {
     throw new Error(`unsupported_image_file:${file.name}`);
   }
 
-  const imageBitmap = await createImageBitmap(file);
+  const imageBitmap = await decodeImageFile(file);
   try {
     return {
       name: file.name,
@@ -149,30 +201,6 @@ async function readPreparedImageSource(file: File): Promise<PdfImageSource> {
 
 function estimateSourcePdfContribution(source: PdfImageSource): number {
   return Math.ceil(source.bytes.byteLength * PDF_IMAGE_ESTIMATE_MULTIPLIER);
-}
-
-async function buildAdaptiveImageSource(image: File, maxPartSizeBytes: number): Promise<PdfImageSource> {
-  let lastRenderedSize = 0;
-  let lastSourceSize = 0;
-  let fallbackSource: PdfImageSource | null = null;
-  for (const profile of CONVERSION_PROFILES) {
-    const source = await readImageSource(image, profile);
-    fallbackSource = source;
-    lastSourceSize = source.bytes.byteLength;
-    const singlePagePdf = await renderPdfBytes([source]);
-    lastRenderedSize = singlePagePdf.byteLength;
-    if (singlePagePdf.byteLength <= maxPartSizeBytes) {
-      return source;
-    }
-  }
-
-  if (fallbackSource) {
-    return fallbackSource;
-  }
-
-  throw new Error(
-    `image_too_large_after_compress:${image.name}:${Math.ceil(lastSourceSize / 1024 / 1024)}:${Math.ceil(lastRenderedSize / 1024 / 1024)}`,
-  );
 }
 
 export async function prepareImagesForPdf(
@@ -211,7 +239,7 @@ export async function prepareImagesForPdf(
     }
 
     const preparedName = image.name.replace(/\.[^/.]+$/, '.jpg');
-    prepared.push(new File([Uint8Array.from(selectedSource.bytes)], preparedName, {
+    prepared.push(new File([selectedSource.bytes], preparedName, {
       type: 'image/jpeg',
       lastModified: Date.now(),
     }));
@@ -254,7 +282,7 @@ function buildInitialGroups(sources: PdfImageSource[], maxPartSizeBytes: number)
   return groups;
 }
 
-async function splitAndRenderGroup(sources: PdfImageSource[], maxPartSizeBytes: number): Promise<Uint8Array[]> {
+async function splitAndRenderGroup(sources: PdfImageSource[], maxPartSizeBytes: number): Promise<Uint8Array<ArrayBuffer>[]> {
   const bytes = await renderPdfBytes(sources);
   if (bytes.byteLength <= maxPartSizeBytes) {
     return [bytes];
@@ -275,7 +303,7 @@ async function buildPdfFilesFromSources(
   baseName: string,
   normalizedMaxPartSize: number,
 ): Promise<File[]> {
-  const rawParts: Uint8Array[] = [];
+  const rawParts: Uint8Array<ArrayBuffer>[] = [];
   const fullPdfBytes = await renderPdfBytes(sources);
   if (fullPdfBytes.byteLength <= normalizedMaxPartSize) {
     rawParts.push(fullPdfBytes);
@@ -290,7 +318,7 @@ async function buildPdfFilesFromSources(
   const totalParts = rawParts.length;
   return rawParts.map((bytes, partIndex) => (
     new File(
-      [Uint8Array.from(bytes)],
+      [bytes],
       getPartFileName(baseName, partIndex, totalParts),
       {
         type: 'application/pdf',
@@ -298,26 +326,6 @@ async function buildPdfFilesFromSources(
       },
     )
   ));
-}
-
-export async function buildPdfFilesFromImages(
-  images: File[],
-  outputName?: string,
-  maxPartSizeBytes = DEFAULT_MAX_PDF_PART_BYTES,
-): Promise<File[]> {
-  if (!images.length) {
-    throw new Error('no_images_selected');
-  }
-
-  const normalizedMaxPartSize = normalizeMaxPartSize(maxPartSizeBytes);
-  const baseName = toPdfBaseName(outputName?.trim() || images[0]?.name || FALLBACK_PDF_BASENAME);
-  const adaptedSources: PdfImageSource[] = [];
-
-  for (const image of images) {
-    adaptedSources.push(await buildAdaptiveImageSource(image, normalizedMaxPartSize));
-  }
-
-  return buildPdfFilesFromSources(adaptedSources, baseName, normalizedMaxPartSize);
 }
 
 export async function buildPdfFilesFromPreparedImages(
@@ -338,15 +346,4 @@ export async function buildPdfFilesFromPreparedImages(
   }
 
   return buildPdfFilesFromSources(preparedSources, baseName, normalizedMaxPartSize);
-}
-
-export async function buildPdfFromImages(
-  images: File[],
-  outputName?: string,
-): Promise<File> {
-  const files = await buildPdfFilesFromImages(images, outputName);
-  if (files.length !== 1) {
-    throw new Error('too_many_pdf_parts');
-  }
-  return files[0];
 }
