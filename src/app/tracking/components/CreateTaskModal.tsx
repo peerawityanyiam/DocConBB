@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { buildPdfFilesFromPreparedImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
+import { buildPdfFilesFromPreparedImages, prepareImagesForPdf, type ImagePrepareMode } from '@/lib/files/image-to-pdf';
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
   MAX_RESUMABLE_UPLOAD_FILE_SIZE_BYTES,
@@ -79,6 +79,9 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const [pdfImageCount, setPdfImageCount] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
+  const [imagePrepareMode, setImagePrepareMode] = useState<ImagePrepareMode>('quality');
+  // Original picks kept so switching quality mode can re-prepare without re-selecting.
+  const sourceImageFilesRef = useRef<File[]>([]);
   const wordInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const pdfImageInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +109,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     setPdfImageCount(null);
     setUploadProgress(null);
     setIsConvertingImages(false);
+    sourceImageFilesRef.current = [];
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (pdfInputRef.current) pdfInputRef.current.value = '';
     if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
@@ -129,17 +133,12 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     setPreparedImageFiles([]);
     setImageQueue([]);
     setPdfImageCount(null);
+    sourceImageFilesRef.current = [];
     if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
   }
 
-  async function handleImageToPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selectedImages = Array.from(e.target.files ?? []);
-    if (!selectedImages.length) return;
+  async function prepareAndSetImages(selectedImages: File[], mode: ImagePrepareMode) {
     const sourceTotalBytes = selectedImages.reduce((sum, file) => sum + file.size, 0);
-
-    setError('');
-    setPdfFile(null);
-    if (pdfInputRef.current) pdfInputRef.current.value = '';
     setImageQueue(selectedImages.map((image) => ({
       name: image.name,
       status: 'pending',
@@ -169,18 +168,39 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
             outputBytes: progress.outputBytes,
           };
         }));
-      });
+      }, mode);
 
+      sourceImageFilesRef.current = selectedImages;
       setPreparedImageFiles(preparedFiles);
       setPdfImageCount(selectedImages.length);
     } catch (err) {
+      sourceImageFilesRef.current = [];
       setPreparedImageFiles([]);
       setPdfImageCount(null);
       setImageQueue([]);
       setError(toUploadFailureMessage(err, 'ไม่สามารถเตรียมรูปเพื่อส่งได้'));
     } finally {
       setIsConvertingImages(false);
-      e.target.value = '';
+    }
+  }
+
+  async function handleImageToPdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedImages = Array.from(e.target.files ?? []);
+    if (!selectedImages.length) return;
+
+    setError('');
+    setPdfFile(null);
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
+    await prepareAndSetImages(selectedImages, imagePrepareMode);
+    e.target.value = '';
+  }
+
+  function handleImageModeChange(mode: ImagePrepareMode) {
+    if (mode === imagePrepareMode) return;
+    setImagePrepareMode(mode);
+    if (sourceImageFilesRef.current.length > 0) {
+      setError('');
+      void prepareAndSetImages(sourceImageFilesRef.current, mode);
     }
   }
 
@@ -508,6 +528,25 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 </button>
                 <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
               </div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.7rem]">
+                <span className="text-slate-600">คุณภาพรูปแนบ:</span>
+                {([
+                  ['quality', 'ชัดสุด'],
+                  ['compact', 'ประหยัดเน็ต (ไฟล์เล็ก)'],
+                ] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={loading || isConvertingImages}
+                    onClick={() => handleImageModeChange(mode)}
+                    className={`px-2 py-0.5 rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${imagePrepareMode === mode
+                      ? 'border-teal-500 bg-teal-50 text-teal-700 font-semibold'
+                      : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               {pdfFile && (
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-green-700">
                   <span>✅ {pdfFile.name}</span>
@@ -518,6 +557,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                       setPreparedImageFiles([]);
                       setImageQueue([]);
                       setPdfImageCount(null);
+                      sourceImageFilesRef.current = [];
                       if (pdfInputRef.current) pdfInputRef.current.value = '';
                       if (pdfImageInputRef.current) pdfImageInputRef.current.value = '';
                     }}

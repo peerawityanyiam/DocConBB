@@ -5,7 +5,7 @@ import StatusBadge from './StatusBadge';
 import PrivateDraftFiles from './PrivateDraftFiles';
 import type { Task } from './TaskCard';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
-import { buildPdfFilesFromPreparedImages, prepareImagesForPdf } from '@/lib/files/image-to-pdf';
+import { buildPdfFilesFromPreparedImages, prepareImagesForPdf, type ImagePrepareMode } from '@/lib/files/image-to-pdf';
 import {
   MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES,
   MAX_IMAGE_BATCH_COUNT,
@@ -281,6 +281,9 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isConvertingImages, setIsConvertingImages] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [imagePrepareMode, setImagePrepareMode] = useState<ImagePrepareMode>('quality');
+  // Original picks kept so switching quality mode can re-prepare without re-selecting.
+  const sourceImageFilesRef = useRef<File[]>([]);
   const wordInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -327,6 +330,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     setSelectedImageFiles([]);
     setImageQueue([]);
     setSelectedImageCount(null);
+    sourceImageFilesRef.current = [];
     if (wordInputRef.current) wordInputRef.current.value = '';
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
@@ -652,15 +656,8 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     setActionError('');
   }
 
-  async function onImageFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const images = Array.from(e.target.files ?? []);
-    if (!images.length) return;
+  async function prepareAndSetImages(images: File[], mode: ImagePrepareMode) {
     const sourceTotalBytes = images.reduce((sum, file) => sum + file.size, 0);
-
-    setUploadError('');
-    setActionError('');
-    setSelectedWordFile(null);
-    if (wordInputRef.current) wordInputRef.current.value = '';
     setImageQueue(images.map((image) => ({ name: image.name, status: 'pending' })));
     setIsConvertingImages(true);
     try {
@@ -687,17 +684,40 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
             outputBytes: progress.outputBytes,
           };
         }));
-      });
+      }, mode);
+      sourceImageFilesRef.current = images;
       setSelectedImageFiles(preparedImages);
       setSelectedImageCount(images.length);
     } catch (err) {
+      sourceImageFilesRef.current = [];
       setSelectedImageFiles([]);
       setSelectedImageCount(null);
       setImageQueue([]);
       setUploadError(toUploadFailureMessage(err, 'ไม่สามารถเตรียมรูปเพื่อส่งได้'));
     } finally {
       setIsConvertingImages(false);
-      e.target.value = '';
+    }
+  }
+
+  async function onImageFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const images = Array.from(e.target.files ?? []);
+    if (!images.length) return;
+
+    setUploadError('');
+    setActionError('');
+    setSelectedWordFile(null);
+    if (wordInputRef.current) wordInputRef.current.value = '';
+    await prepareAndSetImages(images, imagePrepareMode);
+    e.target.value = '';
+  }
+
+  function handleImageModeChange(mode: ImagePrepareMode) {
+    if (mode === imagePrepareMode) return;
+    setImagePrepareMode(mode);
+    if (sourceImageFilesRef.current.length > 0) {
+      setUploadError('');
+      setActionError('');
+      void prepareAndSetImages(sourceImageFilesRef.current, mode);
     }
   }
 
@@ -841,6 +861,27 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
     <div className={`mt-2 rounded-md border px-2 py-1.5 text-[0.7rem] ${(selectedWordFile || selectedImageFiles.length > 0) ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700' : 'border-slate-300 bg-slate-50/70 text-slate-600'}`}>
       <p className="font-semibold break-all">{attachmentSummaryLabel}</p>
       <p className="mt-0.5 text-[0.65rem] opacity-90">{(selectedWordFile || selectedImageFiles.length > 0) ? attachmentSummaryHint : hint}</p>
+    </div>
+  );
+  const renderImageModeToggle = () => (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.7rem]">
+      <span className="text-slate-600">คุณภาพรูปแนบ:</span>
+      {([
+        ['quality', 'ชัดสุด'],
+        ['compact', 'ประหยัดเน็ต (ไฟล์เล็ก)'],
+      ] as const).map(([mode, label]) => (
+        <button
+          key={mode}
+          type="button"
+          disabled={isBlocked}
+          onClick={() => handleImageModeChange(mode)}
+          className={`px-2 py-0.5 rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${imagePrepareMode === mode
+            ? 'border-teal-500 bg-teal-50 text-teal-700 font-semibold'
+            : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'}`}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
   const renderImageQueue = () => (
@@ -1192,6 +1233,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                       </button>
                       <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                     </div>
+                    {renderImageModeToggle()}
                   </>
                 )}
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
@@ -1317,6 +1359,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
+                {renderImageModeToggle()}
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
@@ -1424,6 +1467,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
+                {renderImageModeToggle()}
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}
@@ -1539,6 +1583,7 @@ export default function ActionCard({ task, activeRole, activeSubTab, userId, onU
                   </button>
                   <span className="flex-1 min-w-0 truncate">{imagePickerStatusText}</span>
                 </div>
+                {renderImageModeToggle()}
                 {(selectedWordFile || selectedImageFiles.length > 0) && (
                   <p className="text-xs text-green-700 mt-1.5">✅ เลือกแล้ว: <span className="font-medium">{selectedFileDisplayName}</span></p>
                 )}

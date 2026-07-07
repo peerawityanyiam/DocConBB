@@ -8,6 +8,13 @@ const PDF_BASE_OVERHEAD_BYTES = 96 * 1024;
 const PDF_IMAGE_ESTIMATE_MULTIPLIER = 1.08;
 // 30 images x 3.4MB x 1.08 estimate stays under the 150MB part ceiling.
 const PREPARED_IMAGE_SOFT_TARGET_BYTES = Math.floor(3.4 * 1024 * 1024);
+// Camera JPEGs below this pass through byte-for-byte: re-encoding is what
+// softens thin document lines, so it only happens when a file is oversized
+// or its EXIF rotation must be baked in (PDF ignores EXIF).
+const JPEG_PASS_THROUGH_MAX_BYTES = 8 * 1024 * 1024;
+// Decode/encode runs off the main thread, so a small pool speeds up big
+// batches without freezing the UI.
+const PREPARE_CONCURRENCY = 3;
 
 interface ConversionProfile {
   maxEdge: number;
@@ -26,6 +33,17 @@ const CONVERSION_PROFILES: ConversionProfile[] = [
   { maxEdge: 768, quality: 0.54 },
   { maxEdge: 512, quality: 0.5 },
 ];
+
+// 'quality' keeps camera pixels when possible; 'compact' always re-encodes
+// small for slow connections, trading line sharpness for ~3x faster uploads.
+export type ImagePrepareMode = 'quality' | 'compact';
+
+const COMPACT_PROFILES: ConversionProfile[] = [
+  { maxEdge: 1600, quality: 0.75 },
+  { maxEdge: 1280, quality: 0.68 },
+  { maxEdge: 1024, quality: 0.6 },
+];
+const COMPACT_SOFT_TARGET_BYTES = 1 * 1024 * 1024;
 
 interface PdfImageSource {
   name: string;
@@ -60,6 +78,57 @@ function getPartFileName(baseName: string, partIndex: number, totalParts: number
 function normalizeMaxPartSize(maxPartSizeBytes: number): number {
   if (!Number.isFinite(maxPartSizeBytes)) return DEFAULT_MAX_PDF_PART_BYTES;
   return Math.max(Math.floor(maxPartSizeBytes), MIN_PART_SIZE_BYTES);
+}
+
+// Returns the EXIF orientation tag value; 1 means upright (or no EXIF).
+function readJpegOrientation(bytes: Uint8Array): number {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return 1;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 2;
+  while (offset + 4 <= bytes.length) {
+    if (bytes[offset] !== 0xff) return 1;
+    const marker = bytes[offset + 1];
+    // Start-of-scan or end-of-image: no EXIF segment ahead.
+    if (marker === 0xda || marker === 0xd9) return 1;
+    const segmentLength = view.getUint16(offset + 2, false);
+    if (segmentLength < 2) return 1;
+    const isExifApp1 = marker === 0xe1
+      && offset + 10 <= bytes.length
+      && bytes[offset + 4] === 0x45 // 'Exif\0\0'
+      && bytes[offset + 5] === 0x78
+      && bytes[offset + 6] === 0x69
+      && bytes[offset + 7] === 0x66
+      && bytes[offset + 8] === 0x00
+      && bytes[offset + 9] === 0x00;
+    if (isExifApp1) {
+      const tiff = offset + 10;
+      if (tiff + 8 > bytes.length) return 1;
+      const littleEndian = view.getUint16(tiff, false) === 0x4949;
+      const ifd = tiff + view.getUint32(tiff + 4, littleEndian);
+      if (ifd + 2 > bytes.length) return 1;
+      const entryCount = view.getUint16(ifd, littleEndian);
+      for (let i = 0; i < entryCount; i += 1) {
+        const entry = ifd + 2 + i * 12;
+        if (entry + 12 > bytes.length) return 1;
+        if (view.getUint16(entry, littleEndian) === 0x0112) {
+          return view.getUint16(entry + 8, littleEndian);
+        }
+      }
+      return 1;
+    }
+    offset += 2 + segmentLength;
+  }
+  return 1;
+}
+
+// Byte-for-byte pass-through for upright camera JPEGs, so the PDF page keeps
+// the exact photo pixels; returns null when the file needs re-encoding.
+async function tryPassThroughJpeg(image: File): Promise<File | null> {
+  if (image.type !== 'image/jpeg' || image.size > JPEG_PASS_THROUGH_MAX_BYTES) return null;
+  const bytes = new Uint8Array(await image.arrayBuffer());
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  if (readJpegOrientation(bytes) !== 1) return null;
+  return image;
 }
 
 async function decodeImageFile(file: File): Promise<ImageBitmap> {
@@ -203,17 +272,63 @@ function estimateSourcePdfContribution(source: PdfImageSource): number {
   return Math.ceil(source.bytes.byteLength * PDF_IMAGE_ESTIMATE_MULTIPLIER);
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await fn(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function prepareSingleImage(image: File, mode: ImagePrepareMode): Promise<File> {
+  if (mode === 'quality') {
+    const passThrough = await tryPassThroughJpeg(image);
+    if (passThrough) return passThrough;
+  }
+
+  const profiles = mode === 'compact' ? COMPACT_PROFILES : CONVERSION_PROFILES;
+  const softTarget = mode === 'compact' ? COMPACT_SOFT_TARGET_BYTES : PREPARED_IMAGE_SOFT_TARGET_BYTES;
+
+  let selectedSource: PdfImageSource | null = null;
+  for (const profile of profiles) {
+    const source = await readImageSource(image, profile);
+    selectedSource = source;
+    if (source.bytes.byteLength <= softTarget) {
+      break;
+    }
+  }
+
+  if (!selectedSource) {
+    throw new Error(`prepare_image_failed:${image.name}`);
+  }
+
+  const preparedName = image.name.replace(/\.[^/.]+$/, '.jpg');
+  return new File([selectedSource.bytes], preparedName, {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  });
+}
+
 export async function prepareImagesForPdf(
   images: File[],
   onProgress?: (progress: PreparedImageProgress) => void,
+  mode: ImagePrepareMode = 'quality',
 ): Promise<File[]> {
   if (!images.length) {
     throw new Error('no_images_selected');
   }
 
-  const prepared: File[] = [];
-  for (let index = 0; index < images.length; index += 1) {
-    const image = images[index];
+  return mapWithConcurrency(images, PREPARE_CONCURRENCY, async (image, index) => {
     if (!image.type.startsWith('image/')) {
       throw new Error(`unsupported_image_file:${image.name}`);
     }
@@ -225,35 +340,18 @@ export async function prepareImagesForPdf(
       status: 'processing',
     });
 
-    let selectedSource: PdfImageSource | null = null;
-    for (const profile of CONVERSION_PROFILES) {
-      const source = await readImageSource(image, profile);
-      selectedSource = source;
-      if (source.bytes.byteLength <= PREPARED_IMAGE_SOFT_TARGET_BYTES) {
-        break;
-      }
-    }
-
-    if (!selectedSource) {
-      throw new Error(`prepare_image_failed:${image.name}`);
-    }
-
-    const preparedName = image.name.replace(/\.[^/.]+$/, '.jpg');
-    prepared.push(new File([selectedSource.bytes], preparedName, {
-      type: 'image/jpeg',
-      lastModified: Date.now(),
-    }));
+    const prepared = await prepareSingleImage(image, mode);
 
     onProgress?.({
       index,
       total: images.length,
       name: image.name,
       status: 'done',
-      outputBytes: selectedSource.bytes.byteLength,
+      outputBytes: prepared.size,
     });
-  }
 
-  return prepared;
+    return prepared;
+  });
 }
 
 function buildInitialGroups(sources: PdfImageSource[], maxPartSizeBytes: number): PdfImageSource[][] {
