@@ -34,17 +34,6 @@ const CONVERSION_PROFILES: ConversionProfile[] = [
   { maxEdge: 512, quality: 0.5 },
 ];
 
-// 'quality' keeps camera pixels when possible; 'compact' always re-encodes
-// small for slow connections, trading line sharpness for ~3x faster uploads.
-export type ImagePrepareMode = 'quality' | 'compact';
-
-const COMPACT_PROFILES: ConversionProfile[] = [
-  { maxEdge: 1600, quality: 0.75 },
-  { maxEdge: 1280, quality: 0.68 },
-  { maxEdge: 1024, quality: 0.6 },
-];
-const COMPACT_SOFT_TARGET_BYTES = 1 * 1024 * 1024;
-
 interface PdfImageSource {
   name: string;
   bytes: Uint8Array<ArrayBuffer>;
@@ -316,20 +305,15 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function prepareSingleImage(image: File, mode: ImagePrepareMode): Promise<File> {
-  if (mode === 'quality') {
-    const passThrough = await tryPassThroughJpeg(image);
-    if (passThrough) return passThrough;
-  }
-
-  const profiles = mode === 'compact' ? COMPACT_PROFILES : CONVERSION_PROFILES;
-  const softTarget = mode === 'compact' ? COMPACT_SOFT_TARGET_BYTES : PREPARED_IMAGE_SOFT_TARGET_BYTES;
+async function prepareSingleImage(image: File): Promise<File> {
+  const passThrough = await tryPassThroughJpeg(image);
+  if (passThrough) return passThrough;
 
   let selectedSource: PdfImageSource | null = null;
-  for (const profile of profiles) {
+  for (const profile of CONVERSION_PROFILES) {
     const source = await readImageSource(image, profile);
     selectedSource = source;
-    if (source.bytes.byteLength <= softTarget) {
+    if (source.bytes.byteLength <= PREPARED_IMAGE_SOFT_TARGET_BYTES) {
       break;
     }
   }
@@ -348,7 +332,6 @@ async function prepareSingleImage(image: File, mode: ImagePrepareMode): Promise<
 export async function prepareImagesForPdf(
   images: File[],
   onProgress?: (progress: PreparedImageProgress) => void,
-  mode: ImagePrepareMode = 'quality',
 ): Promise<File[]> {
   if (!images.length) {
     throw new Error('no_images_selected');
@@ -366,7 +349,7 @@ export async function prepareImagesForPdf(
       status: 'processing',
     });
 
-    const prepared = await prepareSingleImage(image, mode);
+    const prepared = await prepareSingleImage(image);
 
     onProgress?.({
       index,
