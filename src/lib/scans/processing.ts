@@ -209,24 +209,43 @@ function renderWarpedCanvas(sourceCanvas: HTMLCanvasElement, adjustments: ScanAd
   if (!outputCtx) throw new Error('canvas_context_unavailable');
   const output = outputCtx.createImageData(outputWidth, outputHeight);
 
+  const sourceWidth = sourceCanvas.width;
+  const sourceHeight = sourceCanvas.height;
+  const data = sourceData.data;
   for (let y = 0; y < outputHeight; y += 1) {
     for (let x = 0; x < outputWidth; x += 1) {
       const denom = h[6] * x + h[7] * y + 1;
-      const sx = Math.round((h[0] * x + h[1] * y + h[2]) / denom);
-      const sy = Math.round((h[3] * x + h[4] * y + h[5]) / denom);
+      const sx = (h[0] * x + h[1] * y + h[2]) / denom;
+      const sy = (h[3] * x + h[4] * y + h[5]) / denom;
       const targetIndex = (y * outputWidth + x) * 4;
-      if (sx < 0 || sx >= sourceCanvas.width || sy < 0 || sy >= sourceCanvas.height) {
+      if (sx < 0 || sx > sourceWidth - 1 || sy < 0 || sy > sourceHeight - 1) {
         output.data[targetIndex] = 255;
         output.data[targetIndex + 1] = 255;
         output.data[targetIndex + 2] = 255;
         output.data[targetIndex + 3] = 255;
         continue;
       }
-      const sourceIndex = (sy * sourceCanvas.width + sx) * 4;
+      // Bilinear sampling: rounding to the nearest source pixel makes thin
+      // document lines step sideways one whole pixel at a time, which reads
+      // as short broken segments after even a slight perspective warp.
+      const x0 = Math.floor(sx);
+      const y0 = Math.floor(sy);
+      const x1 = Math.min(x0 + 1, sourceWidth - 1);
+      const y1 = Math.min(y0 + 1, sourceHeight - 1);
+      const fx = sx - x0;
+      const fy = sy - y0;
+      const w00 = (1 - fx) * (1 - fy);
+      const w10 = fx * (1 - fy);
+      const w01 = (1 - fx) * fy;
+      const w11 = fx * fy;
+      const i00 = (y0 * sourceWidth + x0) * 4;
+      const i10 = (y0 * sourceWidth + x1) * 4;
+      const i01 = (y1 * sourceWidth + x0) * 4;
+      const i11 = (y1 * sourceWidth + x1) * 4;
       const [r, g, b] = enhancePixel(
-        sourceData.data[sourceIndex],
-        sourceData.data[sourceIndex + 1],
-        sourceData.data[sourceIndex + 2],
+        data[i00] * w00 + data[i10] * w10 + data[i01] * w01 + data[i11] * w11,
+        data[i00 + 1] * w00 + data[i10 + 1] * w10 + data[i01 + 1] * w01 + data[i11 + 1] * w11,
+        data[i00 + 2] * w00 + data[i10 + 2] * w10 + data[i01 + 2] * w01 + data[i11 + 2] * w11,
         adjustments,
       );
       output.data[targetIndex] = r;
