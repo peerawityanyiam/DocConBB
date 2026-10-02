@@ -84,7 +84,7 @@ export default async function Home() {
             ))}
           </div>
 
-          <HomeShortcuts canManage={canManageShortcuts} isGuest={isGuest} />
+          <HomeShortcuts canManage={canManageShortcuts} />
         </div>
       </div>
 
