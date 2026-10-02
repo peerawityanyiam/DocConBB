@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { AUTH_CONFIG } from '@/lib/auth/config';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo, useState } from 'react';
 
@@ -17,6 +18,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 function LoginContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
+  const nextParam = searchParams.get('next');
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
   const [loadingMode, setLoadingMode] = useState<'login' | null>(null);
   const [localError, setLocalError] = useState('');
 
@@ -49,7 +52,9 @@ function LoginContent() {
             ...AUTH_CONFIG.oauthQueryParams,
             prompt: 'select_account',
           },
-          redirectTo: `${window.location.origin}/callback`,
+          redirectTo: next
+            ? `${window.location.origin}/callback?next=${encodeURIComponent(next)}`
+            : `${window.location.origin}/callback`,
         },
       });
     } catch {
@@ -95,6 +100,12 @@ function LoginContent() {
             </div>
           </div>
 
+          {next && !errorMessage && (
+            <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              กรุณาเข้าสู่ระบบเพื่อใช้งานส่วนนี้
+            </div>
+          )}
+
           {errorMessage && (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {errorMessage}
@@ -108,6 +119,13 @@ function LoginContent() {
           >
             {loadingMode === 'login' ? 'กำลังเชื่อมต่อ...' : 'เข้าสู่ระบบด้วย Google'}
           </button>
+
+          <Link
+            href="/"
+            className="mt-3 block w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            เข้าใช้งานโดยไม่เข้าสู่ระบบ
+          </Link>
 
           <p className="mt-4 text-center text-xs text-slate-500">
             ใช้บัญชี @medicine.psu.ac.th เท่านั้น

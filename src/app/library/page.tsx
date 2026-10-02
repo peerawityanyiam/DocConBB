@@ -5,8 +5,7 @@ import { buildDocumentControlUrl } from '@/lib/google-apps-script/document-contr
 export const dynamic = 'force-dynamic';
 
 export default async function LibraryPage() {
+  // Guests are allowed: the GAS enforces its own Google Workspace login.
   const user = await getAuthUser('hub');
-  if (!user) redirect('/login');
-
-  redirect(buildDocumentControlUrl(user.email));
+  redirect(buildDocumentControlUrl(user?.email));
 }

@@ -3,6 +3,15 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { generateRequestId } from '@/lib/ops/observability';
 
 const PUBLIC_PATHS = ['/login', '/callback', '/api/cron', '/api/health'];
+// Exact-match paths guests may open without logging in.
+// /library only redirects to the Document Control GAS, which has its own Google login.
+const GUEST_PATHS = new Set(['/', '/library']);
+
+function isGuestAllowed(request: NextRequest): boolean {
+  const { pathname } = request.nextUrl;
+  if (GUEST_PATHS.has(pathname)) return true;
+  return pathname === '/api/shortcuts' && request.method === 'GET';
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -54,8 +63,16 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
+    if (isGuestAllowed(request)) return supabaseResponse;
+    if (pathname.startsWith('/api/')) {
+      const response = NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+      response.headers.set('x-request-id', requestId);
+      return response;
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.search = '';
+    url.searchParams.set('next', pathname + request.nextUrl.search);
     const response = NextResponse.redirect(url);
     response.headers.set('x-request-id', requestId);
     return response;

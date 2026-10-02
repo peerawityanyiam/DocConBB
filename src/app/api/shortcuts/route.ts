@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { AuthError, getAuthUser, handleAuthError, hasGlobalRole } from '@/lib/auth/guards';
 import { SHORTCUT_ICONS } from '@/lib/shortcuts/icons';
+import { SHORTCUT_COLUMNS } from '@/lib/shortcuts/columns';
 
 const MAX_LABEL_LEN = 60;
 const MAX_URL_LEN = 2048;
@@ -22,17 +23,19 @@ function badRequest(message: string) {
   return NextResponse.json({ error: 'bad_request', message }, { status: 400 });
 }
 
-// GET /api/shortcuts — everyone signed in; returns active shortcuts ordered.
+// GET /api/shortcuts — returns active shortcuts ordered.
+// Guests (no session) only get shortcuts marked show_to_guests.
 export async function GET() {
   try {
     const user = await getAuthUser('hub');
-    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
     const admin = await createServiceRoleClient();
-    const { data, error } = await admin
+    let query = admin
       .from('external_shortcuts')
-      .select('id, label, url, icon_key, sort_order, is_active, created_at, updated_at')
-      .eq('is_active', true)
+      .select(SHORTCUT_COLUMNS)
+      .eq('is_active', true);
+    if (!user) query = query.eq('show_to_guests', true);
+    const { data, error } = await query
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
     if (error) throw error;
@@ -56,6 +59,7 @@ export async function POST(request: NextRequest) {
       label?: string;
       url?: string;
       icon_key?: string | null;
+      show_to_guests?: boolean;
     };
 
     const label = typeof body.label === 'string' ? body.label.trim() : '';
@@ -103,9 +107,10 @@ export async function POST(request: NextRequest) {
         icon_key: iconKey,
         sort_order: nextSort,
         is_active: true,
+        show_to_guests: body.show_to_guests === true,
         created_by: user.id,
       })
-      .select('id, label, url, icon_key, sort_order, is_active, created_at, updated_at')
+      .select(SHORTCUT_COLUMNS)
       .single();
     if (error) throw error;
 

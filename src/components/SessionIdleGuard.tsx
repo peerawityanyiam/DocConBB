@@ -30,6 +30,22 @@ export default function SessionIdleGuard() {
     [pathname],
   );
 
+  // Guests may browse some pages (e.g. home) without a session — no idle logout for them.
+  const [hasSession, setHasSession] = useState(false);
+  const isInactive = isPublicPath || !hasSession;
+
+  useEffect(() => {
+    if (isPublicPath) return;
+    let cancelled = false;
+    const supabase = createClient();
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) setHasSession(Boolean(session));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPublicPath, pathname]);
+
   const [warningVisible, setWarningVisible] = useState(false);
   const [countdownMs, setCountdownMs] = useState(IDLE_WARNING_MS);
 
@@ -121,7 +137,7 @@ export default function SessionIdleGuard() {
   );
 
   useEffect(() => {
-    if (isPublicPath) {
+    if (isInactive) {
       setWarningVisible(false);
       return;
     }
@@ -216,9 +232,9 @@ export default function SessionIdleGuard() {
         channelRef.current = null;
       }
     };
-  }, [clearLogoutSignal, isPublicPath, markActivity, readLastActivityAt, signOutForIdle, writeLastActivityAt]);
+  }, [clearLogoutSignal, isInactive, markActivity, readLastActivityAt, signOutForIdle, writeLastActivityAt]);
 
-  if (isPublicPath || !warningVisible) return null;
+  if (isInactive || !warningVisible) return null;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 px-4">

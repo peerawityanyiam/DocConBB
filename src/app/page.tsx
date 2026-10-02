@@ -1,5 +1,4 @@
 ﻿import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { getAuthUser, hasGlobalRole } from '@/lib/auth/guards';
 import PWAInstallButton from '@/components/PWAInstallButton';
 import LogoutButton from './LogoutButton';
@@ -23,11 +22,12 @@ const cards = [
 ];
 
 export default async function Home() {
+  // Guests (no session) may view the hub; modules behind the cards still require login via proxy.
   const user = await getAuthUser('hub');
-  if (!user) redirect('/login');
+  const isGuest = !user;
   // Hub isn't a project slug, so user.roles is typically empty here.
   // Check SUPER_ADMIN across any project assignment + legacy roles.
-  const canManageShortcuts = await hasGlobalRole(user.id, ['SUPER_ADMIN']);
+  const canManageShortcuts = user ? await hasGlobalRole(user.id, ['SUPER_ADMIN']) : false;
 
   return (
     <div
@@ -37,11 +37,20 @@ export default async function Home() {
       <nav className="fixed left-0 right-0 top-0 z-50 bg-[#212529] shadow-sm" style={{ height: '45px' }}>
         <div className="mx-auto flex h-full max-w-[900px] items-center justify-between px-5">
           <span className="min-w-0 flex-1 truncate pr-3 text-sm font-normal tracking-wide text-white/80">
-            {user.email}
+            {user ? user.email : 'ผู้เยี่ยมชม'}
           </span>
           <div className="flex shrink-0 items-center gap-2">
             <PWAInstallButton />
-            <LogoutButton />
+            {isGuest ? (
+              <Link
+                href="/login"
+                className="rounded border border-white/30 px-3 py-1 text-xs font-semibold text-white no-underline transition-colors hover:bg-white/10"
+              >
+                เข้าสู่ระบบ
+              </Link>
+            ) : (
+              <LogoutButton />
+            )}
           </div>
         </div>
       </nav>
@@ -75,7 +84,7 @@ export default async function Home() {
             ))}
           </div>
 
-          <HomeShortcuts canManage={canManageShortcuts} />
+          <HomeShortcuts canManage={canManageShortcuts} isGuest={isGuest} />
         </div>
       </div>
 

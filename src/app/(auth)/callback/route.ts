@@ -6,7 +6,11 @@ import { isAllowedEmail, AUTH_CONFIG } from '@/lib/auth/config';
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? AUTH_CONFIG.defaultRedirect;
+  // Only allow same-origin relative paths to avoid an open redirect.
+  const nextParam = searchParams.get('next');
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+    ? nextParam
+    : AUTH_CONFIG.defaultRedirect;
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);

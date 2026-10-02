@@ -11,10 +11,12 @@ export interface Shortcut {
   icon_key: string | null;
   sort_order: number;
   is_active: boolean;
+  show_to_guests: boolean;
 }
 
 interface HomeShortcutsProps {
   canManage: boolean;
+  isGuest?: boolean;
 }
 
 type DraftState = {
@@ -22,9 +24,10 @@ type DraftState = {
   label: string;
   url: string;
   icon_key: string | null;
+  show_to_guests: boolean;
 };
 
-const EMPTY_DRAFT: DraftState = { id: null, label: '', url: '', icon_key: null };
+const EMPTY_DRAFT: DraftState = { id: null, label: '', url: '', icon_key: null, show_to_guests: false };
 
 const FIXED_RELATED_LINKS = [
   {
@@ -32,10 +35,11 @@ const FIXED_RELATED_LINKS = [
     label: 'สแกนเอกสารเป็น PDF',
     href: '/scan',
     icon: '📷',
+    requiresLogin: true,
   },
 ];
 
-export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
+export default function HomeShortcuts({ canManage, isGuest = false }: HomeShortcutsProps) {
   const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -85,6 +89,9 @@ export default function HomeShortcuts({ canManage }: HomeShortcutsProps) {
               {link.icon}
             </span>
             <span className="min-w-0 flex-1 truncate">{link.label}</span>
+            {isGuest && link.requiresLogin && (
+              <span className="flex-none text-xs text-slate-400">🔒 ต้องเข้าสู่ระบบ</span>
+            )}
             <span className="flex-none text-sm text-slate-300 transition-colors group-hover:text-[#c5a059]">
               →
             </span>
@@ -151,7 +158,7 @@ function AdminModal({ shortcuts, onClose, onChanged }: AdminModalProps) {
   const [error, setError] = useState('');
 
   function startEdit(s: Shortcut) {
-    setDraft({ id: s.id, label: s.label, url: s.url, icon_key: s.icon_key });
+    setDraft({ id: s.id, label: s.label, url: s.url, icon_key: s.icon_key, show_to_guests: s.show_to_guests });
     setError('');
   }
 
@@ -187,7 +194,7 @@ function AdminModal({ shortcuts, onClose, onChanged }: AdminModalProps) {
         {
           method: isEditing ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label, url, icon_key: draft.icon_key }),
+          body: JSON.stringify({ label, url, icon_key: draft.icon_key, show_to_guests: draft.show_to_guests }),
         },
       );
       if (!res.ok) {
@@ -282,7 +289,14 @@ function AdminModal({ shortcuts, onClose, onChanged }: AdminModalProps) {
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <span className="w-5 text-base leading-none">{emoji ?? ''}</span>
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-slate-800">{s.label}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-medium text-slate-800">{s.label}</span>
+                            {s.show_to_guests && (
+                              <span className="flex-none rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-700">
+                                ผู้เยี่ยมชมเห็น
+                              </span>
+                            )}
+                          </div>
                           <div className="truncate text-xs text-slate-400">{s.url}</div>
                         </div>
                       </div>
@@ -389,6 +403,16 @@ function AdminModal({ shortcuts, onClose, onChanged }: AdminModalProps) {
                   })}
                 </div>
               </div>
+
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={draft.show_to_guests}
+                  onChange={(e) => setDraft((d) => ({ ...d, show_to_guests: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 accent-[#003366]"
+                />
+                แสดงให้ผู้เยี่ยมชม (ไม่ต้อง login)
+              </label>
 
               {/* Preview */}
               <div>

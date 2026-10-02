@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { AuthError, getAuthUser, handleAuthError, hasGlobalRole } from '@/lib/auth/guards';
 import { SHORTCUT_ICONS } from '@/lib/shortcuts/icons';
+import { SHORTCUT_COLUMNS } from '@/lib/shortcuts/columns';
 
 const MAX_LABEL_LEN = 60;
 const MAX_URL_LEN = 2048;
@@ -21,7 +22,7 @@ function badRequest(message: string) {
   return NextResponse.json({ error: 'bad_request', message }, { status: 400 });
 }
 
-// PATCH /api/shortcuts/[id] — update label/url/icon/sort_order/is_active.
+// PATCH /api/shortcuts/[id] — update label/url/icon/sort_order/is_active/show_to_guests.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -42,6 +43,7 @@ export async function PATCH(
       icon_key?: string | null;
       sort_order?: number;
       is_active?: boolean;
+      show_to_guests?: boolean;
     };
 
     const updates: Record<string, unknown> = {};
@@ -75,6 +77,9 @@ export async function PATCH(
     if (typeof body.is_active === 'boolean') {
       updates.is_active = body.is_active;
     }
+    if (typeof body.show_to_guests === 'boolean') {
+      updates.show_to_guests = body.show_to_guests;
+    }
 
     if (Object.keys(updates).length === 0) {
       return badRequest('no fields to update');
@@ -85,7 +90,7 @@ export async function PATCH(
       .from('external_shortcuts')
       .update(updates)
       .eq('id', id)
-      .select('id, label, url, icon_key, sort_order, is_active, created_at, updated_at')
+      .select(SHORTCUT_COLUMNS)
       .single();
     if (error) throw error;
 
