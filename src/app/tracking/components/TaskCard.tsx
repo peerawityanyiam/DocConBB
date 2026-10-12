@@ -165,9 +165,10 @@ function PipelineBar({ status }: { status: TaskStatus }) {
   const isCancelled = status === 'CANCELLED';
 
   return (
-    <div className="flex items-center gap-0 mt-2 mb-1 overflow-x-auto" style={{ padding: '4px 0 2px' }}>
+    <div className="flex items-start mt-2 mb-1 overflow-x-auto" style={{ padding: '4px 0' }}>
       {PIPELINE_STAGES.map((stage, i) => {
         const isDone = !isCancelled && currentIdx > i;
+        const nextDone = !isCancelled && currentIdx > i + 1;
         const isCurrent = currentIdx === i;
         const isUpcoming = isCancelled || currentIdx < i;
 
@@ -187,19 +188,25 @@ function PipelineBar({ status }: { status: TaskStatus }) {
           labelColor = 'text-[#00c2a8] font-bold';
         }
 
-        const lineColor = isDone ? 'bg-[#10b981]' : 'bg-[#e2e8f0]';
+        // Each stage is an equal-width column with the dot centered; connector halves
+        // run from the column edges to the dot so labels never overflow the bar.
+        const leftLineColor = isDone ? 'bg-[#10b981]' : 'bg-[#e2e8f0]';
+        const rightLineColor = nextDone ? 'bg-[#10b981]' : 'bg-[#e2e8f0]';
 
         return (
-          <div key={stage.key} className="flex items-center" style={{ flex: 1, minWidth: '48px' }}>
-            {i > 0 && <div className={`h-0.5 ${lineColor}`} style={{ flex: 1, minWidth: '8px', marginBottom: '16px' }} />}
-            <div className={`flex flex-col items-center shrink-0 gap-1 ${dotOpacity}`}>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[0.65rem] border-2 ${dotBg}`}>
-                {isDone ? '✓' : stage.icon}
-              </div>
-              <span className={`text-[0.6rem] ${labelColor} text-center whitespace-nowrap`} style={{ fontWeight: 500 }}>
-                {stage.label}
-              </span>
+          <div key={stage.key} className="relative flex flex-col items-center gap-1" style={{ flex: 1, minWidth: '52px' }}>
+            {i > 0 && (
+              <div className={`absolute h-0.5 ${leftLineColor}`} style={{ top: '13px', left: 0, right: 'calc(50% + 14px)' }} />
+            )}
+            {i < PIPELINE_STAGES.length - 1 && (
+              <div className={`absolute h-0.5 ${rightLineColor}`} style={{ top: '13px', left: 'calc(50% + 14px)', right: 0 }} />
+            )}
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[0.65rem] border-2 ${dotBg} ${dotOpacity}`}>
+              {isDone ? '✓' : stage.icon}
             </div>
+            <span className={`text-[0.6rem] leading-normal ${labelColor} ${dotOpacity} text-center whitespace-nowrap`} style={{ fontWeight: 500 }}>
+              {stage.label}
+            </span>
           </div>
         );
       })}
