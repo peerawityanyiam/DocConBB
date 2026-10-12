@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
 import type { AppRole } from '@/lib/auth/guards';
 import { STATUS_LABELS, type TaskStatus } from '@/lib/constants/status';
@@ -165,12 +165,13 @@ function PipelineBar({ status }: { status: TaskStatus }) {
   const isCancelled = status === 'CANCELLED';
 
   return (
-    <div className="flex items-start mt-2 mb-1 overflow-x-auto" style={{ padding: '4px 0' }}>
+    <div className="flex items-start mt-2 mb-1 pt-1 pb-5">
       {PIPELINE_STAGES.map((stage, i) => {
         const isDone = !isCancelled && currentIdx > i;
-        const nextDone = !isCancelled && currentIdx > i + 1;
         const isCurrent = currentIdx === i;
         const isUpcoming = isCancelled || currentIdx < i;
+        const isFirst = i === 0;
+        const isLast = i === PIPELINE_STAGES.length - 1;
 
         let dotBg = 'bg-[#f8fafc] border-[#e2e8f0] text-[#6b7f96]';
         let labelColor = 'text-[#6b7f96]';
@@ -188,26 +189,25 @@ function PipelineBar({ status }: { status: TaskStatus }) {
           labelColor = 'text-[#00c2a8] font-bold';
         }
 
-        // Each stage is an equal-width column with the dot centered; connector halves
-        // run from the column edges to the dot so labels never overflow the bar.
-        const leftLineColor = isDone ? 'bg-[#10b981]' : 'bg-[#e2e8f0]';
-        const rightLineColor = nextDone ? 'bg-[#10b981]' : 'bg-[#e2e8f0]';
+        const lineColor = isDone ? 'bg-[#10b981]' : 'bg-[#e2e8f0]';
+        // First/last labels hug the edges so the bar spans the full width without overflowing.
+        const labelPosition = isFirst ? 'left-0' : isLast ? 'right-0' : 'left-1/2 -translate-x-1/2';
 
         return (
-          <div key={stage.key} className="relative flex flex-col items-center gap-1" style={{ flex: 1, minWidth: '52px' }}>
-            {i > 0 && (
-              <div className={`absolute h-0.5 ${leftLineColor}`} style={{ top: '13px', left: 0, right: 'calc(50% + 14px)' }} />
-            )}
-            {i < PIPELINE_STAGES.length - 1 && (
-              <div className={`absolute h-0.5 ${rightLineColor}`} style={{ top: '13px', left: 'calc(50% + 14px)', right: 0 }} />
-            )}
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[0.65rem] border-2 ${dotBg} ${dotOpacity}`}>
-              {isDone ? '✓' : stage.icon}
+          <Fragment key={stage.key}>
+            {i > 0 && <div className={`h-0.5 flex-1 mt-[13px] ${lineColor}`} />}
+            <div className="relative shrink-0">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[0.65rem] border-2 ${dotBg} ${dotOpacity}`}>
+                {isDone ? '✓' : stage.icon}
+              </div>
+              <span
+                className={`absolute top-full mt-1 ${labelPosition} text-[0.6rem] leading-normal ${labelColor} ${dotOpacity} whitespace-nowrap`}
+                style={{ fontWeight: 500 }}
+              >
+                {stage.label}
+              </span>
             </div>
-            <span className={`text-[0.6rem] leading-normal ${labelColor} ${dotOpacity} text-center whitespace-nowrap`} style={{ fontWeight: 500 }}>
-              {stage.label}
-            </span>
-          </div>
+          </Fragment>
         );
       })}
     </div>
