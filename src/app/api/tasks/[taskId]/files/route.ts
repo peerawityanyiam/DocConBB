@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthUser, AuthError, handleAuthError } from '@/lib/auth/guards';
-import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists, trashFile } from '@/lib/google-drive/files';
+import { uploadFile, getOrCreateFolder, deleteFilePermanent, checkFolderExists, trashFile, archiveFile } from '@/lib/google-drive/files';
 import { setFilePublic } from '@/lib/google-drive/permissions';
 import { MAX_DIRECT_UPLOAD_FILE_SIZE_BYTES, MAX_DIRECT_UPLOAD_FILE_SIZE_LABEL } from '@/lib/files/upload-limits';
 import { getRequestIdFromHeaders, logEvent } from '@/lib/ops/observability';
@@ -218,19 +218,13 @@ export async function POST(
     const updates: Record<string, unknown> = { updated_at: now };
     const cleanupWarnings: string[] = [];
 
-    async function removeOldFile(fileId: string, label: 'DOCX' | 'PDF') {
+    // Keep superseded files (moved to "ฉบับเก่า") so file history stays downloadable.
+    async function archiveOldFile(fileId: string, label: 'DOCX' | 'PDF', parentFolderId: string) {
       try {
-        await deleteFilePermanent(fileId);
-        return;
-      } catch (deleteErr) {
-        console.warn(`[FILE_UPLOAD] Permanent delete failed for ${label} ${fileId}, fallback to trash`, deleteErr);
-      }
-
-      try {
-        await trashFile(fileId);
-      } catch (trashErr) {
-        console.error(`[FILE_UPLOAD] Failed to remove old ${label} ${fileId}`, trashErr);
-        cleanupWarnings.push(`remove_old_${label.toLowerCase()}_failed`);
+        await archiveFile(fileId, parentFolderId);
+      } catch (archiveErr) {
+        console.warn(`[FILE_UPLOAD] Failed to archive old ${label} ${fileId}; left in place`, archiveErr);
+        cleanupWarnings.push(`archive_old_${label.toLowerCase()}_failed`);
       }
     }
 
@@ -294,7 +288,7 @@ export async function POST(
     } else {
       const oldDocxId = task.drive_file_id ?? latestOldDocxFromHistory;
       if (oldDocxId && oldDocxId !== driveFileId) {
-        await removeOldFile(oldDocxId, 'DOCX');
+        await archiveOldFile(oldDocxId, 'DOCX', taskFolderId);
       }
       updates.drive_file_id = driveFileId;
       updates.drive_file_name = driveFileName;

@@ -712,6 +712,10 @@ export default function TaskDetailPage({ taskId, userRoles, userId }: { taskId: 
                   {f.isPdf && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">PDF</span>
                   )}
+                  <a href={`/api/tasks/${task.id}/files/download?fileId=${encodeURIComponent(f.driveFileId ?? '')}`}target="_blank" rel="noopener noreferrer" title="ดาวน์โหลด"
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800">
+                    ⬇ ดาวน์โหลด
+                  </a>
                 </div>
               ))
             )}

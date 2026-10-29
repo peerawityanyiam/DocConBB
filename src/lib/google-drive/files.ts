@@ -170,6 +170,26 @@ export async function trashFile(fileId: string): Promise<void> {
   });
 }
 
+export const ARCHIVE_FOLDER_NAME = 'ฉบับเก่า';
+
+/** Move a superseded file into the "ฉบับเก่า" subfolder of parentFolderId so file history stays downloadable. */
+export async function archiveFile(fileId: string, parentFolderId: string): Promise<void> {
+  const archiveFolderId = await getOrCreateFolder(parentFolderId, ARCHIVE_FOLDER_NAME);
+  const meta = await drive().files.get({
+    fileId,
+    fields: 'parents',
+    supportsAllDrives: true,
+  });
+  const currentParents = (meta.data.parents ?? []).filter((id) => id !== archiveFolderId);
+  if (currentParents.length === 0) return;
+  await drive().files.update({
+    fileId,
+    addParents: archiveFolderId,
+    removeParents: currentParents.join(','),
+    supportsAllDrives: true,
+  });
+}
+
 export async function deleteFilePermanent(fileId: string): Promise<void> {
   await drive().files.delete({
     fileId,
